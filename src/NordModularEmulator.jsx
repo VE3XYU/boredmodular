@@ -501,7 +501,7 @@ function ModuleNode({
             isOutput={false}
             isMod={isMod}
             isConnected={connectedPorts.has(`in:${port}`)}
-            onMouseDown={() => {}}
+            onMouseDown={(e) => onPortDragStart(e, moduleState.id, port, false)}
             onMouseUp={(e) => onPortDragEnd(e, moduleState.id, port, false)}
           />
         );
@@ -522,7 +522,7 @@ function ModuleNode({
             isMod={false}
             isConnected={connectedPorts.has(`out:${port}`)}
             onMouseDown={(e) => onPortDragStart(e, moduleState.id, port, true)}
-            onMouseUp={() => {}}
+            onMouseUp={(e) => onPortDragEnd(e, moduleState.id, port, true)}
           />
         );
       })}
@@ -770,21 +770,33 @@ export default function NordModularEmulator() {
   const handlePortDragEnd = useCallback(
     (e, moduleId, portName, isOutput) => {
       if (!cableDrag) return;
-      // Must connect output -> input
+      // Normalize: one side must be output, the other input
+      let outId, outPort, inId, inPort;
       if (cableDrag.isOutput && !isOutput) {
-        const success = engineRef.current.connect(cableDrag.fromId, cableDrag.fromPort, moduleId, portName);
-        if (success) {
-          setConnections((prev) => [
-            ...prev,
-            {
-              fromId: cableDrag.fromId,
-              fromPort: cableDrag.fromPort,
-              toId: moduleId,
-              toPort: portName,
-              color: `hsl(${Math.random() * 360}, 70%, 55%)`,
-            },
-          ]);
-        }
+        // Dragged from output to input (normal)
+        outId = cableDrag.fromId; outPort = cableDrag.fromPort;
+        inId = moduleId; inPort = portName;
+      } else if (!cableDrag.isOutput && isOutput) {
+        // Dragged from input to output (reverse)
+        outId = moduleId; outPort = portName;
+        inId = cableDrag.fromId; inPort = cableDrag.fromPort;
+      } else {
+        // Same type (output→output or input→input) — can't connect
+        setCableDrag(null);
+        return;
+      }
+      const success = engineRef.current.connect(outId, outPort, inId, inPort);
+      if (success) {
+        setConnections((prev) => [
+          ...prev,
+          {
+            fromId: outId,
+            fromPort: outPort,
+            toId: inId,
+            toPort: inPort,
+            color: `hsl(${Math.random() * 360}, 70%, 55%)`,
+          },
+        ]);
       }
       setCableDrag(null);
     },
@@ -906,7 +918,7 @@ export default function NordModularEmulator() {
       const p1 = getPortPosition(fromMod, c.fromPort, true);
       const p2 = getPortPosition(toMod, c.toPort, false);
       return (
-        <g key={idx} onDoubleClick={() => removeCable(idx)} style={{ cursor: "pointer" }}>
+        <g key={idx} onDoubleClick={() => removeCable(idx)} style={{ cursor: "pointer" }} pointerEvents="visibleStroke">
           <CableSVG
             x1={p1.x}
             y1={p1.y}
@@ -1134,12 +1146,53 @@ export default function NordModularEmulator() {
           ))}
 
           {/* Cables (rendered after modules, so they appear in front) */}
-          {cableElements}
+          <g pointerEvents="none">
+            {cableElements}
+          </g>
 
           {/* Dragging cable */}
           {cableDrag && (
-            <CableSVG x1={cableDrag.startX} y1={cableDrag.startY} x2={mousePos.x - panOffset.x} y2={mousePos.y - panOffset.y} color="#fff" />
+            <g pointerEvents="none">
+              <CableSVG x1={cableDrag.startX} y1={cableDrag.startY} x2={mousePos.x - panOffset.x} y2={mousePos.y - panOffset.y} color="#fff" />
+            </g>
           )}
+
+          {/* Port hit overlay — rendered last so ports are always interactive on top of cables */}
+          {modules.map((m) => {
+            const def = MODULE_DEFS[m.type];
+            const allInputs = [...(def.inputs || []), ...(def.modInputs || [])];
+            const allOutputs = def.outputs || [];
+            return (
+              <g key={`ports-${m.id}`}>
+                {allOutputs.map((port) => {
+                  const pos = getPortPosition(m, port, true);
+                  return (
+                    <circle
+                      key={`oh-${port}`}
+                      cx={pos.x} cy={pos.y} r={PORT_SIZE}
+                      fill="transparent"
+                      style={{ cursor: "pointer" }}
+                      onMouseDown={(e) => { e.stopPropagation(); handlePortDragStart(e, m.id, port, true); }}
+                      onMouseUp={(e) => { e.stopPropagation(); handlePortDragEnd(e, m.id, port, true); }}
+                    />
+                  );
+                })}
+                {allInputs.map((port) => {
+                  const pos = getPortPosition(m, port, false);
+                  return (
+                    <circle
+                      key={`ih-${port}`}
+                      cx={pos.x} cy={pos.y} r={PORT_SIZE}
+                      fill="transparent"
+                      style={{ cursor: "pointer" }}
+                      onMouseDown={(e) => { e.stopPropagation(); handlePortDragStart(e, m.id, port, false); }}
+                      onMouseUp={(e) => { e.stopPropagation(); handlePortDragEnd(e, m.id, port, false); }}
+                    />
+                  );
+                })}
+              </g>
+            );
+          })}
         </g>
 
         {/* Empty state */}
