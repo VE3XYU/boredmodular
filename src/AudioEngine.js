@@ -898,6 +898,7 @@ class AudioEngine {
       inputs: {},
       _nodes: [noteOut, gateOut, velOut],
       _gateTargetEnvelopes: [], // filled by connect/disconnect
+      _pitchTargets: [], // { audioParam, moduleId } — directly set on note play
       _currentNote: -1,
       params: {
         octave: { value: 0, min: -2, max: 4, label: "Oct" },
@@ -906,10 +907,15 @@ class AudioEngine {
       playNote: (midiNote) => {
         const octShift = kbd.params.octave.value * 12;
         const freq = NOTE_FREQ(midiNote + octShift);
-        noteOut.offset.setValueAtTime(freq, this.ctx.currentTime);
-        gateOut.offset.setValueAtTime(1, this.ctx.currentTime);
-        velOut.offset.setValueAtTime(0.8, this.ctx.currentTime);
+        const now = this.ctx.currentTime;
+        noteOut.offset.setValueAtTime(freq, now);
+        gateOut.offset.setValueAtTime(1, now);
+        velOut.offset.setValueAtTime(0.8, now);
         kbd._currentNote = midiNote;
+        // Directly set frequency on connected oscillator pitch targets
+        kbd._pitchTargets.forEach(({ audioParam }) => {
+          audioParam.setValueAtTime(freq, now);
+        });
         // Trigger connected envelopes
         kbd._gateTargetEnvelopes.forEach(envId => {
           const envMod = this.modules.get(envId);
@@ -943,6 +949,15 @@ class AudioEngine {
     const outputNode = fromMod.outputs[fromPort];
     const inputNode = toMod.inputs[toPort];
     if (!outputNode || !inputNode) return false;
+
+    // Keyboard Note -> PitchMod: use direct pitch tracking instead of audio connection
+    // (audio connection is additive, which breaks pitch control)
+    if (fromMod.type === "Keyboard" && fromPort === "Note" && inputNode instanceof AudioParam) {
+      fromMod._pitchTargets.push({ audioParam: inputNode, moduleId: toId, port: toPort });
+      this.connections.push({ fromId, fromPort, toId, toPort });
+      return true;
+    }
+
     try {
       outputNode.connect(inputNode);
       this.connections.push({ fromId, fromPort, toId, toPort });
@@ -968,13 +983,22 @@ class AudioEngine {
     const outputNode = fromMod.outputs[fromPort];
     const inputNode = toMod.inputs[toPort];
     if (!outputNode || !inputNode) return;
-    try {
-      outputNode.disconnect(inputNode);
-    } catch (e) {
-      if (e.name !== "InvalidAccessError") {
-        console.error("AudioEngine.disconnect: unexpected error", e);
+
+    // Keyboard Note pitch targets: no audio connection to undo, just remove tracking
+    if (fromMod.type === "Keyboard" && fromPort === "Note" && inputNode instanceof AudioParam) {
+      fromMod._pitchTargets = fromMod._pitchTargets.filter(
+        pt => !(pt.moduleId === toId && pt.port === toPort)
+      );
+    } else {
+      try {
+        outputNode.disconnect(inputNode);
+      } catch (e) {
+        if (e.name !== "InvalidAccessError") {
+          console.error("AudioEngine.disconnect: unexpected error", e);
+        }
       }
     }
+
     this.connections = this.connections.filter(
       (c) => !(c.fromId === fromId && c.fromPort === fromPort && c.toId === toId && c.toPort === toPort)
     );

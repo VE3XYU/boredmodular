@@ -682,13 +682,13 @@ export default function NordModularEmulator() {
 
   const savePatch = useCallback(() => {
     const patch = JSON.stringify({ modules, connections });
-    localStorage.setItem("nord-patch-1", patch);
+    localStorage.setItem("bored-patch-1", patch);
     setPatchMsg("Saved!");
     setTimeout(() => setPatchMsg(null), 1500);
   }, [modules, connections]);
 
   const loadPatch = useCallback(() => {
-    const raw = localStorage.getItem("nord-patch-1");
+    const raw = localStorage.getItem("bored-patch-1");
     if (!raw) {
       setPatchMsg("No saved patch");
       setTimeout(() => setPatchMsg(null), 1500);
@@ -708,7 +708,7 @@ export default function NordModularEmulator() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "nord-patch.json";
+    a.download = "bored-patch.json";
     a.click();
     URL.revokeObjectURL(url);
   }, [modules, connections]);
@@ -953,9 +953,9 @@ export default function NordModularEmulator() {
             borderBottom: "1px solid #222",
           }}
         >
-          <div style={{ fontSize: 11, letterSpacing: 3, color: "#666", textTransform: "uppercase" }}>Nord</div>
-          <div style={{ fontSize: 16, fontWeight: 500, color: "#e33", letterSpacing: 1 }}>Modular</div>
-          <div style={{ fontSize: 9, color: "#555", marginTop: 2 }}>Web Emulator v0.1</div>
+          <div style={{ fontSize: 11, letterSpacing: 3, color: "#666", textTransform: "uppercase" }}>bored</div>
+          <div style={{ fontSize: 16, fontWeight: 500, color: "#e33", letterSpacing: 1 }}>modular</div>
+          <div style={{ fontSize: 9, color: "#555", marginTop: 2 }}>v0.1</div>
         </div>
 
         {/* Module palette */}
@@ -1118,15 +1118,7 @@ export default function NordModularEmulator() {
         <rect width="100%" height="100%" fill="url(#grid)" />
 
         <g transform={`translate(${panOffset.x}, ${panOffset.y})`}>
-          {/* Cables */}
-          {cableElements}
-
-          {/* Dragging cable */}
-          {cableDrag && (
-            <CableSVG x1={cableDrag.startX} y1={cableDrag.startY} x2={mousePos.x - panOffset.x} y2={mousePos.y - panOffset.y} color="#fff" />
-          )}
-
-          {/* Modules */}
+          {/* Modules (rendered first, behind cables) */}
           {modules.map((m) => (
             <ModuleNode
               key={m.id}
@@ -1140,6 +1132,14 @@ export default function NordModularEmulator() {
               onRemove={removeModule}
             />
           ))}
+
+          {/* Cables (rendered after modules, so they appear in front) */}
+          {cableElements}
+
+          {/* Dragging cable */}
+          {cableDrag && (
+            <CableSVG x1={cableDrag.startX} y1={cableDrag.startY} x2={mousePos.x - panOffset.x} y2={mousePos.y - panOffset.y} color="#fff" />
+          )}
         </g>
 
         {/* Empty state */}
