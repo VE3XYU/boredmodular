@@ -20,7 +20,7 @@ function getPortPosition(moduleState, portName, isOutput) {
 
   const headerH = 32;
   const paramsH = Object.keys(moduleState.params || {}).length * 32 + 8;
-  const customH = def.hasCustomUI ? 55 : 0;
+  const customH = def.customUIHeight || 0;
   const baseY = headerH + paramsH + customH + 12;
 
   if (isOutput) {
@@ -40,7 +40,7 @@ function getModuleHeight(type, params) {
   const allInputs = [...(def.inputs || []), ...(def.modInputs || [])];
   const hasPorts = allInputs.length > 0 || (def.outputs || []).length > 0;
   const portsH = hasPorts ? 60 : 10;
-  const customH = def.hasCustomUI ? 55 : 0;
+  const customH = def.customUIHeight || 0;
   return headerH + paramsH + customH + portsH;
 }
 
@@ -225,6 +225,7 @@ function ModuleNode({
   connections,
   onParamChange,
   onRemove,
+  seqFrame,
 }) {
   const [editingParam, setEditingParam] = useState(null);
   const def = MODULE_DEFS[moduleState.type];
@@ -399,7 +400,7 @@ function ModuleNode({
         );
       })}
 
-      {/* Keyboard custom UI */}
+      {/* Custom UI renderers */}
       {moduleState.type === "Keyboard" && (() => {
         const kbY = paramsStartY + Object.keys(params).length * 32 + 12;
         const whiteKeys = PIANO_KEYS.filter(k => !k.black);
@@ -482,6 +483,195 @@ function ModuleNode({
                 />
               ));
             })()}
+          </g>
+        );
+      })()}
+
+      {/* EventSeq custom UI */}
+      {moduleState.type === "EventSeq" && (() => {
+        const seqY = paramsStartY + Object.keys(params).length * 32 + 8;
+        const mod = engine.current?.modules?.get(moduleState.id);
+        const step = mod?._currentStep || 0;
+        const cellW = MODULE_WIDTH / 16;
+        return (
+          <g>
+            {/* Step indicator */}
+            {[...Array(16)].map((_, i) => (
+              <rect key={`led-${i}`} x={i * cellW + 1} y={seqY} width={cellW - 2} height={3}
+                rx={1} fill={i === step ? "#ff0" : "#222"} />
+            ))}
+            {/* Row 1 triggers */}
+            {[...Array(16)].map((_, i) => (
+              <rect key={`t1-${i}`} x={i * cellW + 1} y={seqY + 6} width={cellW - 2} height={24}
+                rx={2} fill={mod?._triggers1[i] ? "#f84" : "#1a1a1e"} stroke="#333" strokeWidth={0.5}
+                style={{ cursor: "pointer" }}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  if (mod) { mod._triggers1[i] = !mod._triggers1[i]; onParamChange(moduleState.id, "steps", params.steps.value); }
+                }} />
+            ))}
+            {/* Row 2 triggers */}
+            {[...Array(16)].map((_, i) => (
+              <rect key={`t2-${i}`} x={i * cellW + 1} y={seqY + 33} width={cellW - 2} height={24}
+                rx={2} fill={mod?._triggers2[i] ? "#4cf" : "#1a1a1e"} stroke="#333" strokeWidth={0.5}
+                style={{ cursor: "pointer" }}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  if (mod) { mod._triggers2[i] = !mod._triggers2[i]; onParamChange(moduleState.id, "steps", params.steps.value); }
+                }} />
+            ))}
+          </g>
+        );
+      })()}
+
+      {/* CtrlSeq custom UI */}
+      {moduleState.type === "CtrlSeq" && (() => {
+        const seqY = paramsStartY + Object.keys(params).length * 32 + 8;
+        const mod = engine.current?.modules?.get(moduleState.id);
+        const step = mod?._currentStep || 0;
+        const cellW = MODULE_WIDTH / 16;
+        const maxH = 60;
+        return (
+          <g>
+            {/* Step indicator */}
+            {[...Array(16)].map((_, i) => (
+              <rect key={`led-${i}`} x={i * cellW + 1} y={seqY} width={cellW - 2} height={3}
+                rx={1} fill={i === step ? "#ff0" : "#222"} />
+            ))}
+            {/* Value bars */}
+            {[...Array(16)].map((_, i) => {
+              const val = mod?._values[i] || 0;
+              const norm = (val + 64) / 128; // -64..+64 => 0..1
+              const barH = norm * maxH;
+              return (
+                <g key={`bar-${i}`}>
+                  <rect x={i * cellW + 1} y={seqY + 6} width={cellW - 2} height={maxH}
+                    fill="#111" stroke="#333" strokeWidth={0.5} rx={1} />
+                  <rect x={i * cellW + 2} y={seqY + 6 + (maxH - barH)} width={cellW - 4} height={barH}
+                    fill="#4cf" rx={1} />
+                  <rect x={i * cellW + 1} y={seqY + 6} width={cellW - 2} height={maxH}
+                    fill="transparent" style={{ cursor: "ns-resize" }}
+                    onMouseDown={(e) => {
+                      e.stopPropagation(); e.preventDefault();
+                      const startY = e.clientY;
+                      const startVal = mod?._values[i] || 0;
+                      const move = (me) => {
+                        const dy = startY - me.clientY;
+                        const newVal = Math.max(-64, Math.min(64, Math.round(startVal + dy)));
+                        if (mod) { mod._values[i] = newVal; onParamChange(moduleState.id, "steps", params.steps.value); }
+                      };
+                      const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+                      window.addEventListener("mousemove", move); window.addEventListener("mouseup", up);
+                    }} />
+                </g>
+              );
+            })}
+          </g>
+        );
+      })()}
+
+      {/* NoteSeqA custom UI */}
+      {moduleState.type === "NoteSeqA" && (() => {
+        const seqY = paramsStartY + Object.keys(params).length * 32 + 8;
+        const mod = engine.current?.modules?.get(moduleState.id);
+        const step = mod?._currentStep || 0;
+        const cellW = MODULE_WIDTH / 16;
+        const sliderH = 60;
+        return (
+          <g>
+            {/* Step indicator */}
+            {[...Array(16)].map((_, i) => (
+              <rect key={`led-${i}`} x={i * cellW + 1} y={seqY} width={cellW - 2} height={3}
+                rx={1} fill={i === step ? "#ff0" : "#222"} />
+            ))}
+            {/* Pitch sliders */}
+            {[...Array(16)].map((_, i) => {
+              const midi = mod?._pitchValues[i] || 60;
+              const norm = (midi - 36) / 48; // MIDI 36-84 (C2-C6)
+              const barH = Math.max(2, norm * sliderH);
+              return (
+                <g key={`pitch-${i}`}>
+                  <rect x={i * cellW + 1} y={seqY + 6} width={cellW - 2} height={sliderH}
+                    fill="#111" stroke="#333" strokeWidth={0.5} rx={1} />
+                  <rect x={i * cellW + 2} y={seqY + 6 + (sliderH - barH)} width={cellW - 4} height={barH}
+                    fill="#fc0" rx={1} />
+                  <rect x={i * cellW + 1} y={seqY + 6} width={cellW - 2} height={sliderH}
+                    fill="transparent" style={{ cursor: "ns-resize" }}
+                    onMouseDown={(e) => {
+                      e.stopPropagation(); e.preventDefault();
+                      const startY = e.clientY;
+                      const startMidi = mod?._pitchValues[i] || 60;
+                      const move = (me) => {
+                        const dy = startY - me.clientY;
+                        const newMidi = Math.max(36, Math.min(84, Math.round(startMidi + dy * 0.5)));
+                        if (mod) { mod._pitchValues[i] = newMidi; onParamChange(moduleState.id, "steps", params.steps.value); }
+                      };
+                      const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+                      window.addEventListener("mousemove", move); window.addEventListener("mouseup", up);
+                    }} />
+                </g>
+              );
+            })}
+            {/* Gate toggles */}
+            {[...Array(16)].map((_, i) => (
+              <rect key={`gate-${i}`} x={i * cellW + 1} y={seqY + sliderH + 10} width={cellW - 2} height={16}
+                rx={2} fill={mod?._gatePattern[i] ? "#4f4" : "#1a1a1e"} stroke="#333" strokeWidth={0.5}
+                style={{ cursor: "pointer" }}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  if (mod) { mod._gatePattern[i] = !mod._gatePattern[i]; onParamChange(moduleState.id, "steps", params.steps.value); }
+                }} />
+            ))}
+          </g>
+        );
+      })()}
+
+      {/* NoteSeqB custom UI (Piano Roll) */}
+      {moduleState.type === "NoteSeqB" && (() => {
+        const seqY = paramsStartY + Object.keys(params).length * 32 + 8;
+        const mod = engine.current?.modules?.get(moduleState.id);
+        const step = mod?._currentStep || 0;
+        const cellW = MODULE_WIDTH / 16;
+        const baseOct = (mod?.params?.baseOctave?.value || 3);
+        const baseMidi = (baseOct + 1) * 12; // octave 3 = MIDI 48
+        const rows = 24; // 2 octaves
+        const rowH = 4;
+        const gridH = rows * rowH;
+        const noteNames = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+        return (
+          <g>
+            {/* Step indicator */}
+            {[...Array(16)].map((_, i) => (
+              <rect key={`led-${i}`} x={i * cellW + 1} y={seqY} width={cellW - 2} height={3}
+                rx={1} fill={i === step ? "#ff0" : "#222"} />
+            ))}
+            {/* Grid */}
+            {[...Array(rows)].map((_, row) => {
+              const midi = baseMidi + (rows - 1 - row);
+              const isBlack = [1,3,6,8,10].includes(midi % 12);
+              return [...Array(16)].map((_, col) => {
+                const isActive = mod?._pitchValues[col] === midi && mod?._gatePattern[col];
+                return (
+                  <rect key={`cell-${row}-${col}`}
+                    x={col * cellW + 1} y={seqY + 6 + row * rowH}
+                    width={cellW - 2} height={rowH - 0.5}
+                    fill={isActive ? "#fc0" : isBlack ? "#181818" : "#111"}
+                    stroke="#222" strokeWidth={0.25}
+                    style={{ cursor: "pointer" }}
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                      if (!mod) return;
+                      if (mod._pitchValues[col] === midi && mod._gatePattern[col]) {
+                        mod._gatePattern[col] = false;
+                      } else {
+                        mod._pitchValues[col] = midi;
+                        mod._gatePattern[col] = true;
+                      }
+                      onParamChange(moduleState.id, "steps", params.steps.value);
+                    }} />
+                );
+              });
+            })}
           </g>
         );
       })()}
@@ -756,6 +946,7 @@ export default function NordModularEmulator() {
       const mod = modules.find((m) => m.id === moduleId);
       if (!mod) return;
       const pos = getPortPosition(mod, portName, isOutput);
+      e.preventDefault();
       setCableDrag({
         fromId: moduleId,
         fromPort: portName,
@@ -908,6 +1099,15 @@ export default function NordModularEmulator() {
       window.removeEventListener("keyup", up);
     };
   }, [keyHeld, initAudio]);
+
+  // Sequencer step animation: poll at ~15fps to update step LEDs
+  const [seqFrame, setSeqFrame] = useState(0);
+  useEffect(() => {
+    const hasSeq = modules.some(m => ["EventSeq", "CtrlSeq", "NoteSeqA", "NoteSeqB"].includes(m.type));
+    if (!hasSeq) return;
+    const id = setInterval(() => setSeqFrame(f => f + 1), 66);
+    return () => clearInterval(id);
+  }, [modules]);
 
   // Render cables
   const cableElements = useMemo(() => {
@@ -1116,7 +1316,7 @@ export default function NordModularEmulator() {
       {/* Canvas */}
       <svg
         ref={svgRef}
-        style={{ flex: 1, cursor: isPanning ? "grabbing" : "default" }}
+        style={{ flex: 1, cursor: isPanning ? "grabbing" : "default", userSelect: "none" }}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseDown={handleSvgMouseDown}
@@ -1142,6 +1342,7 @@ export default function NordModularEmulator() {
               onPortDragEnd={handlePortDragEnd}
               onParamChange={handleParamChange}
               onRemove={removeModule}
+              seqFrame={seqFrame}
             />
           ))}
 
@@ -1172,7 +1373,7 @@ export default function NordModularEmulator() {
                       cx={pos.x} cy={pos.y} r={PORT_SIZE}
                       fill="transparent"
                       style={{ cursor: "pointer" }}
-                      onMouseDown={(e) => { e.stopPropagation(); handlePortDragStart(e, m.id, port, true); }}
+                      onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); handlePortDragStart(e, m.id, port, true); }}
                       onMouseUp={(e) => { e.stopPropagation(); handlePortDragEnd(e, m.id, port, true); }}
                     />
                   );
@@ -1185,7 +1386,7 @@ export default function NordModularEmulator() {
                       cx={pos.x} cy={pos.y} r={PORT_SIZE}
                       fill="transparent"
                       style={{ cursor: "pointer" }}
-                      onMouseDown={(e) => { e.stopPropagation(); handlePortDragStart(e, m.id, port, false); }}
+                      onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); handlePortDragStart(e, m.id, port, false); }}
                       onMouseUp={(e) => { e.stopPropagation(); handlePortDragEnd(e, m.id, port, false); }}
                     />
                   );

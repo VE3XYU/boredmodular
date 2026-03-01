@@ -60,6 +60,18 @@ class AudioEngine {
       case "Keyboard": mod = this._createKeyboard(id); break;
       case "DrumSynth": mod = this._createDrumSynth(id); break;
       case "FormantOsc": mod = this._createFormantOsc(id); break;
+      case "MasterOsc": mod = this._createMasterOsc(id); break;
+      case "OscSlvA": mod = this._createOscSlvA(id); break;
+      case "OscSlvB": mod = this._createOscSlvB(id); break;
+      case "OscSlvC": mod = this._createOscSlvC(id); break;
+      case "OscSlvD": mod = this._createOscSlvD(id); break;
+      case "OscSlvE": mod = this._createOscSlvE(id); break;
+      case "OscSlvFM": mod = this._createOscSlvFM(id); break;
+      case "OscSineBank": mod = this._createOscSineBank(id); break;
+      case "EventSeq": mod = this._createEventSeq(id); break;
+      case "CtrlSeq": mod = this._createCtrlSeq(id); break;
+      case "NoteSeqA": mod = this._createNoteSeqA(id); break;
+      case "NoteSeqB": mod = this._createNoteSeqB(id); break;
       default: return null;
     }
     this.modules.set(id, mod);
@@ -84,9 +96,11 @@ class AudioEngine {
     osc.start();
     return {
       id, type: "OscA", node: osc, outputNode: gain,
-      outputs: { Out: gain, SlvOut: slaveGain },
+      outputs: { Out: gain, Slv: slaveGain },
       inputs: { PitchMod1: osc.frequency, PitchMod2: osc.frequency, FmMod: fmGain },
       _nodes: [osc, gain, slaveGain, fmGain],
+      _slaveTargets: [],
+      _frequency: 220,
       params: {
         frequency: { value: 220, min: 20, max: 8000, audioParam: osc.frequency, label: "Freq" },
         coarse: { value: 0, min: -24, max: 24, label: "Coarse" },
@@ -101,19 +115,24 @@ class AudioEngine {
   _createOscB(id) {
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
+    const slaveGain = this.ctx.createGain();
     const fmGain = this.ctx.createGain();
     osc.type = "sawtooth";
     osc.frequency.value = 220;
     gain.gain.value = 0.8;
+    slaveGain.gain.value = 0.8;
     fmGain.gain.value = 0;
     osc.connect(gain);
+    osc.connect(slaveGain);
     fmGain.connect(osc.frequency);
     osc.start();
     return {
       id, type: "OscB", node: osc, outputNode: gain,
-      outputs: { Out: gain },
+      outputs: { Out: gain, Slv: slaveGain },
       inputs: { PitchMod: osc.frequency, FmMod: fmGain },
-      _nodes: [osc, gain, fmGain],
+      _nodes: [osc, gain, slaveGain, fmGain],
+      _slaveTargets: [],
+      _frequency: 220,
       params: {
         frequency: { value: 220, min: 20, max: 8000, audioParam: osc.frequency, label: "Freq" },
         waveform: { value: "sawtooth", options: ["sine", "sawtooth", "square", "triangle"], label: "Wave" },
@@ -126,16 +145,21 @@ class AudioEngine {
   _createOscC(id) {
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
+    const slaveGain = this.ctx.createGain();
     osc.type = "square";
     osc.frequency.value = 330;
     gain.gain.value = 0.6;
+    slaveGain.gain.value = 0.6;
     osc.connect(gain);
+    osc.connect(slaveGain);
     osc.start();
     return {
       id, type: "OscC", node: osc, outputNode: gain,
-      outputs: { Out: gain },
+      outputs: { Out: gain, Slv: slaveGain },
       inputs: { PitchMod: osc.frequency },
-      _nodes: [osc, gain],
+      _nodes: [osc, gain, slaveGain],
+      _slaveTargets: [],
+      _frequency: 330,
       params: {
         frequency: { value: 330, min: 20, max: 8000, audioParam: osc.frequency, label: "Freq" },
         waveform: { value: "square", options: ["sine", "sawtooth", "square", "triangle"], label: "Wave" },
@@ -289,6 +313,189 @@ class AudioEngine {
       },
     };
     return mod;
+  }
+
+  // ── Master / Slave Oscillators ──────────────────────────────────────────
+
+  _createMasterOsc(id) {
+    // Pitch-only controller, no audio output
+    const slvOut = this.ctx.createConstantSource();
+    slvOut.offset.value = 220;
+    slvOut.start();
+    return {
+      id, type: "MasterOsc", node: slvOut, outputNode: slvOut,
+      outputs: { Slv: slvOut },
+      inputs: { PitchMod1: slvOut.offset, PitchMod2: slvOut.offset },
+      _nodes: [slvOut],
+      _slaveTargets: [], // { moduleId, mod } — slaves connected to Slv output
+      _frequency: 220,
+      params: {
+        frequency: { value: 220, min: 20, max: 8000, label: "Freq" },
+        coarse: { value: 0, min: -36, max: 36, label: "Coarse" },
+        fine: { value: 0, min: -50, max: 50, label: "Fine" },
+        kbt: { value: "on", options: ["on", "off"], label: "KBT" },
+      },
+    };
+  }
+
+  _makeSlaveOsc(id, type, waveform, modInputDefs) {
+    // Shared slave oscillator factory
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = waveform;
+    osc.frequency.value = 220;
+    gain.gain.value = 0.8;
+    osc.connect(gain);
+    osc.start();
+
+    const inputs = { Mst: null }; // Virtual input — handled in connect()
+    const modGains = {};
+    if (modInputDefs.FMA) {
+      const fmGain = this.ctx.createGain();
+      fmGain.gain.value = 0;
+      fmGain.connect(osc.frequency);
+      inputs.FMA = fmGain;
+      modGains._fmGain = fmGain;
+    }
+    if (modInputDefs.FMB) {
+      const fmGain = this.ctx.createGain();
+      fmGain.gain.value = 0;
+      fmGain.connect(osc.frequency);
+      inputs.FMB = fmGain;
+      modGains._fmGain = fmGain;
+    }
+    if (modInputDefs.AM) {
+      inputs.AM = gain.gain;
+    }
+    if (modInputDefs.PwMod) {
+      const pwGain = this.ctx.createGain();
+      pwGain.gain.value = 0;
+      inputs.PwMod = pwGain;
+      modGains._pwGain = pwGain;
+    }
+
+    const params = {
+      partials: { value: 1, min: 0.25, max: 16, label: "Partials" },
+      detune: { value: 0, min: -24, max: 24, label: "Detune" },
+      fine: { value: 0, min: -50, max: 50, label: "Fine" },
+      level: { value: 0.8, min: 0, max: 1, audioParam: gain.gain, label: "Level" },
+    };
+    if (modInputDefs.FMA || modInputDefs.FMB) {
+      params.fmDepth = { value: 0, min: 0, max: 1000, audioParam: modGains._fmGain?.gain, label: "FM Dep" };
+    }
+    if (waveform === "square" || type === "OscSlvA") {
+      params.waveform = type === "OscSlvA"
+        ? { value: waveform, options: ["sine", "sawtooth", "square", "triangle"], label: "Wave" }
+        : undefined;
+    }
+    if (type === "OscSlvFM") {
+      params.octShift = { value: 0, min: -3, max: 3, label: "Oct" };
+    }
+    // Clean undefined params
+    Object.keys(params).forEach(k => { if (params[k] === undefined) delete params[k]; });
+
+    const allNodes = [osc, gain, ...Object.values(modGains)].filter(Boolean);
+    return {
+      id, type, node: osc, outputNode: gain,
+      outputs: { Out: gain },
+      inputs,
+      _nodes: allNodes,
+      _masterFreq: 0,
+      _masterModId: null,
+      _recalcFreq() {
+        if (!this._masterFreq) return;
+        const p = this.params;
+        const partial = p.partials.value;
+        const det = p.detune.value;
+        const fn = p.fine.value;
+        const octShift = p.octShift ? p.octShift.value : 0;
+        const freq = this._masterFreq * partial * Math.pow(2, det / 12) * Math.pow(2, fn / 1200) * Math.pow(2, octShift);
+        osc.frequency.setValueAtTime(freq, osc.context.currentTime);
+      },
+      params,
+    };
+  }
+
+  _createOscSlvA(id) {
+    return this._makeSlaveOsc(id, "OscSlvA", "sawtooth", { FMA: true, AM: true });
+  }
+  _createOscSlvB(id) {
+    return this._makeSlaveOsc(id, "OscSlvB", "square", { PwMod: true });
+  }
+  _createOscSlvC(id) {
+    return this._makeSlaveOsc(id, "OscSlvC", "sawtooth", { FMA: true });
+  }
+  _createOscSlvD(id) {
+    return this._makeSlaveOsc(id, "OscSlvD", "triangle", { FMA: true });
+  }
+  _createOscSlvE(id) {
+    return this._makeSlaveOsc(id, "OscSlvE", "sine", { FMA: true, AM: true });
+  }
+  _createOscSlvFM(id) {
+    return this._makeSlaveOsc(id, "OscSlvFM", "sine", { FMB: true });
+  }
+
+  _createOscSineBank(id) {
+    const output = this.ctx.createGain();
+    output.gain.value = 0.6;
+    const oscs = [];
+    const gains = [];
+    const inputs = { Mst: null };
+    const params = {};
+
+    for (let i = 0; i < 6; i++) {
+      const n = i + 1;
+      const osc = this.ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.value = 220 * n;
+      const g = this.ctx.createGain();
+      g.gain.value = i === 0 ? 1 : 0.5 / n;
+      osc.connect(g);
+      g.connect(output);
+      osc.start();
+      oscs.push(osc);
+      gains.push(g);
+      inputs[`AM${n}`] = g.gain;
+      params[`tune${n}`] = { value: n, min: 0.25, max: 16, label: `Tune${n}` };
+      params[`fine${n}`] = { value: 0, min: -50, max: 50, label: `Fine${n}` };
+      params[`level${n}`] = { value: i === 0 ? 1 : +(0.5 / n).toFixed(2), min: 0, max: 1, audioParam: g.gain, label: `Lvl${n}` };
+    }
+
+    return {
+      id, type: "OscSineBank", node: oscs[0], outputNode: output,
+      outputs: { Out: output },
+      inputs,
+      _nodes: [...oscs, ...gains, output],
+      _oscs: oscs,
+      _masterFreq: 0,
+      _masterModId: null,
+      _recalcFreq() {
+        if (!this._masterFreq) return;
+        const p = this.params;
+        for (let i = 0; i < 6; i++) {
+          const n = i + 1;
+          const tune = p[`tune${n}`].value;
+          const fine = p[`fine${n}`].value;
+          const freq = this._masterFreq * tune * Math.pow(2, fine / 1200);
+          oscs[i].frequency.setValueAtTime(freq, oscs[i].context.currentTime);
+        }
+      },
+      params: {
+        ...params,
+        masterLevel: { value: 0.6, min: 0, max: 1, audioParam: output.gain, label: "MstLvl" },
+      },
+    };
+  }
+
+  _propagateToSlaves(masterMod) {
+    if (!masterMod._slaveTargets) return;
+    masterMod._slaveTargets.forEach(({ moduleId }) => {
+      const slaveMod = this.modules.get(moduleId);
+      if (slaveMod) {
+        slaveMod._masterFreq = masterMod._frequency;
+        if (slaveMod._recalcFreq) slaveMod._recalcFreq();
+      }
+    });
   }
 
   // ── Filters ──────────────────────────────────────────────────────────────
@@ -532,6 +739,8 @@ class AudioEngine {
       _timerId: null,
       _tickCount: 0,
       _active: true,
+      _clockSubscribers: [],
+      _resetSubscribers: [],
       params: {
         bpm: { value: 120, min: 24, max: 214, label: "BPM" },
         active: { value: "on", options: ["on", "off"], label: "Active" },
@@ -558,11 +767,25 @@ class AudioEngine {
       if (clk._tickCount % 6 === 0) {
         clk4.offset.setValueAtTime(1, now);
         clk4.offset.setValueAtTime(0, now + pulseLen);
+        // Notify clock subscribers on quarter note
+        if (clk._clockSubscribers) {
+          clk._clockSubscribers.forEach(({ moduleId }) => {
+            const sub = this.modules.get(moduleId);
+            if (sub && sub.clockTick) sub.clockTick();
+          });
+        }
       }
       // Sync = every 24 ticks (one bar at 24 PPQN, assuming 4/4)
       if (clk._tickCount % 24 === 0) {
         sync.offset.setValueAtTime(1, now);
         sync.offset.setValueAtTime(0, now + pulseLen);
+        // Notify reset subscribers on bar
+        if (clk._resetSubscribers) {
+          clk._resetSubscribers.forEach(({ moduleId }) => {
+            const sub = this.modules.get(moduleId);
+            if (sub && sub.resetSeq) sub.resetSeq();
+          });
+        }
         clk._tickCount = 0;
       }
 
@@ -631,6 +854,183 @@ class AudioEngine {
         level: { value: 1, min: 0, max: 1, audioParam: output.gain, label: "Level" },
       },
     };
+  }
+
+  // ── Sequencers ───────────────────────────────────────────────────────────
+
+  _createEventSeq(id) {
+    const out1 = this.ctx.createConstantSource();
+    const out2 = this.ctx.createConstantSource();
+    out1.offset.value = 0; out2.offset.value = 0;
+    out1.start(); out2.start();
+
+    const seq = {
+      id, type: "EventSeq", node: out1, outputNode: out1,
+      outputs: { Out1: out1, Out2: out2 },
+      inputs: { Clk: null, Rst: null }, // Virtual — handled by clock subscriber
+      _nodes: [out1, out2],
+      _triggers1: new Array(16).fill(false),
+      _triggers2: new Array(16).fill(false),
+      _currentStep: 0,
+      _stepCount: 16,
+      _gateTargetEnvelopes1: [],
+      _gateTargetEnvelopes2: [],
+      params: {
+        steps: { value: 16, min: 1, max: 16, label: "Steps" },
+      },
+      clockTick: () => {
+        const step = seq._currentStep;
+        const now = this.ctx.currentTime;
+        const pulseLen = 0.01;
+        if (seq._triggers1[step]) {
+          out1.offset.setValueAtTime(1, now);
+          out1.offset.setValueAtTime(0, now + pulseLen);
+          seq._gateTargetEnvelopes1.forEach(envId => {
+            const envMod = this.modules.get(envId);
+            if (envMod && envMod.trigger) envMod.trigger();
+            if (envMod && envMod.releaseEnv) setTimeout(() => envMod.releaseEnv(), pulseLen * 1000 + 10);
+          });
+        }
+        if (seq._triggers2[step]) {
+          out2.offset.setValueAtTime(1, now);
+          out2.offset.setValueAtTime(0, now + pulseLen);
+          seq._gateTargetEnvelopes2.forEach(envId => {
+            const envMod = this.modules.get(envId);
+            if (envMod && envMod.trigger) envMod.trigger();
+            if (envMod && envMod.releaseEnv) setTimeout(() => envMod.releaseEnv(), pulseLen * 1000 + 10);
+          });
+        }
+        seq._currentStep = (step + 1) % seq.params.steps.value;
+      },
+      resetSeq: () => { seq._currentStep = 0; },
+    };
+    return seq;
+  }
+
+  _createCtrlSeq(id) {
+    const out = this.ctx.createConstantSource();
+    out.offset.value = 0;
+    out.start();
+
+    const seq = {
+      id, type: "CtrlSeq", node: out, outputNode: out,
+      outputs: { Out: out },
+      inputs: { Clk: null, Rst: null },
+      _nodes: [out],
+      _values: new Array(16).fill(0),
+      _currentStep: 0,
+      _stepCount: 16,
+      params: {
+        steps: { value: 16, min: 1, max: 16, label: "Steps" },
+      },
+      clockTick: () => {
+        const step = seq._currentStep;
+        const val = seq._values[step];
+        out.offset.setValueAtTime(val, this.ctx.currentTime);
+        seq._currentStep = (step + 1) % seq.params.steps.value;
+      },
+      resetSeq: () => { seq._currentStep = 0; },
+    };
+    return seq;
+  }
+
+  _createNoteSeqA(id) {
+    const noteOut = this.ctx.createConstantSource();
+    const gateOut = this.ctx.createConstantSource();
+    noteOut.offset.value = 0; gateOut.offset.value = 0;
+    noteOut.start(); gateOut.start();
+
+    const seq = {
+      id, type: "NoteSeqA", node: noteOut, outputNode: noteOut,
+      outputs: { Note: noteOut, Gate: gateOut },
+      inputs: { Clk: null, Rst: null },
+      _nodes: [noteOut, gateOut],
+      _pitchValues: [60,62,64,65,67,69,71,72,60,62,64,65,67,69,71,72],
+      _gatePattern: new Array(16).fill(true),
+      _currentStep: 0,
+      _stepCount: 16,
+      _gateTargetEnvelopes: [],
+      _pitchTargets: [],
+      params: {
+        steps: { value: 16, min: 1, max: 16, label: "Steps" },
+      },
+      clockTick: () => {
+        const step = seq._currentStep;
+        const midi = seq._pitchValues[step];
+        const freq = NOTE_FREQ(midi);
+        const now = this.ctx.currentTime;
+        const gateOn = seq._gatePattern[step];
+        noteOut.offset.setValueAtTime(freq, now);
+        // Set pitch targets directly
+        seq._pitchTargets.forEach(({ audioParam }) => {
+          audioParam.setValueAtTime(freq, now);
+        });
+        if (gateOn) {
+          gateOut.offset.setValueAtTime(1, now);
+          gateOut.offset.setValueAtTime(0, now + 0.05);
+          seq._gateTargetEnvelopes.forEach(envId => {
+            const envMod = this.modules.get(envId);
+            if (envMod && envMod.trigger) envMod.trigger();
+            if (envMod && envMod.releaseEnv) setTimeout(() => envMod.releaseEnv(), 60);
+          });
+        } else {
+          gateOut.offset.setValueAtTime(0, now);
+        }
+        seq._currentStep = (step + 1) % seq.params.steps.value;
+      },
+      resetSeq: () => { seq._currentStep = 0; },
+    };
+    return seq;
+  }
+
+  _createNoteSeqB(id) {
+    // Same audio engine as NoteSeqA, different type for UI
+    const noteOut = this.ctx.createConstantSource();
+    const gateOut = this.ctx.createConstantSource();
+    noteOut.offset.value = 0; gateOut.offset.value = 0;
+    noteOut.start(); gateOut.start();
+
+    const seq = {
+      id, type: "NoteSeqB", node: noteOut, outputNode: noteOut,
+      outputs: { Note: noteOut, Gate: gateOut },
+      inputs: { Clk: null, Rst: null },
+      _nodes: [noteOut, gateOut],
+      _pitchValues: [60,62,64,65,67,69,71,72,60,62,64,65,67,69,71,72],
+      _gatePattern: new Array(16).fill(true),
+      _currentStep: 0,
+      _stepCount: 16,
+      _gateTargetEnvelopes: [],
+      _pitchTargets: [],
+      params: {
+        steps: { value: 16, min: 1, max: 16, label: "Steps" },
+        baseOctave: { value: 3, min: 1, max: 6, label: "Oct" },
+      },
+      clockTick: () => {
+        const step = seq._currentStep;
+        const midi = seq._pitchValues[step];
+        const freq = NOTE_FREQ(midi);
+        const now = this.ctx.currentTime;
+        const gateOn = seq._gatePattern[step];
+        noteOut.offset.setValueAtTime(freq, now);
+        seq._pitchTargets.forEach(({ audioParam }) => {
+          audioParam.setValueAtTime(freq, now);
+        });
+        if (gateOn) {
+          gateOut.offset.setValueAtTime(1, now);
+          gateOut.offset.setValueAtTime(0, now + 0.05);
+          seq._gateTargetEnvelopes.forEach(envId => {
+            const envMod = this.modules.get(envId);
+            if (envMod && envMod.trigger) envMod.trigger();
+            if (envMod && envMod.releaseEnv) setTimeout(() => envMod.releaseEnv(), 60);
+          });
+        } else {
+          gateOut.offset.setValueAtTime(0, now);
+        }
+        seq._currentStep = (step + 1) % seq.params.steps.value;
+      },
+      resetSeq: () => { seq._currentStep = 0; },
+    };
+    return seq;
   }
 
   // ── Level ────────────────────────────────────────────────────────────────
@@ -948,11 +1348,39 @@ class AudioEngine {
     if (!fromMod || !toMod) return false;
     const outputNode = fromMod.outputs[fromPort];
     const inputNode = toMod.inputs[toPort];
+
+    // Master/Slave connection: Slv output -> Mst input (virtual, no audio)
+    if (fromPort === "Slv" && toPort === "Mst" && toMod._recalcFreq) {
+      if (!fromMod._slaveTargets) fromMod._slaveTargets = [];
+      fromMod._slaveTargets.push({ moduleId: toId });
+      toMod._masterModId = fromId;
+      toMod._masterFreq = fromMod._frequency || fromMod.params.frequency?.value || 220;
+      toMod._recalcFreq();
+      this.connections.push({ fromId, fromPort, toId, toPort });
+      return true;
+    }
+
+    // Clock subscriber: clock output -> sequencer Clk input
+    if (toPort === "Clk" && toMod.clockTick) {
+      if (!fromMod._clockSubscribers) fromMod._clockSubscribers = [];
+      fromMod._clockSubscribers.push({ moduleId: toId });
+      this.connections.push({ fromId, fromPort, toId, toPort });
+      return true;
+    }
+
+    // Reset subscriber: Sync/Rst output -> sequencer Rst input
+    if (toPort === "Rst" && toMod.resetSeq) {
+      if (!fromMod._resetSubscribers) fromMod._resetSubscribers = [];
+      fromMod._resetSubscribers.push({ moduleId: toId });
+      this.connections.push({ fromId, fromPort, toId, toPort });
+      return true;
+    }
+
     if (!outputNode || !inputNode) return false;
 
-    // Keyboard Note -> PitchMod: use direct pitch tracking instead of audio connection
-    // (audio connection is additive, which breaks pitch control)
-    if (fromMod.type === "Keyboard" && fromPort === "Note" && inputNode instanceof AudioParam) {
+    // Note -> PitchMod: direct pitch tracking (Keyboard, NoteSeqA, NoteSeqB)
+    const isNoteSource = (fromMod.type === "Keyboard" || fromMod.type === "NoteSeqA" || fromMod.type === "NoteSeqB") && fromPort === "Note";
+    if (isNoteSource && inputNode instanceof AudioParam) {
       fromMod._pitchTargets.push({ audioParam: inputNode, moduleId: toId, port: toPort });
       this.connections.push({ fromId, fromPort, toId, toPort });
       return true;
@@ -962,11 +1390,16 @@ class AudioEngine {
       outputNode.connect(inputNode);
       this.connections.push({ fromId, fromPort, toId, toPort });
 
-      // Gate target tracking: if Keyboard Gate -> envelope-like module
-      if (fromMod.type === "Keyboard" && fromPort === "Gate") {
-        if (toMod.trigger && toMod.releaseEnv) {
-          fromMod._gateTargetEnvelopes.push(toId);
-        }
+      // Gate target tracking: Keyboard/NoteSeq Gate -> envelope
+      const isGateSource = (fromMod.type === "Keyboard" || fromMod.type === "NoteSeqA" || fromMod.type === "NoteSeqB") && fromPort === "Gate";
+      if (isGateSource && toMod.trigger && toMod.releaseEnv) {
+        fromMod._gateTargetEnvelopes.push(toId);
+      }
+
+      // EventSeq Out1/Out2 gate tracking
+      if (fromMod.type === "EventSeq" && toMod.trigger && toMod.releaseEnv) {
+        if (fromPort === "Out1") fromMod._gateTargetEnvelopes1.push(toId);
+        if (fromPort === "Out2") fromMod._gateTargetEnvelopes2.push(toId);
       }
 
       return true;
@@ -980,12 +1413,45 @@ class AudioEngine {
     const fromMod = this.modules.get(fromId);
     const toMod = this.modules.get(toId);
     if (!fromMod || !toMod) return;
+
+    // Master/Slave disconnect
+    if (fromPort === "Slv" && toPort === "Mst" && fromMod._slaveTargets) {
+      fromMod._slaveTargets = fromMod._slaveTargets.filter(s => s.moduleId !== toId);
+      if (toMod._masterModId === fromId) {
+        toMod._masterModId = null;
+        toMod._masterFreq = 0;
+      }
+      this.connections = this.connections.filter(
+        (c) => !(c.fromId === fromId && c.fromPort === fromPort && c.toId === toId && c.toPort === toPort)
+      );
+      return;
+    }
+
+    // Clock subscriber disconnect
+    if (toPort === "Clk" && fromMod._clockSubscribers) {
+      fromMod._clockSubscribers = fromMod._clockSubscribers.filter(s => s.moduleId !== toId);
+      this.connections = this.connections.filter(
+        (c) => !(c.fromId === fromId && c.fromPort === fromPort && c.toId === toId && c.toPort === toPort)
+      );
+      return;
+    }
+
+    // Reset subscriber disconnect
+    if (toPort === "Rst" && fromMod._resetSubscribers) {
+      fromMod._resetSubscribers = fromMod._resetSubscribers.filter(s => s.moduleId !== toId);
+      this.connections = this.connections.filter(
+        (c) => !(c.fromId === fromId && c.fromPort === fromPort && c.toId === toId && c.toPort === toPort)
+      );
+      return;
+    }
+
     const outputNode = fromMod.outputs[fromPort];
     const inputNode = toMod.inputs[toPort];
     if (!outputNode || !inputNode) return;
 
-    // Keyboard Note pitch targets: no audio connection to undo, just remove tracking
-    if (fromMod.type === "Keyboard" && fromPort === "Note" && inputNode instanceof AudioParam) {
+    // Note pitch targets (Keyboard, NoteSeqA, NoteSeqB)
+    const isNoteSource = (fromMod.type === "Keyboard" || fromMod.type === "NoteSeqA" || fromMod.type === "NoteSeqB") && fromPort === "Note";
+    if (isNoteSource && inputNode instanceof AudioParam) {
       fromMod._pitchTargets = fromMod._pitchTargets.filter(
         pt => !(pt.moduleId === toId && pt.port === toPort)
       );
@@ -1003,9 +1469,16 @@ class AudioEngine {
       (c) => !(c.fromId === fromId && c.fromPort === fromPort && c.toId === toId && c.toPort === toPort)
     );
 
-    // Gate target tracking: remove
-    if (fromMod.type === "Keyboard" && fromPort === "Gate") {
+    // Gate target tracking: remove (Keyboard, NoteSeqA, NoteSeqB)
+    const isGateSource = (fromMod.type === "Keyboard" || fromMod.type === "NoteSeqA" || fromMod.type === "NoteSeqB") && fromPort === "Gate";
+    if (isGateSource) {
       fromMod._gateTargetEnvelopes = fromMod._gateTargetEnvelopes.filter(eid => eid !== toId);
+    }
+
+    // EventSeq gate tracking
+    if (fromMod.type === "EventSeq") {
+      if (fromPort === "Out1") fromMod._gateTargetEnvelopes1 = fromMod._gateTargetEnvelopes1.filter(eid => eid !== toId);
+      if (fromPort === "Out2") fromMod._gateTargetEnvelopes2 = fromMod._gateTargetEnvelopes2.filter(eid => eid !== toId);
     }
   }
 
@@ -1023,6 +1496,20 @@ class AudioEngine {
     // Clean up gate targets
     if (mod.type === "Keyboard") {
       this._gateTargets.delete(id);
+    }
+    // Clean up master->slave references
+    if (mod._slaveTargets) {
+      mod._slaveTargets.forEach(({ moduleId }) => {
+        const slave = this.modules.get(moduleId);
+        if (slave) { slave._masterModId = null; slave._masterFreq = 0; }
+      });
+    }
+    // Clean up slave->master references
+    if (mod._masterModId) {
+      const master = this.modules.get(mod._masterModId);
+      if (master && master._slaveTargets) {
+        master._slaveTargets = master._slaveTargets.filter(s => s.moduleId !== id);
+      }
     }
     // Stop and disconnect all internal nodes
     const nodes = mod._nodes || [mod.node, mod.outputNode].filter(Boolean);
@@ -1156,14 +1643,45 @@ class AudioEngine {
         f.frequency.setValueAtTime(freq, this.ctx.currentTime);
       });
     }
-    // OscA: coarse/fine tuning
-    if (mod.type === "OscA" && (paramName === "coarse" || paramName === "fine")) {
+    // OscA: coarse/fine tuning + propagate to slaves
+    if (mod.type === "OscA" && (paramName === "coarse" || paramName === "fine" || paramName === "frequency")) {
       const baseFreq = mod.params.frequency.value;
       const coarse = mod.params.coarse.value;
       const fine = mod.params.fine.value;
       const semitones = coarse + fine / 100;
       const freq = baseFreq * Math.pow(2, semitones / 12);
       mod.node.frequency.setValueAtTime(freq, this.ctx.currentTime);
+      mod._frequency = freq;
+      this._propagateToSlaves(mod);
+    }
+    // MasterOsc: coarse/fine tuning + propagate to slaves
+    if (mod.type === "MasterOsc" && (paramName === "coarse" || paramName === "fine" || paramName === "frequency")) {
+      const baseFreq = mod.params.frequency.value;
+      const coarse = mod.params.coarse.value;
+      const fine = mod.params.fine.value;
+      const semitones = coarse + fine / 100;
+      const freq = baseFreq * Math.pow(2, semitones / 12);
+      mod._frequency = freq;
+      mod.node.offset.setValueAtTime(freq, this.ctx.currentTime);
+      this._propagateToSlaves(mod);
+    }
+    // OscB/OscC: update _frequency for slave propagation
+    if ((mod.type === "OscB" || mod.type === "OscC") && paramName === "frequency") {
+      mod._frequency = value;
+      this._propagateToSlaves(mod);
+    }
+    // Slave oscillators: recalc on partial/detune/fine/octShift change
+    const isSlaveType = mod.type?.startsWith("OscSlv") || mod.type === "OscSineBank";
+    if (isSlaveType && (paramName === "partials" || paramName === "detune" || paramName === "fine" || paramName === "octShift")) {
+      if (mod._recalcFreq) mod._recalcFreq();
+    }
+    // OscSineBank: recalc on tune/fine changes
+    if (mod.type === "OscSineBank" && (paramName.startsWith("tune") || paramName.startsWith("fine"))) {
+      if (mod._recalcFreq) mod._recalcFreq();
+    }
+    // Slave waveform change
+    if (mod.type === "OscSlvA" && paramName === "waveform") {
+      mod.node.type = value;
     }
   }
 
