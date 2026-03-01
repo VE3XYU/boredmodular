@@ -1,620 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
-
-// ─── Audio Engine ───────────────────────────────────────────────────────────
-// Web Audio API based modular synthesis engine inspired by the Nord Modular G2
-
-class AudioEngine {
-  constructor() {
-    this.ctx = null;
-    this.modules = new Map();
-    this.connections = [];
-    this.masterGain = null;
-    this.analyser = null;
-    this.scopeData = new Float32Array(256);
-    this.isRunning = false;
-  }
-
-  init() {
-    if (this.ctx) return;
-    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-    this.masterGain = this.ctx.createGain();
-    this.masterGain.gain.value = 0.3;
-    this.analyser = this.ctx.createAnalyser();
-    this.analyser.fftSize = 512;
-    this.masterGain.connect(this.analyser);
-    this.analyser.connect(this.ctx.destination);
-    this.isRunning = true;
-  }
-
-  createModule(id, type) {
-    if (!this.ctx) this.init();
-    let mod;
-    switch (type) {
-      case "OscB":
-        mod = this._createOscB(id);
-        break;
-      case "OscC":
-        mod = this._createOscC(id);
-        break;
-      case "Filter":
-        mod = this._createFilter(id);
-        break;
-      case "Envelope":
-        mod = this._createEnvelope(id);
-        break;
-      case "LFO":
-        mod = this._createLFO(id);
-        break;
-      case "Amplifier":
-        mod = this._createAmplifier(id);
-        break;
-      case "Mixer2":
-        mod = this._createMixer2(id);
-        break;
-      case "Noise":
-        mod = this._createNoise(id);
-        break;
-      case "Output":
-        mod = this._createOutput(id);
-        break;
-      case "Delay":
-        mod = this._createDelay(id);
-        break;
-      case "Panner":
-        mod = this._createPanner(id);
-        break;
-      case "Chorus":
-        mod = this._createChorus(id);
-        break;
-      default:
-        return null;
-    }
-    this.modules.set(id, mod);
-    return mod;
-  }
-
-  _createOscB(id) {
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    const fmGain = this.ctx.createGain();
-    osc.type = "sawtooth";
-    osc.frequency.value = 220;
-    gain.gain.value = 0.8;
-    fmGain.gain.value = 0;
-    osc.connect(gain);
-    fmGain.connect(osc.frequency);
-    osc.start();
-    return {
-      id,
-      type: "OscB",
-      node: osc,
-      outputNode: gain,
-      outputs: { Out: gain },
-      inputs: { PitchMod: osc.frequency, FmMod: fmGain },
-      _nodes: [osc, gain, fmGain],
-      params: {
-        frequency: { value: 220, min: 20, max: 8000, audioParam: osc.frequency, label: "Freq" },
-        waveform: { value: "sawtooth", options: ["sine", "sawtooth", "square", "triangle"], label: "Wave" },
-        fmDepth: { value: 0, min: 0, max: 1000, audioParam: fmGain.gain, label: "FM Depth" },
-        level: { value: 0.8, min: 0, max: 1, audioParam: gain.gain, label: "Level" },
-      },
-    };
-  }
-
-  _createOscC(id) {
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = "square";
-    osc.frequency.value = 330;
-    gain.gain.value = 0.6;
-    osc.connect(gain);
-    osc.start();
-    return {
-      id,
-      type: "OscC",
-      node: osc,
-      outputNode: gain,
-      outputs: { Out: gain },
-      inputs: { PitchMod: osc.frequency },
-      _nodes: [osc, gain],
-      params: {
-        frequency: { value: 330, min: 20, max: 8000, audioParam: osc.frequency, label: "Freq" },
-        waveform: { value: "square", options: ["sine", "sawtooth", "square", "triangle"], label: "Wave" },
-        pulseWidth: { value: 0.5, min: 0, max: 1, label: "PW" },
-        level: { value: 0.6, min: 0, max: 1, audioParam: gain.gain, label: "Level" },
-      },
-    };
-  }
-
-  _createFilter(id) {
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 1200;
-    filter.Q.value = 4;
-    return {
-      id,
-      type: "Filter",
-      node: filter,
-      outputNode: filter,
-      outputs: { Out: filter },
-      inputs: { In: filter, FreqMod: filter.frequency, ResMod: filter.Q },
-      _nodes: [filter],
-      params: {
-        frequency: { value: 1200, min: 20, max: 15000, audioParam: filter.frequency, label: "Freq" },
-        resonance: { value: 4, min: 0.1, max: 30, audioParam: filter.Q, label: "Res" },
-        filterType: { value: "lowpass", options: ["lowpass", "highpass", "bandpass", "notch"], label: "Type" },
-      },
-    };
-  }
-
-  _createEnvelope(id) {
-    const gain = this.ctx.createGain();
-    gain.gain.value = 0;
-    const env = {
-      id,
-      type: "Envelope",
-      node: gain,
-      outputNode: gain,
-      outputs: { Out: gain },
-      inputs: { In: gain },
-      _nodes: [gain],
-      params: {
-        attack: { value: 0.01, min: 0.001, max: 4, label: "Atk" },
-        decay: { value: 0.2, min: 0.001, max: 4, label: "Dec" },
-        sustain: { value: 0.6, min: 0, max: 1, label: "Sus" },
-        release: { value: 0.5, min: 0.001, max: 8, label: "Rel" },
-      },
-      trigger: () => {
-        const now = this.ctx.currentTime;
-        const a = env.params.attack.value;
-        const d = env.params.decay.value;
-        const s = env.params.sustain.value;
-        gain.gain.cancelScheduledValues(now);
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(1, now + a);
-        gain.gain.linearRampToValueAtTime(s, now + a + d);
-      },
-      releaseEnv: () => {
-        const now = this.ctx.currentTime;
-        const r = env.params.release.value;
-        gain.gain.cancelScheduledValues(now);
-        gain.gain.setValueAtTime(gain.gain.value, now);
-        gain.gain.linearRampToValueAtTime(0, now + r);
-      },
-    };
-    return env;
-  }
-
-  _createLFO(id) {
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.value = 2;
-    gain.gain.value = 100;
-    osc.connect(gain);
-    osc.start();
-    return {
-      id,
-      type: "LFO",
-      node: osc,
-      outputNode: gain,
-      outputs: { Out: gain },
-      inputs: {},
-      _nodes: [osc, gain],
-      params: {
-        rate: { value: 2, min: 0.05, max: 40, audioParam: osc.frequency, label: "Rate" },
-        amount: { value: 100, min: 0, max: 2000, audioParam: gain.gain, label: "Amt" },
-        waveform: { value: "sine", options: ["sine", "sawtooth", "square", "triangle"], label: "Wave" },
-      },
-    };
-  }
-
-  _createAmplifier(id) {
-    const gain = this.ctx.createGain();
-    gain.gain.value = 0.8;
-    return {
-      id,
-      type: "Amplifier",
-      node: gain,
-      outputNode: gain,
-      outputs: { Out: gain },
-      inputs: { In: gain, GainMod: gain.gain },
-      _nodes: [gain],
-      params: {
-        level: { value: 0.8, min: 0, max: 1, audioParam: gain.gain, label: "Level" },
-      },
-    };
-  }
-
-  _createMixer2(id) {
-    const gain1 = this.ctx.createGain();
-    const gain2 = this.ctx.createGain();
-    const merger = this.ctx.createGain();
-    gain1.gain.value = 0.5;
-    gain2.gain.value = 0.5;
-    gain1.connect(merger);
-    gain2.connect(merger);
-    return {
-      id,
-      type: "Mixer2",
-      node: merger,
-      outputNode: merger,
-      outputs: { Out: merger },
-      inputs: { In1: gain1, In2: gain2 },
-      _nodes: [gain1, gain2, merger],
-      params: {
-        level1: { value: 0.5, min: 0, max: 1, audioParam: gain1.gain, label: "Lvl 1" },
-        level2: { value: 0.5, min: 0, max: 1, audioParam: gain2.gain, label: "Lvl 2" },
-      },
-    };
-  }
-
-  _createNoise(id) {
-    const bufferSize = this.ctx.sampleRate * 2;
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
-    }
-    const source = this.ctx.createBufferSource();
-    source.buffer = buffer;
-    source.loop = true;
-    const gain = this.ctx.createGain();
-    gain.gain.value = 0.3;
-    source.connect(gain);
-    source.start();
-    return {
-      id,
-      type: "Noise",
-      node: source,
-      outputNode: gain,
-      outputs: { Out: gain },
-      inputs: {},
-      _nodes: [source, gain],
-      params: {
-        level: { value: 0.3, min: 0, max: 1, audioParam: gain.gain, label: "Level" },
-        color: { value: "white", options: ["white", "pink"], label: "Color" },
-      },
-    };
-  }
-
-  _createOutput(id) {
-    const gain = this.ctx.createGain();
-    gain.gain.value = 0.5;
-    gain.connect(this.masterGain);
-    return {
-      id,
-      type: "Output",
-      node: gain,
-      outputNode: null,
-      outputs: {},
-      inputs: { InL: gain, InR: gain },
-      _nodes: [gain],
-      params: {
-        level: { value: 0.5, min: 0, max: 1, audioParam: gain.gain, label: "Level" },
-      },
-    };
-  }
-
-  _createDelay(id) {
-    const input = this.ctx.createGain();
-    const delay = this.ctx.createDelay(2.0);
-    const feedback = this.ctx.createGain();
-    const output = this.ctx.createGain();
-    delay.delayTime.value = 0.35;
-    feedback.gain.value = 0.4;
-    output.gain.value = 0.6;
-    input.connect(delay);
-    delay.connect(feedback);
-    feedback.connect(delay);
-    input.connect(output);
-    delay.connect(output);
-    return {
-      id,
-      type: "Delay",
-      node: input,
-      outputNode: output,
-      outputs: { Out: output },
-      inputs: { In: input },
-      _nodes: [input, delay, feedback, output],
-      params: {
-        time: { value: 0.35, min: 0.01, max: 2, audioParam: delay.delayTime, label: "Time" },
-        feedback: { value: 0.4, min: 0, max: 0.95, audioParam: feedback.gain, label: "Fdbk" },
-        mix: { value: 0.6, min: 0, max: 1, audioParam: output.gain, label: "Mix" },
-      },
-    };
-  }
-
-  _createPanner(id) {
-    const panner = this.ctx.createStereoPanner();
-    panner.pan.value = 0;
-    return {
-      id,
-      type: "Panner",
-      node: panner,
-      outputNode: panner,
-      outputs: { Out: panner },
-      inputs: { In: panner, PanMod: panner.pan },
-      _nodes: [panner],
-      params: {
-        pan: { value: 0, min: -1, max: 1, audioParam: panner.pan, label: "Pan" },
-      },
-    };
-  }
-
-  _createChorus(id) {
-    const input = this.ctx.createGain();
-    const output = this.ctx.createGain();
-    const dry = this.ctx.createGain();
-    const wet = this.ctx.createGain();
-    dry.gain.value = 0.7;
-    wet.gain.value = 0.5;
-
-    // Voice 1
-    const delay1 = this.ctx.createDelay(0.05);
-    delay1.delayTime.value = 0.015;
-    const lfo1 = this.ctx.createOscillator();
-    lfo1.type = "sine";
-    lfo1.frequency.value = 0.8;
-    const lfoGain1 = this.ctx.createGain();
-    lfoGain1.gain.value = 0.003;
-    lfo1.connect(lfoGain1);
-    lfoGain1.connect(delay1.delayTime);
-    lfo1.start();
-
-    // Voice 2
-    const delay2 = this.ctx.createDelay(0.05);
-    delay2.delayTime.value = 0.02;
-    const lfo2 = this.ctx.createOscillator();
-    lfo2.type = "sine";
-    lfo2.frequency.value = 1.1;
-    const lfoGain2 = this.ctx.createGain();
-    lfoGain2.gain.value = 0.003;
-    lfo2.connect(lfoGain2);
-    lfoGain2.connect(delay2.delayTime);
-    lfo2.start();
-
-    // Routing
-    input.connect(dry);
-    dry.connect(output);
-    input.connect(delay1);
-    input.connect(delay2);
-    delay1.connect(wet);
-    delay2.connect(wet);
-    wet.connect(output);
-
-    const mod = {
-      id,
-      type: "Chorus",
-      node: input,
-      outputNode: output,
-      outputs: { Out: output },
-      inputs: { In: input },
-      _nodes: [input, output, dry, wet, delay1, delay2, lfo1, lfo2, lfoGain1, lfoGain2],
-      _lfo2: lfo2,
-      _lfoGain2: lfoGain2,
-      params: {
-        rate: { value: 0.8, min: 0.1, max: 5, audioParam: lfo1.frequency, label: "Rate" },
-        depth: { value: 0.003, min: 0, max: 0.01, audioParam: lfoGain1.gain, label: "Depth" },
-        mix: { value: 0.5, min: 0, max: 1, audioParam: wet.gain, label: "Mix" },
-      },
-    };
-    return mod;
-  }
-
-  connect(fromId, fromPort, toId, toPort) {
-    const fromMod = this.modules.get(fromId);
-    const toMod = this.modules.get(toId);
-    if (!fromMod || !toMod) return false;
-    const outputNode = fromMod.outputs[fromPort];
-    const inputNode = toMod.inputs[toPort];
-    if (!outputNode || !inputNode) return false;
-    try {
-      outputNode.connect(inputNode);
-      this.connections.push({ fromId, fromPort, toId, toPort });
-      return true;
-    } catch (e) {
-      console.error("Connection error:", e);
-      return false;
-    }
-  }
-
-  disconnect(fromId, fromPort, toId, toPort) {
-    const fromMod = this.modules.get(fromId);
-    const toMod = this.modules.get(toId);
-    if (!fromMod || !toMod) return;
-    const outputNode = fromMod.outputs[fromPort];
-    const inputNode = toMod.inputs[toPort];
-    if (!outputNode || !inputNode) return;
-    try {
-      outputNode.disconnect(inputNode);
-    } catch (e) {
-      if (e.name !== "InvalidAccessError") {
-        console.error("AudioEngine.disconnect: unexpected error", e);
-      }
-    }
-    this.connections = this.connections.filter(
-      (c) => !(c.fromId === fromId && c.fromPort === fromPort && c.toId === toId && c.toPort === toPort)
-    );
-  }
-
-  removeModule(id) {
-    const mod = this.modules.get(id);
-    if (!mod) return;
-    // Disconnect everything
-    const toRemove = this.connections.filter((c) => c.fromId === id || c.toId === id);
-    toRemove.forEach((c) => this.disconnect(c.fromId, c.fromPort, c.toId, c.toPort));
-    // Stop and disconnect all internal nodes
-    const nodes = mod._nodes || [mod.node, mod.outputNode].filter(Boolean);
-    nodes.forEach((n) => {
-      try { if (n.stop) n.stop(); } catch (e) {}
-      try { n.disconnect(); } catch (e) {}
-    });
-    this.modules.delete(id);
-  }
-
-  getScopeData() {
-    if (!this.analyser) return new Float32Array(256);
-    this.analyser.getFloatTimeDomainData(this.scopeData);
-    return this.scopeData;
-  }
-
-  setParam(moduleId, paramName, value) {
-    const mod = this.modules.get(moduleId);
-    if (!mod || !mod.params[paramName]) return;
-    mod.params[paramName].value = value;
-    if (mod.params[paramName].audioParam) {
-      mod.params[paramName].audioParam.setValueAtTime(value, this.ctx.currentTime);
-    }
-    // Handle Chorus cross-updates
-    if (mod.type === "Chorus" && paramName === "rate") {
-      mod._lfo2.frequency.setValueAtTime(value * 1.375, this.ctx.currentTime);
-    }
-    if (mod.type === "Chorus" && paramName === "depth") {
-      mod._lfoGain2.gain.setValueAtTime(value, this.ctx.currentTime);
-    }
-    // Handle waveform changes
-    if (paramName === "waveform" || paramName === "filterType") {
-      if (mod.node && mod.node.type !== undefined) {
-        mod.node.type = value;
-      }
-    }
-  }
-
-  triggerEnvelopes() {
-    this.modules.forEach((mod) => {
-      if (mod.trigger) mod.trigger();
-    });
-  }
-
-  releaseEnvelopes() {
-    this.modules.forEach((mod) => {
-      if (mod.releaseEnv) mod.releaseEnv();
-    });
-  }
-}
-
-// ─── Module Definitions (UI metadata) ───────────────────────────────────────
-
-const MODULE_DEFS = {
-  OscB: {
-    label: "OscB",
-    category: "oscillator",
-    color: "#c33",
-    inputs: [],
-    outputs: ["Out"],
-    modInputs: ["PitchMod", "FmMod"],
-    description: "Oscillator B - Classic analog waveforms with FM",
-  },
-  OscC: {
-    label: "OscC",
-    category: "oscillator",
-    color: "#c55",
-    inputs: [],
-    outputs: ["Out"],
-    modInputs: ["PitchMod"],
-    description: "Oscillator C - With pulse width",
-  },
-  Filter: {
-    label: "Filter",
-    category: "filter",
-    color: "#2a7",
-    inputs: ["In"],
-    outputs: ["Out"],
-    modInputs: ["FreqMod", "ResMod"],
-    description: "Multi-mode filter with resonance",
-  },
-  Envelope: {
-    label: "Env",
-    category: "modulator",
-    color: "#c80",
-    inputs: ["In"],
-    outputs: ["Out"],
-    modInputs: [],
-    description: "ADSR Envelope generator",
-  },
-  LFO: {
-    label: "LFO",
-    category: "modulator",
-    color: "#c60",
-    inputs: [],
-    outputs: ["Out"],
-    modInputs: [],
-    description: "Low frequency oscillator for modulation",
-  },
-  Amplifier: {
-    label: "Amp",
-    category: "level",
-    color: "#66a",
-    inputs: ["In"],
-    outputs: ["Out"],
-    modInputs: ["GainMod"],
-    description: "Voltage controlled amplifier",
-  },
-  Mixer2: {
-    label: "Mix2",
-    category: "level",
-    color: "#669",
-    inputs: ["In1", "In2"],
-    outputs: ["Out"],
-    modInputs: [],
-    description: "2-channel mixer",
-  },
-  Noise: {
-    label: "Noise",
-    category: "oscillator",
-    color: "#888",
-    inputs: [],
-    outputs: ["Out"],
-    modInputs: [],
-    description: "White/Pink noise generator",
-  },
-  Delay: {
-    label: "Delay",
-    category: "effect",
-    color: "#4899bb",
-    inputs: ["In"],
-    outputs: ["Out"],
-    modInputs: [],
-    description: "Delay effect with feedback",
-  },
-  Panner: {
-    label: "Pan",
-    category: "level",
-    color: "#6a6",
-    inputs: ["In"],
-    outputs: ["Out"],
-    modInputs: ["PanMod"],
-    description: "Stereo panner",
-  },
-  Chorus: {
-    label: "Chorus",
-    category: "effect",
-    color: "#48a9bb",
-    inputs: ["In"],
-    outputs: ["Out"],
-    modInputs: [],
-    description: "Stereo chorus effect",
-  },
-  Output: {
-    label: "Out",
-    category: "io",
-    color: "#555",
-    inputs: ["InL", "InR"],
-    outputs: [],
-    modInputs: [],
-    description: "Master audio output",
-  },
-};
-
-const CATEGORIES = [
-  { key: "oscillator", label: "Oscillators", modules: ["OscB", "OscC", "Noise"] },
-  { key: "filter", label: "Filters", modules: ["Filter"] },
-  { key: "modulator", label: "Modulators", modules: ["Envelope", "LFO"] },
-  { key: "level", label: "Level", modules: ["Amplifier", "Mixer2", "Panner"] },
-  { key: "effect", label: "Effects", modules: ["Delay", "Chorus"] },
-  { key: "io", label: "I/O", modules: ["Output"] },
-];
+import AudioEngine from "./AudioEngine";
+import { MODULE_DEFS, CATEGORIES } from "./moduleDefs";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -634,7 +20,8 @@ function getPortPosition(moduleState, portName, isOutput) {
 
   const headerH = 32;
   const paramsH = Object.keys(moduleState.params || {}).length * 32 + 8;
-  const baseY = headerH + paramsH + 12;
+  const customH = def.hasCustomUI ? 55 : 0;
+  const baseY = headerH + paramsH + customH + 12;
 
   if (isOutput) {
     const spacing = MODULE_WIDTH / (allOutputs.length + 1);
@@ -653,8 +40,31 @@ function getModuleHeight(type, params) {
   const allInputs = [...(def.inputs || []), ...(def.modInputs || [])];
   const hasPorts = allInputs.length > 0 || (def.outputs || []).length > 0;
   const portsH = hasPorts ? 60 : 10;
-  return headerH + paramsH + portsH;
+  const customH = def.hasCustomUI ? 55 : 0;
+  return headerH + paramsH + customH + portsH;
 }
+
+// Keyboard note mapping: computer keys -> MIDI notes (relative to C4=60)
+const KEY_NOTE_MAP = {
+  a: 60, w: 61, s: 62, e: 63, d: 64, f: 65, t: 66, g: 67, y: 68, h: 69, u: 70, j: 71, k: 72,
+};
+
+// Piano key layout for the clickable keyboard
+const PIANO_KEYS = [
+  { note: 60, label: "C", black: false },
+  { note: 61, label: "C#", black: true },
+  { note: 62, label: "D", black: false },
+  { note: 63, label: "D#", black: true },
+  { note: 64, label: "E", black: false },
+  { note: 65, label: "F", black: false },
+  { note: 66, label: "F#", black: true },
+  { note: 67, label: "G", black: false },
+  { note: 68, label: "G#", black: true },
+  { note: 69, label: "A", black: false },
+  { note: 70, label: "A#", black: true },
+  { note: 71, label: "B", black: false },
+  { note: 72, label: "C", black: false },
+];
 
 // ─── Components ─────────────────────────────────────────────────────────────
 
@@ -988,6 +398,93 @@ function ModuleNode({
           </g>
         );
       })}
+
+      {/* Keyboard custom UI */}
+      {moduleState.type === "Keyboard" && (() => {
+        const kbY = paramsStartY + Object.keys(params).length * 32 + 12;
+        const whiteKeys = PIANO_KEYS.filter(k => !k.black);
+        const ww = MODULE_WIDTH / whiteKeys.length; // white key width
+        let whiteIdx = 0;
+        return (
+          <g>
+            {/* White keys */}
+            {PIANO_KEYS.filter(k => !k.black).map((k, i) => (
+              <rect
+                key={`w-${k.note}`}
+                x={i * ww + 1}
+                y={kbY}
+                width={ww - 1}
+                height={40}
+                rx={1}
+                fill="#ddd"
+                stroke="#999"
+                strokeWidth={0.5}
+                style={{ cursor: "pointer" }}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  const eng = engine.current;
+                  const mod = eng.modules.get(moduleState.id);
+                  if (mod && mod.playNote) mod.playNote(k.note);
+                }}
+                onMouseUp={(e) => {
+                  e.stopPropagation();
+                  const eng = engine.current;
+                  const mod = eng.modules.get(moduleState.id);
+                  if (mod && mod.releaseNote) mod.releaseNote(k.note);
+                }}
+                onMouseLeave={(e) => {
+                  const eng = engine.current;
+                  const mod = eng.modules.get(moduleState.id);
+                  if (mod && mod.releaseNote) mod.releaseNote(k.note);
+                }}
+              />
+            ))}
+            {/* Black keys */}
+            {(() => {
+              const blackKeyPositions = [];
+              let wi = 0;
+              for (let i = 0; i < PIANO_KEYS.length; i++) {
+                if (PIANO_KEYS[i].black) {
+                  blackKeyPositions.push({ ...PIANO_KEYS[i], xPos: wi * ww - ww * 0.3 });
+                } else {
+                  wi++;
+                }
+              }
+              return blackKeyPositions.map((k) => (
+                <rect
+                  key={`b-${k.note}`}
+                  x={k.xPos}
+                  y={kbY}
+                  width={ww * 0.6}
+                  height={25}
+                  rx={1}
+                  fill="#222"
+                  stroke="#000"
+                  strokeWidth={0.5}
+                  style={{ cursor: "pointer" }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    const eng = engine.current;
+                    const mod = eng.modules.get(moduleState.id);
+                    if (mod && mod.playNote) mod.playNote(k.note);
+                  }}
+                  onMouseUp={(e) => {
+                    e.stopPropagation();
+                    const eng = engine.current;
+                    const mod = eng.modules.get(moduleState.id);
+                    if (mod && mod.releaseNote) mod.releaseNote(k.note);
+                  }}
+                  onMouseLeave={(e) => {
+                    const eng = engine.current;
+                    const mod = eng.modules.get(moduleState.id);
+                    if (mod && mod.releaseNote) mod.releaseNote(k.note);
+                  }}
+                />
+              ));
+            })()}
+          </g>
+        );
+      })()}
 
       {/* Input ports */}
       {allInputs.map((port, i) => {
@@ -1354,20 +851,42 @@ export default function NordModularEmulator() {
     [panOffset]
   );
 
-  // Keyboard trigger
+  // Keyboard trigger + musical keyboard
   useEffect(() => {
+    const heldNotes = new Set();
     const down = (e) => {
-      if (e.key === " " && !keyHeld && e.target.tagName !== "INPUT" && e.target.tagName !== "SELECT") {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+      if (e.key === " " && !keyHeld) {
         e.preventDefault();
         setKeyHeld(true);
         initAudio();
         engineRef.current.triggerEnvelopes();
+        return;
+      }
+      // Musical keyboard: route to all Keyboard modules
+      const note = KEY_NOTE_MAP[e.key.toLowerCase()];
+      if (note !== undefined && !e.repeat && !heldNotes.has(note)) {
+        e.preventDefault();
+        heldNotes.add(note);
+        initAudio();
+        engineRef.current.modules.forEach((mod) => {
+          if (mod.type === "Keyboard" && mod.playNote) mod.playNote(note);
+        });
       }
     };
     const up = (e) => {
-      if (e.key === " " && e.target.tagName !== "INPUT" && e.target.tagName !== "SELECT") {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+      if (e.key === " ") {
         setKeyHeld(false);
         engineRef.current.releaseEnvelopes();
+        return;
+      }
+      const note = KEY_NOTE_MAP[e.key.toLowerCase()];
+      if (note !== undefined) {
+        heldNotes.delete(note);
+        engineRef.current.modules.forEach((mod) => {
+          if (mod.type === "Keyboard" && mod.releaseNote) mod.releaseNote(note);
+        });
       }
     };
     window.addEventListener("keydown", down);
