@@ -1118,7 +1118,7 @@ class AudioEngine {
       inputs: { In: gain, GainMod: gain.gain },
       _nodes: [gain],
       params: {
-        level: { value: 0.8, min: 0, max: 1, audioParam: gain.gain, label: "Level" },
+        level: { value: 0.8, min: 0, max: 4, audioParam: gain.gain, label: "Level" },
       },
     };
   }
