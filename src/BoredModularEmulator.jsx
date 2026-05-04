@@ -756,7 +756,7 @@ function CableSVG({ x1, y1, x2, y2, color }) {
 
 // ─── Main App ───────────────────────────────────────────────────────────────
 
-export default function NordModularEmulator() {
+export default function BoredModularEmulator() {
   const engineRef = useRef(new AudioEngine());
   const svgRef = useRef(null);
   const [modules, setModules] = useState([]);
@@ -776,6 +776,24 @@ export default function NordModularEmulator() {
       setAudioStarted(true);
     }
   }, [audioStarted]);
+
+  const addModuleAt = useCallback(
+    (type, x, y) => {
+      initAudio();
+      const id = genId();
+      const eng = engineRef.current;
+      const audioMod = eng.createModule(id, type);
+      if (!audioMod) return;
+
+      const params = {};
+      Object.entries(audioMod.params).forEach(([k, v]) => {
+        params[k] = { ...v };
+      });
+
+      setModules((prev) => [...prev, { id, type, x, y, params }]);
+    },
+    [initAudio]
+  );
 
   const addModule = useCallback(
     (type) => {
@@ -1004,6 +1022,19 @@ export default function NordModularEmulator() {
     });
   }, []);
 
+  const handleSidebarDrop = useCallback(
+    (e) => {
+      const type = e.dataTransfer.getData("application/x-bored-modular");
+      if (!type || !MODULE_DEFS[type]) return;
+      e.preventDefault();
+      const rect = svgRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left - panOffset.x;
+      const y = e.clientY - rect.top - panOffset.y;
+      addModuleAt(type, x, y);
+    },
+    [panOffset, addModuleAt]
+  );
+
   // Mouse move
   const handleMouseMove = useCallback(
     (e) => {
@@ -1190,18 +1221,47 @@ export default function NordModularEmulator() {
                 return (
                   <div
                     key={type}
+                    draggable
                     onClick={() => addModule(type)}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/x-bored-modular", type);
+                      e.dataTransfer.effectAllowed = "copy";
+                      const chip = e.currentTarget.querySelector("[data-drag-chip]");
+                      if (chip) e.dataTransfer.setDragImage(chip, 0, 0);
+                    }}
                     style={{
                       padding: "6px 12px",
-                      cursor: "pointer",
+                      cursor: "grab",
                       display: "flex",
                       alignItems: "center",
                       gap: 8,
                       transition: "background 0.15s",
+                      position: "relative",
                     }}
                     onMouseEnter={(e) => (e.currentTarget.style.background = "#1e1e22")}
                     onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                   >
+                    <div
+                      data-drag-chip
+                      style={{
+                        position: "absolute",
+                        top: -9999,
+                        left: -9999,
+                        padding: "4px 8px",
+                        background: "#1e1e22",
+                        border: "1px solid #333",
+                        borderRadius: 3,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        fontSize: 12,
+                        color: "#ddd",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      <div style={{ width: 8, height: 8, borderRadius: 2, background: d.color }} />
+                      {d.label}
+                    </div>
                     <div
                       style={{
                         width: 10,
@@ -1320,6 +1380,8 @@ export default function NordModularEmulator() {
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseDown={handleSvgMouseDown}
+        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }}
+        onDrop={handleSidebarDrop}
       >
         {/* Grid pattern */}
         <defs>

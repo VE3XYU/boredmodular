@@ -1,5 +1,5 @@
 // ─── Audio Engine ───────────────────────────────────────────────────────────
-// Web Audio API based modular synthesis engine inspired by the Nord Modular G2
+// Web Audio API based modular synthesis engine
 
 // Note-to-frequency conversion
 const NOTE_FREQ = (note) => 440 * Math.pow(2, (note - 69) / 12);
