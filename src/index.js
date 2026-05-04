@@ -1,10 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import NordModularEmulator from './NordModularEmulator';
+import BoredModularEmulator from './BoredModularEmulator';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-    <NordModularEmulator />
+    <BoredModularEmulator />
   </React.StrictMode>
 );

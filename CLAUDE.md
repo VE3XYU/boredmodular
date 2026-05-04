@@ -1,27 +1,14 @@
-# CLAUDE.md — Nord Modular Web Emulator
+# CLAUDE.md
 
-## What This Project Is
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-A browser-based partial emulation of the **Clavia Nord Modular** synthesizer's modular patching system, built with React and the Web Audio API. Users place modules on a canvas, connect them with virtual cables (output → input), tweak parameters in real time, and hear the results immediately.
+## Project
 
-The goal is **accurate, usable sound design** — not just a visual toy. All audio runs through the Web Audio API with real signal-flow patching. The project is inspired by the Nord Modular G1 but is not a cycle-accurate emulation; it aims to capture the *workflow and sonic character* of modular patching.
+Browser-based modular synthesizer — a spiritual homage to the patch-cord modular tradition, not a clone of any specific hardware. Users drop modules on an SVG canvas, patch them with virtual cables (output → input), tweak params, and hear the result through the Web Audio API. The goal is usable sound design — accurate workflow and sonic character, not cycle-accurate DSP.
 
-## Project Structure
+Built with Create React App, React 18, no extra runtime deps. The published name is "bored modular".
 
-```
-nord-modular-app/
-├── package.json              # CRA-based, React 18, no extra deps
-├── public/
-│   └── index.html            # Minimal shell
-├── src/
-│   ├── index.js              # Entry point, renders <NordModularEmulator />
-│   └── NordModularEmulator.jsx  # THE ENTIRE APP — single-file monolith
-└── CLAUDE.md                 # You are here
-```
-
-Everything lives in **`NordModularEmulator.jsx`** (~1300 lines). This is intentional for now — the project is in early prototype stage. Splitting into separate files is a good future refactor (see below).
-
-## How to Run
+## Commands
 
 ```bash
 npm install
@@ -29,135 +16,139 @@ npm start        # dev server at localhost:3000
 npm run build    # production build to build/
 ```
 
-Requires Node.js ≥ 16. No other dependencies beyond React and react-scripts.
+There are no tests, no lint script, and no typecheck — just the two CRA scripts. Node ≥ 16.
 
-## Architecture Overview
+## Architecture
 
-The app has two parallel systems that stay in sync:
+The app is split across three source files. Two parallel systems stay in sync: an imperative AudioEngine (Web Audio graph) and React state (SVG render).
 
-### 1. AudioEngine (imperative, class-based)
+```
+src/
+├── index.js                  # CRA entry, renders <BoredModularEmulator />
+├── AudioEngine.js            # AudioEngine class — all _create*() methods, connect/disconnect, setParam
+├── moduleDefs.js             # MODULE_DEFS (UI metadata) + CATEGORIES (sidebar order)
+└── BoredModularEmulator.jsx   # React components (Scope, SvgSlider, Port, ModuleNode, CableSVG) + main app
+```
 
-`class AudioEngine` — a plain JS class that owns the Web Audio API graph. Stored in a `useRef` so it persists across renders without triggering them.
+### AudioEngine (imperative)
 
-Key points:
-- **`this.ctx`** — single `AudioContext`, lazily initialised on first user interaction (browser autoplay policy)
-- **`this.modules`** — `Map<id, AudioModuleObject>` where each module object contains:
-  - `node` — primary Web Audio node (OscillatorNode, BiquadFilterNode, etc.)
-  - `outputNode` — the node other modules connect *from* (often a GainNode wrapper)
-  - `outputs` — `{ portName: AudioNode }` map of connectable output ports
-  - `inputs` — `{ portName: AudioNode | AudioParam }` map of connectable input ports
-  - `params` — `{ paramName: { value, min, max, audioParam?, options?, label } }` — UI-facing parameter definitions, with optional direct reference to the underlying `AudioParam`
-  - `trigger()` / `releaseEnv()` — only on Envelope modules, for gate control
-- **`connect(fromId, fromPort, toId, toPort)`** — wires an output AudioNode to an input AudioNode or AudioParam
-- **`disconnect(...)`** — tears down a specific connection
-- **`setParam(moduleId, paramName, value)`** — updates both the param object and the underlying AudioParam
-- **Signal chain**: modules → user-patched connections → Output module → masterGain → analyser → ctx.destination
+`class AudioEngine` owns the Web Audio graph. Stored in `useRef` so it persists across renders. Key shape:
 
-### 2. React State (declarative, functional)
+- `this.ctx` — single `AudioContext`, lazily initialised on first user interaction (autoplay policy)
+- `this.modules` — `Map<id, AudioModuleObject>` where each module exposes:
+  - `node`, `outputNode`, `_nodes[]` (for cleanup)
+  - `outputs: { portName: AudioNode }` — sources you connect *from*
+  - `inputs: { portName: AudioNode | AudioParam | null }` — destinations you connect *to*. `null` = virtual port (see below).
+  - `params: { name: { value, min, max, audioParam?, options?, label } }` — UI-facing param defs, optionally bound to an `AudioParam`
+  - Optional method hooks: `trigger()`/`releaseEnv()` (envelopes), `playNote()`/`releaseNote()` (Keyboard), `clockTick()`/`resetSeq()` (sequencers), `_recalcFreq()` (slave oscs)
+- Final chain: modules → user patches → `Output` → `masterGain` → `analyser` → `ctx.destination`
 
-The `NordModularEmulator` component holds:
-- **`modules`** — array of `{ id, type, x, y, params }` — position + serialisable param snapshots
-- **`connections`** — array of `{ fromId, fromPort, toId, toPort, color }` — the patch cables
-- **`panOffset`** — canvas pan state (shift+drag or alt+drag)
-- **`dragging`** / **`cableDrag`** — transient interaction state
+### React state (declarative)
 
-React state drives the SVG rendering. The AudioEngine drives the audio. When a user changes a param slider, both are updated in `handleParamChange`.
+`BoredModularEmulator` holds:
+- `modules` — `[{ id, type, x, y, params }]` (canvas-space x/y, serialisable param snapshots)
+- `connections` — `[{ fromId, fromPort, toId, toPort, color }]`
+- `panOffset`, `dragging`, `cableDrag`, `mousePos` — interaction state
+- `seqFrame` — 66ms tick counter to refresh sequencer step LEDs (~15fps)
 
-### Module System
+React state drives the SVG render; AudioEngine drives the audio. `handleParamChange` writes both. Patch save/load is implemented (localStorage + JSON export/import via `loadPatchData`).
 
-Defined in two places:
-1. **`MODULE_DEFS`** — static UI metadata (colour, port names, category, description). This is what the sidebar and SVG renderer use.
-2. **`AudioEngine._create*(id)`** methods — each returns an audio module object with real Web Audio nodes.
+### Module system — definition lives in two places
 
-Adding a new module requires updating both. Current modules:
+Each module is defined in **both** `moduleDefs.js` (UI metadata: label, color, category, port names, optional `customUIHeight`) **and** `AudioEngine._create<Type>(id)` (the audio graph + params). Adding a module requires:
 
-| Module    | Type       | Audio Nodes Used                        | Inputs              | Outputs | Notes |
-|-----------|------------|-----------------------------------------|---------------------|---------|-------|
-| OscB      | Oscillator | OscillatorNode → GainNode               | PitchMod, FmMod     | Out     | Saw default, 4 waveforms |
-| OscC      | Oscillator | OscillatorNode → GainNode               | PitchMod            | Out     | Square default, has PW param (not yet functional) |
-| Filter    | Filter     | BiquadFilterNode                        | In, FreqMod, ResMod | Out     | LP/HP/BP/Notch |
-| Envelope  | Modulator  | GainNode (0→1→S→0 automation)           | In                  | Out     | ADSR, triggered by gate |
-| LFO       | Modulator  | OscillatorNode → GainNode               | —                   | Out     | Mod source, amount controls depth |
-| Amplifier | Level      | GainNode                                | In, GainMod         | Out     | VCA |
-| Mixer2    | Level      | 2× GainNode → merger GainNode           | In1, In2            | Out     | 2-ch mixer |
-| Noise     | Oscillator | BufferSourceNode (white noise) → GainNode | —                 | Out     | Pink noise option exists but not implemented |
-| Delay     | Effect     | GainNode → DelayNode → feedback loop → GainNode | In          | Out     | Time, feedback, mix |
-| Output    | I/O        | GainNode → masterGain                   | InL, InR            | —       | Final output to speakers |
+1. Entry in `MODULE_DEFS` (`moduleDefs.js`)
+2. Type string added to the relevant `CATEGORIES` group (sidebar order)
+3. `_create<Type>(id)` method on `AudioEngine` — return `{ id, type, node, outputNode, outputs, inputs, params, _nodes }` plus any system-specific fields (`_slaveTargets`, `_pitchTargets`, `_clockSubscribers`, etc.)
+4. `case "<Type>":` in `AudioEngine.createModule()` switch
+5. If the module needs cross-param updates, add a branch in `setParam`
 
-### Port Types and Colour Coding
+### Modules (39 total, by category)
 
-- **Red circles** — Outputs. Drag FROM these.
-- **Blue circles** — Audio inputs (signal flow).
-- **Yellow circles** — Modulation inputs (connect to an AudioParam like frequency or gain).
+- **Oscillators** (14): `OscA`, `OscB`, `OscC`, `MasterOsc`, `OscSlvA`–`OscSlvE`, `OscSlvFM`, `OscSineBank`, `Noise`, `DrumSynth`, `FormantOsc`
+- **Filters** (3): `Filter`, `FilterC` (3-output LP/BP/HP), `FilterE` (12/24 dB slope)
+- **Modulators** (11): `Envelope`, `ADSREnv`, `LFO`, `LFOA`, `ClkGen`, `RandomGen`, `PortamentoA`, `EventSeq`, `CtrlSeq`, `NoteSeqA`, `NoteSeqB`
+- **Level** (5): `Amplifier`, `Mixer2`, `Mixer8`, `XFade`, `Panner`
+- **Effects** (4): `Delay`, `ShortDelay` (flanger), `Chorus`, `Shaper`
+- **I/O** (2): `Keyboard` (playable), `Output`
 
-Connections are strictly **output → input**. The cable drag starts on mousedown of an output port and completes on mouseup over an input port.
+### Port semantics
 
-### Cable Rendering
+- **Red circles** = outputs. **Blue** = audio inputs. **Yellow** = modulation inputs (target an `AudioParam`).
+- Cable drag is **bidirectional** — start from any port, the system normalises to output→input on drop. Same-type drops are rejected.
+- Cables render *on top* of modules (SVG order: modules → cables → transparent port hit overlay last for reliable interaction over cables).
+- `CableSVG` draws a cubic Bézier with calculated sag (gravity sim). Each cable gets a random hue. Double-click to remove.
 
-`CableSVG` draws a cubic Bézier curve with calculated sag (simulating gravity/droop on a physical cable). Each cable gets a random hue on creation. Double-click a cable to remove it.
+### Master/Slave oscillator system
 
-### Gate / Trigger System
+Slave oscillators (`OscSlvA`–`E`, `OscSlvFM`, `OscSineBank`) take pitch from a master (`OscA`/`B`/`C`/`MasterOsc`) via a **virtual** `Slv → Mst` connection — no audio flows; pitch propagates through fields:
 
-- **Spacebar** (hold) or the **GATE button** in the sidebar triggers all Envelope modules simultaneously via `engineRef.current.triggerEnvelopes()`.
-- Release fires `releaseEnvelopes()`.
-- This is a global gate — there's no per-voice or MIDI triggering yet.
+- Master has `_slaveTargets[]`, `_frequency`, and a `Slv` output port
+- Slave has `_masterFreq`, `_masterModId`, `_recalcFreq()`, and a `Mst` input that maps to `null` (virtual)
+- `connect()` detects `Slv→Mst` and writes the relationship instead of calling `outputNode.connect()`. Same for disconnect.
+- Slave freq formula: `masterFreq * partials * 2^(detune/12) * 2^(fine/1200)` (with per-module variations)
+- Master param changes call `_propagateToSlaves(masterMod)` to recompute every slave's frequency
 
-### Oscilloscope
+### Clock / Sequencer subscriber system
 
-The `Scope` component reads `analyser.getFloatTimeDomainData()` on every animation frame and draws a green phosphor-style waveform on a `<canvas>`.
+`ClkGen` drives sequencers (`EventSeq`, `CtrlSeq`, `NoteSeqA`, `NoteSeqB`) via subscriber lists, not audio:
 
-## Known Limitations and Bugs
+- ClkGen schedules `setTimeout` ticks at 24 PPQN; on quarter notes (`Clk4`) it calls every `_clockSubscribers[].clockTick()`, on bar boundaries (`Sync`) it calls every `_resetSubscribers[].resetSeq()`.
+- Sequencer `Clk` and `Rst` inputs are virtual (`null`); `connect()` recognises them and pushes onto the clock module's subscriber list.
+- The sequencer's own `Clk24`/`Clk4`/`Sync` are `ConstantSourceNode`s that pulse 0→1→0 — useful as audio-rate triggers if patched into envelope mod inputs, but the clock-tick logic above is the primary mechanism.
 
-These are the issues a future session should be aware of:
+### Note-source pattern (Keyboard, NoteSeqA, NoteSeqB)
 
-1. **OscC pulse width param is non-functional** — the `pulseWidth` param exists in the UI but doesn't affect audio. True PWM requires an AudioWorklet (the built-in OscillatorNode doesn't support variable pulse width).
-2. **Noise "pink" option not implemented** — the dropdown exists but both options produce white noise. Pink noise requires shaping the spectrum with a filter network.
-3. **No patch save/load** — state is lost on refresh.
-4. **No MIDI support** — gate is spacebar-only, no pitch control from keyboard/MIDI.
-5. **Oscillators are always running** — they start immediately on creation. There's no concept of voice allocation or note-on/off per oscillator.
-6. **Connection validation is minimal** — you can connect an LFO output to a filter's audio input (which works but may produce unexpected results). No type checking on port compatibility.
-7. **Module removal can leave dangling Web Audio connections** — the cleanup in `removeModule` tries to disconnect everything but may miss indirect references in complex patches.
-8. **Single-file monolith** — everything is in one 1300-line file. Fine for now, but will need splitting as complexity grows.
-9. **Port position calculation is fragile** — `getPortPosition()` calculates port positions from module state using hardcoded layout math. If module visual layout changes, port positions break and cables will misalign.
-10. **No zoom** — only pan (shift+drag). Adding zoom requires scaling the SVG transform and adjusting all mouse coordinate calculations.
+These modules track their pitch and gate targets directly rather than through the standard audio graph:
 
-## How to Add a New Module
+- `Note` output is a `ConstantSourceNode` whose offset = frequency in Hz. When `Note → PitchMod` is patched, the target `AudioParam` is pushed onto the source's `_pitchTargets[]` and `connect()` does **not** call `outputNode.connect(inputNode)`.
+- On `playNote(midi)`, the source iterates `_pitchTargets` and `setValueAtTime(freq, now)` directly. This is the trick that makes oscillators play in tune — adding the Note's offset to the oscillator's `frequency` would *sum* not *replace*.
+- `Gate` output is a real audio-rate `ConstantSourceNode` (0/1), but additionally tracks `_gateTargetEnvelopes[]`: any envelope module connected to it gets `trigger()`/`releaseEnv()` calls on note on/off.
+- Computer keys: `ASDFGHJK` = white keys C–C, `WETYU` = black keys (see `KEY_NOTE_MAP`). Spacebar still triggers the global gate.
 
-1. **Add a `MODULE_DEFS` entry** with label, category, colour, input/output port names, and modulation input names.
-2. **Add the type string** to the relevant `CATEGORIES` entry so it appears in the sidebar.
-3. **Add `_create<Type>(id)` method** to `AudioEngine`. Follow the existing pattern:
-   - Create Web Audio nodes
-   - Wire them internally
-   - Return `{ id, type, node, outputNode, outputs: {}, inputs: {}, params: {} }`
-   - For `inputs`, map port names to either AudioNodes (signal) or AudioParams (modulation)
-4. **Add a case** in `AudioEngine.createModule()` switch statement.
-5. **Test** the signal flow by patching it into an Output module.
+### Coordinate system (important when changing layout)
 
-## Recommended Next Steps (Priority Order)
+- `moduleState.x/y` are **canvas-space** (the world the SVG `<g transform="translate(panOffset)">` lives in)
+- `getPortPosition()` returns canvas-space and includes `def.customUIHeight || 0` in its math
+- `mousePos` from SVG events is **viewport/screen space** — subtract `panOffset` to get canvas-space
+- `getModuleHeight()` also depends on `customUIHeight`; keep these in sync if you change a module's visual layout, or cables will misalign
 
-### High Impact
-- **MIDI input** — Use the Web MIDI API to receive note-on/off, map note number to oscillator frequency, and trigger envelopes. This transforms it from a drone machine into a playable instrument.
-- **Keyboard module** — A virtual on-screen keyboard or a "Keyboard" module that outputs pitch CV and gate signals.
-- **Patch save/load** — Serialise `modules` and `connections` state to JSON. Store in localStorage or allow file export/import.
+### `customUIHeight` for in-module UI
 
-### Medium Impact
-- **AudioWorklet-based oscillators** — Replace built-in OscillatorNode with custom AudioWorklet processors for proper pulse width modulation, oscillator sync, and more accurate Nord-style waveforms.
-- **More modules** — Ring Modulator, Phaser, Chorus, Reverb (ConvolverNode), Sequencer, Sample & Hold, Constant module, Slew Limiter.
-- **File splitting** — Extract AudioEngine into its own file, module definitions into another, components into a components/ directory.
-- **Proper pink noise** — Implement Paul Kellet's pink noise algorithm in an AudioWorklet.
+Set `customUIHeight: N` in a module's `MODULE_DEFS` entry to reserve N px between the param sliders and the port row for an inline custom SVG widget (e.g., the piano keys on `Keyboard`, the step grid on sequencers). The custom widget is rendered in `ModuleNode` based on module type. Both `getPortPosition` and `getModuleHeight` read `customUIHeight` — both port positions and module height calculations derive from this value, so always set it before adding the renderer or cables will be off.
 
-### Polish
-- **Zoom** — Scroll wheel zoom with SVG viewBox transform.
-- **Module snapping / auto-layout** — Snap to grid, or auto-arrange.
-- **Cable management** — Click-to-select cables, colour coding by signal type, cable opacity/thickness indicating signal level.
-- **Undo/redo** — State history stack.
-- **Preset patches** — Ship a few example patches (basic subtractive synth, FM bass, ambient pad, etc.) that users can load.
-- **Responsive / touch support** — Touch events for mobile/tablet use.
+### `setParam` cross-param handling
 
-## Reference Material
+`AudioEngine.setParam` sets the `value` and (if present) writes the linked `AudioParam`, then runs module-specific branches for cross-param updates:
 
-If you need to understand the original hardware for accuracy:
-- The Nord Modular G1 had ~170 module types across categories: oscillators, filters, envelopes, LFOs, shapers, mixers, logic, sequencers, effects, and I/O.
-- The official Nord Modular Editor software used a two-panel layout (Patch area and Performance area) with colour-coded modules by category.
-- Modules used a red/blue cable colour convention (audio vs control rate), though in practice any output could connect to any input.
-- The G1 ran a custom DSP (Motorola 56303) — we're approximating with Web Audio, which is good enough for most module types but won't perfectly match the DSP character of the original hardware.
+- `Chorus`: rate → `_lfo2.frequency`, depth → `_lfoGain2.gain`
+- `FilterC`/`FilterE`: sync freq/res across multiple internal filters; FilterE rewires on slope change
+- `XFade`: inverse gain on the other channel
+- `Shaper`: regenerates `WaveShaperNode.curve` from shape+drive
+- `PortamentoA`: time → lowpass cutoff
+- `LFOA`: range multiplier on rate
+- `FormantOsc`: vowel → formant filter freqs, timbre → interpolation
+- `OscA`/`MasterOsc`: coarse/fine recompute frequency, then `_propagateToSlaves`
+- `OscB`/`OscC`: frequency change → `_propagateToSlaves`
+- Slaves: any of partials/detune/fine/octShift → `_recalcFreq()`
+- `OscSineBank`: per-partial tune/fine → `_recalcFreq()`
+- Waveform/filterType params: assign directly to `node.type`
+
+When adding a module that needs sync between params, extend this method.
+
+## Gotchas worth knowing
+
+- **SVG vs HTML tagName casing**: `e.target.tagName` is **lowercase** for SVG elements (`"circle"`, `"rect"`) but **UPPERCASE** for HTML inside `<foreignObject>` (`"INPUT"`, `"SELECT"`). The keyboard handler checks for the latter to avoid stealing keys from form inputs.
+- **Virtual inputs are `null`**: `Mst`, `Clk`, `Rst` map to `null` in `inputs`. `connect()`/`disconnect()` must handle these cases *before* the `if (!inputNode) return false` guard.
+- **Oscillators always run**: every oscillator `.start()`s on creation; there's no voice allocation. Audibility is gated by amplifier envelopes, not oscillator on/off.
+- **`removeModule` cleanup**: walks `_nodes` to disconnect, clears subscriber/target arrays on both sides of master/slave and clock relationships, and stops the ClkGen timer. New modules with similar relationships need parallel cleanup or they'll leak.
+- **e.preventDefault() on port mousedown**: required to prevent browser text selection from interfering with cable drags. The SVG has `userSelect: "none"` for the same reason.
+
+## Known limitations (for future work)
+
+- **`OscC`/`OscSlvB` `pulseWidth` is non-functional** — the built-in `OscillatorNode` doesn't support variable PW. Needs an `AudioWorklet`.
+- **Noise "pink" option** produces white noise — the dropdown exists but the spectrum-shaping is not implemented.
+- **No MIDI input** — pitch comes from `Keyboard` (computer keys) and sequencers only.
+- **No zoom** — pan only (shift+drag or alt+drag).
+- **Sidebar palette is click-to-add** — drag-from-sidebar onto canvas was requested but not yet implemented.
+- **Connection type checking is minimal** — any output can connect to any input that isn't already filled. Audio-into-modulation usually works but may sound surprising.
