@@ -5,7 +5,7 @@ This document provides a detailed technical specification for all modules from t
 ## General Conventions
 
 ### Signal Types
-- **Audio/Control (Bipolar):** Range -64 to +64 units (or -1.0 to 1.0 normalized). Used for audio and bipolar modulation.
+- **Bipolar:** Range -64 to +64 units (or -1.0 to 1.0 normalized). Used for audio and bipolar modulation.
 - **Control (Unipolar):** Range 0 to +64 units (or 0.0 to 1.0 normalized). Used for envelopes, velocity, and unipolar modulation.
 - **Logic:** High (+64 units / 1.0) or Low (0 units / 0.0). Used for gates, triggers, and clocks. Any signal crossing from <=0 to >0 triggers logic transitions.
 - **Slave (Gray):** Specialized high-resolution pitch/frequency control signals used between master and slave modules. Slave oscillators track 1:1 with master pitch; slave LFOs track 5 octaves below master pitch.
@@ -88,7 +88,7 @@ Routes two signals as a stereo pair.
 - **Level (Knob):** Output attenuation.
 
 ### 1.8 Output (4 Outputs)
-Routes four separate signals to individual mix buses.
+Routes four separate signals to one mix bus each.
 - **Mix Bus 1-4 (Inputs, Red):** Four audio inputs, one per bus.
 - **Level (Knob):** Master output attenuation.
 
@@ -119,14 +119,14 @@ Two types: **Master oscillators** (more features, more DSP load, provide slave o
 Does not generate audio — controls slave oscillators only. Saves DSP power.
 - **Coarse (Knob):** Semitone tuning. Range: C-1 to G9.
 - **Fine (Knob):** +/- half semitone, 128 steps.
-- **KBT (Knob/Button):** Keyboard tracking. Off, or 0.0 to 2.0.
+- **KBT (Button):** On/Off keyboard tracking.
 - **Pitch Mod x2 (Inputs, Blue):** Two pitch modulation inputs [Attenuator Type II].
 - **Slv (Output, Gray):** Slave control output.
 - **Display:** Hz or Note name.
 
 ### 2.2 OscA
 Full-featured master oscillator with sync and pulse width modulation.
-- **Waveforms:** Pulse, Sawtooth, Triangle, Sine (4 selectors).
+- **Waveforms:** Square/Pulse, Sawtooth, Triangle, Sine (4 selectors).
 - **Coarse (Knob):** C-1 to G9.
 - **Fine (Knob):** +/- half semitone, 128 steps.
 - **KBT (Knob):** Off to 2.0.
@@ -141,7 +141,7 @@ Full-featured master oscillator with sync and pulse width modulation.
 
 ### 2.3 OscB
 Master oscillator with FM and PWM, no sync.
-- **Waveforms:** Pulse, Sawtooth, Triangle, Sine.
+- **Waveforms:** Square/Pulse, Sawtooth, Triangle, Sine.
 - **Coarse/Fine/KBT:** Same as OscA.
 - **Pitch Mod x2 (Inputs, Blue):** [Attenuator Type II].
 - **FMA (Input, Red):** [Attenuator Type II].
@@ -163,7 +163,8 @@ Sine-only master oscillator with AM and FM.
 
 ### 2.5 SpectralOsc
 Additive-style oscillator generating overtones from synced noise.
-- **Coarse/Fine/KBT:** Standard.
+- **Coarse/Fine (Knobs):** Standard.
+- **KBT (Button):** On/Off keyboard tracking.
 - **Spectral Shape (Knob + Blue Mod Input):** Controls overtone amount. Mod input with attenuator.
 - **Partials (Buttons):** All (odd+even) or Odd only.
 - **Pitch Mod x2 (Inputs, Blue):** [Attenuator Type II].
@@ -176,7 +177,8 @@ Additive-style oscillator generating overtones from synced noise.
 Generates vocal-sounding waveforms with non-transposed body resonance spectrum.
 - **Coarse/Fine (Knobs):** Standard.
 - **KBT (Button):** On/Off.
-- **Timbre (Knob + Display):** 1-127 variations plus Random. Blue mod input for external timbre control.
+- **Timbre (Knob + Display):** 1-127 variations plus Random.
+- **Timbre Mod (Input, Blue):** External timbre control [Attenuator Type I].
 - **Pitch Mod x2 (Inputs, Blue):** [Attenuator Type II].
 - **Slv (Output, Gray):** Slave control.
 - **M (Button):** Mute.
@@ -184,7 +186,7 @@ Generates vocal-sounding waveforms with non-transposed body resonance spectrum.
 
 ### 2.7 OscSlvA
 4-waveform slave with sync, FMA, and AM.
-- **Waveforms:** Sine, Triangle, Sawtooth, Pulse.
+- **Waveforms:** Sine, Triangle, Sawtooth, Square/Pulse.
 - **Mst (Input, Gray):** Master pitch control.
 - **Partials (Selector):** Transposition ratio 1:32 to 32:1.
 - **Detune (Knob):** Semitone steps relative to master.
@@ -350,25 +352,25 @@ Compact master LFO with 4 waveforms. No phase, no KBT, no restart.
 Sawtooth slave LFO. Minimal controls.
 - **Mst (Input, Gray):** Master rate control.
 - **Rate (Knob + Display):** 0.025 to 38.05x master rate.
-- **Out (Output, Blue):** Bipolar.
+- **Out (Output, Blue):** Bipolar. LED indicates rate.
 
 ### 3.6 LFOSlvC
 Sine slave LFO. Minimal controls.
 - **Mst (Input, Gray):** Master rate control.
 - **Rate (Knob + Display):** 0.025 to 38.05x master rate.
-- **Out (Output, Blue):** Bipolar.
+- **Out (Output, Blue):** Bipolar. LED indicates rate.
 
 ### 3.7 LFOSlvD
 Square slave LFO. Minimal controls.
 - **Mst (Input, Gray):** Master rate control.
 - **Rate (Knob + Display):** 0.025 to 38.05x master rate.
-- **Out (Output, Blue):** Bipolar.
+- **Out (Output, Blue):** Bipolar. LED indicates rate.
 
 ### 3.8 LFOSlvE
 Triangle slave LFO. Minimal controls.
 - **Mst (Input, Gray):** Master rate control.
 - **Rate (Knob + Display):** 0.025 to 38.05x master rate.
-- **Out (Output, Blue):** Bipolar.
+- **Out (Output, Blue):** Bipolar. LED indicates rate.
 
 ### 3.9 ClkGen
 Internal clock generator (independent of MIDI clock).
@@ -573,7 +575,7 @@ Simulates vocal tract with selectable vowels and morphing between them.
 - **HF Emphasis (Button):** Boost high frequencies in analysis signal.
 - **Mon (Button):** Bypass modulator to output for monitoring.
 - **Reroute Buttons x16:** Remap each synthesis band to any analysis band.
-- **Presets:** Shift buttons (+1 to +15), Inv (reverse routing), Rnd (random routing).
+- **Presets:** Shift buttons (-2 to +2 steps), Inv (reverse routing), Rnd (random routing).
 - **Output Gain (Knob):** 0.25x to 4.0x input level.
 - **Synth Input (Input, Red):** Carrier signal. Lower right.
 - **Out (Output, Red):** Bipolar.
@@ -914,7 +916,7 @@ Two-input mixer for control signals with selectable attenuator characteristics.
 Note and velocity scaler. Generates control signals based on keyboard position and velocity with configurable break point.
 - **Vel (Input, Blue):** Velocity input.
 - **Note (Input, Blue):** Note/pitch input.
-- **Vel Sens (Knob):** Velocity sensitivity [Type I]. Min = always 64; Max = full velocity range.
+- **Vel Sens (Knob):** Velocity sensitivity [Type I]. Min (0) = output always 64 units; Max (127) = output ranges 0-85 units across the velocity input.
 - **L Gain (Knob + Display):** Lower key section slope. +/-24 dB/octave.
 - **Brk Pnt (Knob + Display):** Break point note. C-1 to G9.
 - **R Gain (Knob + Display):** Upper key section slope. +/-24 dB/octave.

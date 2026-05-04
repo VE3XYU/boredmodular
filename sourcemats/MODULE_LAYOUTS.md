@@ -45,11 +45,11 @@ This document describes the visual layout and control arrangement for each modul
 
 ### 1.6 Output (1 Output)
 - **Compact Row**
-- [Mix Input (Red)] [Dest Buttons (1/2/3/4/CVA L/CVA R)] [M Button] [Level Knob]
+- [Dest Buttons (1/2/3/4/CVA L/CVA R)] [M Button] [Mix Input (Red)] [Level Knob]
 
 ### 1.7 Output (2 Outputs)
 - **Row Layout**
-- [Mix Bus L Input (Red)] [Mix Bus R Input (Red)] [Dest Buttons (1+2/3+4/CVA)] [M Button] [Level Knob]
+- [Dest Buttons (1/2, 3/4, CVA)] [M Button] [Mix Bus L Input (Red)] [Mix Bus R Input (Red)] [Level Knob]
 
 ### 1.8 Output (4 Outputs)
 - **Row Layout**
@@ -57,7 +57,7 @@ This document describes the visual layout and control arrangement for each modul
 
 ### 1.9 NoteDetect
 - **Compact Row**
-- [Note Knob] [Note Display] [Gate Output (Yellow)] [V Output (Blue)] [R Output (Blue)]
+- [Note Display] [Note Knob] [Gate Output (Yellow)] [V Output (Blue)] [R Output (Blue)]
 
 ### 1.10 KeybSplit
 - **Two-Row Layout**
@@ -70,7 +70,7 @@ This document describes the visual layout and control arrangement for each modul
 
 ### 2.1 MasterOsc
 - **Multi-Row Panel**
-- **Top Row:** [Display Box] [Coarse Knob] [Fine Knob] [KBT Knob]
+- **Top Row:** [Display Box] [Coarse Knob] [Fine Knob] [KBT Button]
 - **Middle Row:** [Pitch Mod 1 (Blue)] [Atten] [Pitch Mod 2 (Blue)] [Atten]
 - **Bottom Row:** [Slv Output (Gray)]
 
@@ -88,13 +88,13 @@ This document describes the visual layout and control arrangement for each modul
 
 ### 2.4 OscC
 - **Compact Panel**
-- **Top Row:** [Display Box] [Coarse Knob] [Fine Knob] [KBT Button]
-- **Middle Row:** [Pitch Mod (Red)] [Atten] [AM (Red)] [FMA (Red)] [Atten]
+- **Top Row:** [Display Box] [Coarse Knob] [Fine Knob] [AM (Red)] [KBT Button] [FMA (Red)] [Atten]
+- **Middle Row:** [Pitch Mod (Red)] [Atten]
 - **Bottom Row:** [Slv Output (Gray)] [M Button] [Output (Red)]
 
 ### 2.5 SpectralOsc
 - **Multi-Row Panel**
-- **Top Row:** [Display Box] [Coarse Knob] [Fine Knob] [KBT Knob] [Spectral Shape Knob] [Partials Buttons (All/Odd)]
+- **Top Row:** [Display Box] [Coarse Knob] [Fine Knob] [KBT Button] [Spectral Shape Knob] [Partials Buttons (All/Odd)]
 - **Middle Row:** [Pitch Mod 1 (Blue)] [Atten] [Pitch Mod 2 (Blue)] [Atten] [FMA (Red)] [Atten] [Shape Mod (Blue)] [Atten]
 - **Bottom Row:** [Slv Output (Gray)] [M Button] [Output (Red)]
 
@@ -577,15 +577,15 @@ This document describes the visual layout and control arrangement for each modul
 - **Grid Layout**
 - **Left Side:** [Clk Input (Yellow)] [Rst Input (Yellow)] [Snc Output (Yellow)]
 - **Top Bar:** [Clr Button] [Step Display + ↑↓] [Loop Button] [Record Button] [Stop/Go Button] [< > Buttons]
-- **Main Area:** 16 vertical pitch sliders with 16 gate toggle buttons below. Step LEDs above.
+- **Main Area:** 16 vertical pitch sliders with step LEDs above. No per-step gate buttons — Gclk emits a logic pulse on each step advance.
 - **Right Side:** [Link Output (Yellow)] [Gclk Output (Yellow)] [Note Output (Blue)]
 
 ### 10.4 NoteSeqB
 - **Grid Layout**
-- **Left Side:** [Clk Input (Yellow)] [Rst Input (Yellow)]
+- **Left Side:** [Clk Input (Yellow)] [Rst Input (Yellow)] [Snc Output (Yellow)]
 - **Top Bar:** [Clr Button] [Rnd Button] [Step Display + ↑↓] [Loop Button] [Record Button] [Stop/Go Button] [< > Buttons]
 - **Main Area:** Graphical grid (zoomable 1-6 octaves) with 16 columns. Arrow buttons below each step. Scroll bar on right.
-- **Right Side:** [Snc Output (Yellow)] [Link Output (Yellow)] [Gclk Output (Yellow)] [Out (Blue)]
+- **Right Side:** [Link Output (Yellow)] [Gclk Output (Yellow)] [Out (Blue)]
 
 ---
 
