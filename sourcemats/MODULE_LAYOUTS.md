@@ -1,6 +1,6 @@
-# Nord Modular Module Layout Reference
+# Bored Modular Module Layout Reference
 
-This document describes the visual layout and control arrangement for each module to assist in UI implementation for `boredmodular`. Sourced from the official Nord Modular V3.0 User Manual.
+This document describes the visual layout and control arrangement for each module to assist in UI implementation for `boredmodular`. Sourced from the official Bored Modular V3.0 User Manual.
 
 ## General UI Patterns
 - **Header:** Contains Module Name and Instance Number (e.g., OscA1).

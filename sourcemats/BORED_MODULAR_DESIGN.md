@@ -1,6 +1,6 @@
-# Nord Modular System Design Document
+# Bored Modular System Design Document
 
-This document provides a detailed technical specification for all modules from the Nord Modular V3.0 system, intended as a reference for implementing similar modules in the `boredmodular` project. Sourced from the official Nord Modular V3.0 User Manual.
+This document provides a detailed technical specification for all modules from the Bored Modular V3.0 system, intended as a reference for implementing similar modules in the `boredmodular` project. Sourced from the official Bored Modular V3.0 User Manual.
 
 ## General Conventions
 
@@ -29,7 +29,7 @@ This document provides a detailed technical specification for all modules from t
 ## 0. System Features
 
 ### 0.1 Morphing
-Nord Modular allows assigning multiple parameters to one of four "Morph Groups". This enables a single control source to sweep many parameters simultaneously between their current value and a "morphed" value.
+Bored Modular allows assigning multiple parameters to one of four "Morph Groups". This enables a single control source to sweep many parameters simultaneously between their current value and a "morphed" value.
 - **Morph Groups:** 4 per patch.
 - **Sources:** Mod Wheel, Velocity, Aftertouch, Keyboard Note.
 - **Implementation:** Each parameter stores an offset/target value for each morph group.
