@@ -4,6 +4,22 @@
 // Note-to-frequency conversion
 const NOTE_FREQ = (note) => 440 * Math.pow(2, (note - 69) / 12);
 
+// Pink noise filter (Paul Kellet refined coefficients) — fills a Float32Array in place
+function _fillPinkBuffer(data) {
+  let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+  for (let i = 0; i < data.length; i++) {
+    const w = Math.random() * 2 - 1;
+    b0 = 0.99886 * b0 + w * 0.0555179;
+    b1 = 0.99332 * b1 + w * 0.0750759;
+    b2 = 0.96900 * b2 + w * 0.1538520;
+    b3 = 0.86650 * b3 + w * 0.3104856;
+    b4 = 0.55000 * b4 + w * 0.5329522;
+    b5 = -0.7616 * b5 - w * 0.0168980;
+    data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11;
+    b6 = w * 0.115926;
+  }
+}
+
 class AudioEngine {
   constructor() {
     this.ctx = null;
@@ -26,11 +42,17 @@ class AudioEngine {
     this.analyser.fftSize = 512;
     this.masterGain.connect(this.analyser);
     this.analyser.connect(this.ctx.destination);
+    this._workletReady = this.ctx.audioWorklet
+      .addModule('/pulse-processor.js')
+      .catch((err) => { console.error('pulse worklet load failed', err); });
     this.isRunning = true;
   }
 
-  createModule(id, type) {
+  async createModule(id, type) {
     if (!this.ctx) this.init();
+    if (type === 'OscC' || type === 'OscSlvB') {
+      await this._workletReady;
+    }
     let mod;
     switch (type) {
       case "OscA": mod = this._createOscA(id); break;
@@ -144,26 +166,46 @@ class AudioEngine {
 
   _createOscC(id) {
     const osc = this.ctx.createOscillator();
+    const pulse = new AudioWorkletNode(this.ctx, 'pulse-processor');
+    const oscMix = this.ctx.createGain();   // active when waveform != "square"
+    const pulseMix = this.ctx.createGain(); // active when waveform == "square"
     const gain = this.ctx.createGain();
     const slaveGain = this.ctx.createGain();
+    const freqSrc = this.ctx.createConstantSource();
+
     osc.type = "square";
-    osc.frequency.value = 330;
+    osc.frequency.value = 0;
+    pulse.parameters.get('frequency').value = 0;
+    pulse.parameters.get('pulseWidth').value = 0.5;
+    freqSrc.offset.value = 330;
+    freqSrc.connect(osc.frequency);
+    freqSrc.connect(pulse.parameters.get('frequency'));
+    freqSrc.start();
+
+    oscMix.gain.value = 0;
+    pulseMix.gain.value = 1;
     gain.gain.value = 0.6;
     slaveGain.gain.value = 0.6;
-    osc.connect(gain);
-    osc.connect(slaveGain);
+
+    osc.connect(oscMix);
+    pulse.connect(pulseMix);
+    oscMix.connect(gain); oscMix.connect(slaveGain);
+    pulseMix.connect(gain); pulseMix.connect(slaveGain);
     osc.start();
+
     return {
       id, type: "OscC", node: osc, outputNode: gain,
       outputs: { Out: gain, Slv: slaveGain },
-      inputs: { PitchMod: osc.frequency },
-      _nodes: [osc, gain, slaveGain],
+      inputs: { PitchMod: freqSrc.offset },
+      _nodes: [osc, pulse, oscMix, pulseMix, gain, slaveGain, freqSrc],
       _slaveTargets: [],
       _frequency: 330,
+      _oscMix: oscMix,
+      _pulseMix: pulseMix,
       params: {
-        frequency: { value: 330, min: 20, max: 8000, audioParam: osc.frequency, label: "Freq" },
+        frequency: { value: 330, min: 20, max: 8000, audioParam: freqSrc.offset, label: "Freq" },
         waveform: { value: "square", options: ["sine", "sawtooth", "square", "triangle"], label: "Wave" },
-        pulseWidth: { value: 0.5, min: 0, max: 1, label: "PW" },
+        pulseWidth: { value: 0.5, min: 0, max: 1, audioParam: pulse.parameters.get('pulseWidth'), label: "PW" },
         level: { value: 0.6, min: 0, max: 1, audioParam: gain.gain, label: "Level" },
       },
     };
@@ -171,13 +213,15 @@ class AudioEngine {
 
   _createNoise(id) {
     const bufferSize = this.ctx.sampleRate * 2;
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
+    const whiteBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const whiteData = whiteBuffer.getChannelData(0);
     for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
+      whiteData[i] = Math.random() * 2 - 1;
     }
+    const pinkBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    _fillPinkBuffer(pinkBuffer.getChannelData(0));
     const source = this.ctx.createBufferSource();
-    source.buffer = buffer;
+    source.buffer = whiteBuffer;
     source.loop = true;
     const gain = this.ctx.createGain();
     gain.gain.value = 0.3;
@@ -188,6 +232,8 @@ class AudioEngine {
       outputs: { Out: gain },
       inputs: {},
       _nodes: [source, gain],
+      _whiteBuffer: whiteBuffer,
+      _pinkBuffer: pinkBuffer,
       params: {
         level: { value: 0.3, min: 0, max: 1, audioParam: gain.gain, label: "Level" },
         color: { value: "white", options: ["white", "pink"], label: "Color" },
@@ -420,7 +466,35 @@ class AudioEngine {
     return this._makeSlaveOsc(id, "OscSlvA", "sawtooth", { FMA: true, AM: true });
   }
   _createOscSlvB(id) {
-    return this._makeSlaveOsc(id, "OscSlvB", "square", { PwMod: true });
+    const pulse = new AudioWorkletNode(this.ctx, 'pulse-processor');
+    pulse.parameters.get('frequency').value = 220;
+    pulse.parameters.get('pulseWidth').value = 0.5;
+    const gain = this.ctx.createGain();
+    gain.gain.value = 0.8;
+    pulse.connect(gain);
+    return {
+      id, type: "OscSlvB", node: pulse, outputNode: gain,
+      outputs: { Out: gain },
+      inputs: { Mst: null, PwMod: pulse.parameters.get('pulseWidth') },
+      _nodes: [pulse, gain],
+      _masterFreq: 0,
+      _masterModId: null,
+      _recalcFreq() {
+        if (!this._masterFreq) return;
+        const p = this.params;
+        const freq = this._masterFreq * p.partials.value
+          * Math.pow(2, p.detune.value / 12)
+          * Math.pow(2, p.fine.value / 1200);
+        pulse.parameters.get('frequency').setValueAtTime(freq, pulse.context.currentTime);
+      },
+      params: {
+        partials: { value: 1, min: 0.25, max: 16, label: "Partials" },
+        detune: { value: 0, min: -24, max: 24, label: "Detune" },
+        fine: { value: 0, min: -50, max: 50, label: "Fine" },
+        pulseWidth: { value: 0.5, min: 0.01, max: 0.99, audioParam: pulse.parameters.get('pulseWidth'), label: "PW" },
+        level: { value: 0.8, min: 0, max: 1, audioParam: gain.gain, label: "Level" },
+      },
+    };
   }
   _createOscSlvC(id) {
     return this._makeSlaveOsc(id, "OscSlvC", "sawtooth", { FMA: true });
@@ -1602,6 +1676,26 @@ class AudioEngine {
         curve[i] = Math.max(-1, Math.min(1, curve[i]));
       }
       mod._shaper.curve = curve;
+    }
+    // OscC: route to pulse worklet when waveform is "square", oscillator otherwise
+    if (mod.type === "OscC" && paramName === "waveform") {
+      const isSquare = value === "square";
+      mod._oscMix.gain.setValueAtTime(isSquare ? 0 : 1, this.ctx.currentTime);
+      mod._pulseMix.gain.setValueAtTime(isSquare ? 1 : 0, this.ctx.currentTime);
+    }
+    // Noise: swap source buffer when color changes (buffer can't change after start())
+    if (mod.type === "Noise" && paramName === "color") {
+      const oldSrc = mod.node;
+      try { oldSrc.stop(); } catch (e) {}
+      try { oldSrc.disconnect(); } catch (e) {}
+      mod._nodes = mod._nodes.filter((n) => n !== oldSrc);
+      const newSrc = this.ctx.createBufferSource();
+      newSrc.buffer = value === "pink" ? mod._pinkBuffer : mod._whiteBuffer;
+      newSrc.loop = true;
+      newSrc.connect(mod.outputNode);
+      newSrc.start();
+      mod.node = newSrc;
+      mod._nodes.push(newSrc);
     }
     // PortamentoA: time -> filter frequency
     if (mod.type === "PortamentoA" && paramName === "time") {
