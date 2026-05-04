@@ -8,6 +8,8 @@ deepened: 2026-05-04
 
 # Module completeness: batch-first workflow, playbook codified from real friction
 
+> **Progress (2026-05-04):** Unit 1 complete in PR #6. Units 2-5 pending. **A future agent picking up this plan should start at Unit 2** — do not re-execute Unit 1.
+
 ## Overview
 
 Establish a sustainable workflow for closing the 39 → 109 gap between `src/` and `sourcemats/BORED_MODULAR_DESIGN.md`, in a shape that matches the project's actual nature (sole-maintainer side project, "spiritual homage to the patch-cord modular tradition, not a clone of any specific hardware"). Five things the plan does:
@@ -153,7 +155,7 @@ The first draft of this plan claimed "the dimensions translate cleanly." Multipl
 
 ## Implementation Units
 
-- [ ] **Unit 1: Pick first batch and execute it (no playbook yet)**
+- [x] **Unit 1: Pick first batch and execute it (no playbook yet)** — **COMPLETED 2026-05-04 in PR #6** (`feat/amplifier-fidelity-batch`). Cluster picked: `Amplifier` alone. Audit: `sourcemats/IMPL_AUDIT_REPORT.md` (Amplifier subsection + 3 systemic findings seeded). Code change: `src/AudioEngine.js:1121` `level.max: 1 → 4` (single `fix-toward-spec` finding F2b). Friction notes: `sourcemats/_friction_notes_unit1.md` (committed; deleted in Unit 2). **Next agent: do not re-execute. Start at Unit 2.**
 
 **Goal:** Land a small, low-risk fidelity-fix batch on a cluster with clean impl↔spec name mapping. Capture friction during the work. Start `IMPL_AUDIT_REPORT.md` with just this cluster.
 
