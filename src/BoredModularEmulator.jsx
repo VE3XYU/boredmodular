@@ -778,11 +778,11 @@ export default function BoredModularEmulator() {
   }, [audioStarted]);
 
   const addModuleAt = useCallback(
-    (type, x, y) => {
+    async (type, x, y) => {
       initAudio();
       const id = genId();
       const eng = engineRef.current;
-      const audioMod = eng.createModule(id, type);
+      const audioMod = await eng.createModule(id, type);
       if (!audioMod) return;
 
       const params = {};
@@ -796,11 +796,11 @@ export default function BoredModularEmulator() {
   );
 
   const addModule = useCallback(
-    (type) => {
+    async (type) => {
       initAudio();
       const id = genId();
       const eng = engineRef.current;
-      const audioMod = eng.createModule(id, type);
+      const audioMod = await eng.createModule(id, type);
       if (!audioMod) return;
 
       const params = {};
@@ -864,17 +864,17 @@ export default function BoredModularEmulator() {
   }, [modules]);
 
   const loadPatchData = useCallback(
-    (patch) => {
+    async (patch) => {
       // Clear existing
       modules.forEach((m) => engineRef.current.removeModule(m.id));
       initAudio();
       // Rebuild modules
-      patch.modules.forEach((m) => {
-        engineRef.current.createModule(m.id, m.type);
+      for (const m of patch.modules) {
+        await engineRef.current.createModule(m.id, m.type);
         Object.entries(m.params).forEach(([k, v]) => {
           engineRef.current.setParam(m.id, k, v.value != null ? v.value : v);
         });
-      });
+      }
       // Update _idCounter
       const maxId = Math.max(...patch.modules.map((m) => parseInt(m.id.split("_")[1]) || 0), 0);
       if (maxId >= _idCounter) _idCounter = maxId;

@@ -146,9 +146,6 @@ When adding a module that needs sync between params, extend this method.
 
 ## Known limitations (for future work)
 
-- **`OscC`/`OscSlvB` `pulseWidth` is non-functional** — the built-in `OscillatorNode` doesn't support variable PW. Needs an `AudioWorklet`.
-- **Noise "pink" option** produces white noise — the dropdown exists but the spectrum-shaping is not implemented.
 - **No MIDI input** — pitch comes from `Keyboard` (computer keys) and sequencers only.
 - **No zoom** — pan only (shift+drag or alt+drag).
-- **Sidebar palette is click-to-add** — drag-from-sidebar onto canvas was requested but not yet implemented.
 - **Connection type checking is minimal** — any output can connect to any input that isn't already filled. Audio-into-modulation usually works but may sound surprising.
