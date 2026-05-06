@@ -8,7 +8,7 @@ deepened: 2026-05-04
 
 # Module completeness: batch-first workflow, playbook codified from real friction
 
-> **Progress (2026-05-04):** Unit 1 complete in PR #6. Units 2-5 pending. **A future agent picking up this plan should start at Unit 2** — do not re-execute Unit 1.
+> **Progress (2026-05-05):** Units 1-2 complete in PRs #6 and #7. Units 3-5 pending. **A future agent picking up this plan should start at Unit 3** — do not re-execute Units 1 or 2.
 
 ## Overview
 
@@ -211,7 +211,7 @@ The first draft of this plan claimed "the dimensions translate cleanly." Multipl
 
 ---
 
-- [ ] **Unit 2: Author `MODULE_PLAYBOOK.md` v0 from friction notes**
+- [x] **Unit 2: Author `MODULE_PLAYBOOK.md` v0 from friction notes** — **COMPLETED 2026-05-05 in PR #7** (`feat/module-playbook-v0`). File: `sourcemats/MODULE_PLAYBOOK.md` (5 sections, 121 lines, well under the 300-line lean target). Sections: modify-a-module checklist (with the `removeModule` cleanup step CLAUDE.md's 5-step list omits), audit methodology (6+3 dimension split rationale + severity-vs-disposition independence + user-visible-fix rationale rule with both acceptance and rejection worked examples + cluster summary template), known systemic divergences, batch sizing, patch-load safety. Three conditional sections from this plan's Unit 2 list (when-to-use, conventions reference, per-batch brief format) deferred to Unit 4 — none surfaced friction in Unit 1. Sub-plan locking the v0 shape: `docs/plans/2026-05-05-001-feat-module-playbook-v0-plan.md`. Friction notes deleted (git history retains). **Next agent: do not re-execute. Start at Unit 3.**
 
 **Goal:** Codify what Unit 1's friction proves is needed. Lean v0. Future batches grow it.
 
