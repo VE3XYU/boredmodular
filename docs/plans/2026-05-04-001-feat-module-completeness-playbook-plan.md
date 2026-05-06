@@ -8,7 +8,7 @@ deepened: 2026-05-04
 
 # Module completeness: batch-first workflow, playbook codified from real friction
 
-> **Progress (2026-05-05):** Units 1-2 complete in PRs #6 and #7. Units 3-5 pending. **A future agent picking up this plan should start at Unit 3** — do not re-execute Units 1 or 2.
+> **Progress (2026-05-06):** Units 1-3 complete in PRs #6, #7, and #9. Units 4-5 pending. **A future agent picking up this plan should start at Unit 4** — do not re-execute Units 1-3.
 
 ## Overview
 
@@ -265,7 +265,7 @@ The first draft of this plan claimed "the dimensions translate cleanly." Multipl
 
 ---
 
-- [ ] **Unit 3: Run a second batch using the playbook**
+- [x] **Unit 3: Run a second batch using the playbook** — **COMPLETED 2026-05-06 in PR #9** (`feat/clkgen-randomgen-fidelity-batch`). Cluster picked: `ClkGen` + `RandomGen`. Audit: `sourcemats/IMPL_AUDIT_REPORT.md` (new "3. LFO Group" section with 11 findings; new systemic finding S4 promoted — non-oscillator master/slave architecture absence). Outcome: audit-only batch (0 code changes; 6 `fix-toward-spec (blocked)` on dependencies/design-calls/schema-extensions, 2 `keep-as-divergence` for impl-only RandomGen extensions surviving the divergence rationale rule's category 2, 1 `undecided` folding to S3, 2 out-of-scope). Sub-plan: `docs/plans/2026-05-06-001-feat-clkgen-randomgen-fidelity-batch-plan.md`. Friction notes: `sourcemats/_friction_notes_unit3.md` (committed; deleted in Unit 4). **Mid-batch framing correction**: the playbook's audit methodology was found to be applying the wrong frame (defaulting spec divergences to `keep-as-divergence` via a backwards "user-visible-fix rationale rule"); reversed across CLAUDE.md, this plan, the playbook, and the audit report — see commit `742a647`. Amplifier findings F1/F2a/F3 were re-dispositioned. **Next agent: do not re-execute. Start at Unit 4.**
 
 **Goal:** Validate that the playbook saves time. Compare batch-2 effort to batch-1.
 
