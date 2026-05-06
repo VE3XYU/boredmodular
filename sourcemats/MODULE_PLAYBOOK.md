@@ -1,6 +1,8 @@
 # Module Playbook
 
-> Procedural reference for module fidelity work in `src/`. Lives next to the spec corpus (`BORED_MODULAR_DESIGN.md`, `MODULE_LAYOUTS.md`, `SPEC_AUDIT_REPORT.md`, `IMPL_AUDIT_REPORT.md`) because that's where the work happens. Codified from real friction during Unit 1 of `docs/plans/2026-05-04-001-feat-module-completeness-playbook-plan.md`; v0 is intentionally lean and grows from later batches.
+> **Status (2026-05-06): static reference.** Parent plan (`docs/plans/2026-05-04-001-feat-module-completeness-playbook-plan.md`) closed at Unit 5; the audit-batch workflow is retired. This file remains as a reference for what was audited and how, but new module work doesn't follow this practice unless it's deliberately re-adopted. The momentum checkpoint below fired in 2026-05-06 — kept here for the historical record.
+>
+> Procedural reference for module fidelity work in `src/`. Lives next to the spec corpus (`BORED_MODULAR_DESIGN.md`, `MODULE_LAYOUTS.md`, `SPEC_AUDIT_REPORT.md`, `IMPL_AUDIT_REPORT.md`) because that's where the work happens. Codified from real friction during Unit 1 of the parent plan; v0 is intentionally lean and grows from later batches.
 >
 > **Momentum checkpoint.** If maintaining this playbook starts feeling like ceremony rather than codification of real friction, that's a signal to revisit Unit 5 of the parent plan and decide whether the artifact is still earning its keep. The per-batch audit may be the durable mechanism here; the playbook may be dead weight.
 

@@ -1,14 +1,15 @@
 ---
 title: "Module completeness: batch-first workflow, playbook codified from real friction"
 type: feat
-status: active
+status: closed
 date: 2026-05-04
 deepened: 2026-05-04
+closed: 2026-05-06
 ---
 
 # Module completeness: batch-first workflow, playbook codified from real friction
 
-> **Progress (2026-05-06):** Units 1-4 complete in PRs #6, #7, #9, and #11. Unit 5 pending. **A future agent picking up this plan should start at Unit 5** — do not re-execute Units 1-4.
+> **Plan closed 2026-05-06.** Units 1-4 complete in PRs #6, #7, #9, and #11. Unit 5 decided to stop the workflow (see Unit 5 outcome below). The playbook (`sourcemats/MODULE_PLAYBOOK.md`) and audit report (`sourcemats/IMPL_AUDIT_REPORT.md`) remain as static reference documents. Future module work proceeds without assuming this workflow is active.
 
 ## Overview
 
@@ -328,7 +329,7 @@ The first draft of this plan claimed "the dimensions translate cleanly." Multipl
 
 ---
 
-- [ ] **Unit 5: Decide success and choose next arc**
+- [x] **Unit 5: Decide success and choose next arc** — **COMPLETED 2026-05-06.** Decision: stop the workflow. Per the decision tree below, this is the "momentum failed, leverage held → stop" branch. **Leverage held**: in batch 2 (Unit 3) the playbook was opened and applied at decision points (6 of 11 findings used the named-blocker shape; the mid-batch framing correction in commit `742a647` is direct evidence the playbook was being read carefully); Unit 4 codified 5 patterns from real friction, so the playbook grew from usage rather than staying static. **Momentum failed**: the maintainer reported not enjoying working in this shape — across two batches the workflow produced 1 line of code change against a heavy ratio of methodology, audit, and disposition work, which doesn't fit a sole-maintainer side project where the goal is a complete, polished product. The artifacts (playbook, audit report) retain value as static reference for what's already been audited and how the audit was framed; they should not be treated as a live process. Future module work picks fun targets directly (e.g., add missing modules, fix obvious sound issues) without the audit-batch shape; consult the playbook only when a question it already answers comes up. Plan closed.
 
 **Goal:** With two batches landed and a refined playbook, decide whether the workflow is working — and what comes next.
 
