@@ -8,7 +8,7 @@ deepened: 2026-05-04
 
 # Module completeness: batch-first workflow, playbook codified from real friction
 
-> **Progress (2026-05-06):** Units 1-3 complete in PRs #6, #7, and #9. Units 4-5 pending. **A future agent picking up this plan should start at Unit 4** — do not re-execute Units 1-3.
+> **Progress (2026-05-06):** Units 1-4 complete in PRs #6, #7, #9, and #11. Unit 5 pending. **A future agent picking up this plan should start at Unit 5** — do not re-execute Units 1-4.
 
 ## Overview
 
@@ -298,7 +298,7 @@ The first draft of this plan claimed "the dimensions translate cleanly." Multipl
 
 ---
 
-- [ ] **Unit 4: Refine playbook from second batch**
+- [x] **Unit 4: Refine playbook from second batch** — **COMPLETED 2026-05-06 in PR #11** (`docs/playbook-unit-4-refine`). Codifications added to `sourcemats/MODULE_PLAYBOOK.md`: `fix-toward-spec (blocked: <reason>)` named-blocker shape (§2 "Disposition shapes"); severity for impl-only spec-silent params; `(consequence of <ID>)` notation (§2 "Consequence findings"); systemic-promotion threshold of ≥2 per-module findings sharing a root cause (§3 "When to promote"); "Display" substring as S3 indicator. Cluster summary template updated to "applied / blocked" + rationale categories + new "Systemic finding promoted" line. New §6 "After-batch retrospective" with batch-1 (Amplifier) and batch-2 (ClkGen + RandomGen) entries. CLAUDE.md "Module system" section gains a paragraph linking to the playbook — Units 1-3 deliberately left it unlinked while it proved itself; Unit 4 promotes it. `_friction_notes_unit3.md` deleted (codified into the playbook; git history retains). Playbook is now 186 lines, well under the 300-line lean ceiling. **Next agent: do not re-execute. Start at Unit 5.**
 
 **Goal:** Update `MODULE_PLAYBOOK.md` from batch-2 friction. If batch 2 was harder than batch 1, restructure (not just append).
 
