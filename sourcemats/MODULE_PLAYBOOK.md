@@ -40,11 +40,30 @@ The split exists because attenuator-type and layout findings would, recorded per
 
 **Description text (`MODULE_DEFS[type].description`) is not an audit dimension.** It's sidebar tooltip text — internal documentation, not user-facing per spec. Don't get sidetracked auditing description strings during a per-module pass.
 
+**Impl-only spec-silent params are findings, not OOS.** When an impl param has no spec equivalent (e.g., `RandomGen.smoothing`, `RandomGen.amount`), it is a finding — severity defaults to Minor (the param is a user-visible knob). Out-of-scope applies only when spec genuinely doesn't speak to the dimension under audit (e.g., a default value when spec is silent on defaults). Disposition is usually `keep-as-divergence` under §2.3 category 2 (extension the spec doesn't preclude).
+
+### Disposition shapes
+
+The audit report's Disposition section (`IMPL_AUDIT_REPORT.md`) is canonical. The playbook calls out one frequently-used pattern explicitly:
+
+- **`fix-toward-spec (blocked: <reason>)`** — the fix is correct in principle but waits on a named blocker: a design call, an external dependency, or a cross-cutting schema/rendering change. Reach for this when you would otherwise mark `undecided` but the fix's correctness is clear and only its application is gated. The named blocker matters: "blocked: depends on S4" is a specific pointer; `undecided` without a named blocker is a graveyard waiting to grow.
+
+Examples of named blockers from existing batches:
+
+- `(blocked: depends on systemic finding S4)` — fix waits on a cross-cutting architectural extension.
+- `(blocked: design call needed — subscriber-pattern vs audio-rate input)` — fix waits on a deliberate choice between equally-valid impl patterns.
+- `(blocked: range narrowing requires patch-load scan per §5; revisit when scan is run)` — fix waits on a safety check.
+- `(blocked: MODULE_DEFS schema needs key/label separation)` — fix waits on a small but cross-cutting code change.
+
 ### Severity vs disposition are independent
 
 Severity describes magnitude of deviation; disposition describes intent. A `Critical` finding can be `keep-as-divergence`, and a `Minor` finding can be `fix-toward-spec`. The two axes don't constrain each other.
 
 **Worked example.** Systemic finding S1 (port-colour semantics, `IMPL_AUDIT_REPORT.md:60-65`) is **Critical** because the divergence is cross-cutting and every module reads differently than spec. Its disposition is **`fix-toward-spec (blocked: cross-cutting overhaul carries scope and visual-design implications; requires its own brainstorm + plan)`**. Severity is the magnitude; disposition is the call. The "more learnable" argument for direction-based does not survive the spec-as-source-of-truth frame (see §2.3); spec convention is canonical pending a deliberate design call to keep the divergence.
+
+### Consequence findings
+
+When a divergence is structurally caused by another (e.g., `RandomGen` missing `Mst` input is a direct consequence of `RandomGen` being standalone vs slave-class), record it as a separate finding for completeness but mark it `(consequence of <ID>)` and inherit the parent's disposition + rationale. Restating the rationale across consequence findings buries the architectural point; consequence-of-X notation keeps the per-port count honest while letting readers trace the chain back to the root cause.
 
 ### Divergence rationale rule
 
@@ -75,9 +94,10 @@ End every per-module audit subsection in `IMPL_AUDIT_REPORT.md` with a cluster s
 ```markdown
 **Cluster summary:**
 - Findings: N in-scope + M out-of-scope = T total.
-- Dispositions: A `fix-toward-spec` (IDs — applied / deferred), B `keep-as-divergence` (IDs), C `undecided` (IDs), D out-of-scope (IDs).
+- Dispositions: A `fix-toward-spec` (IDs — applied / blocked), B `keep-as-divergence` (IDs — rationale category 1/2/3 from §2.3), C `undecided` (IDs — note "folds to <Sn>" if applicable), D out-of-scope (IDs).
 - Code change applied: `path:line` — concise summary, or "none (audit-only batch)".
 - Patch-load impact: none / widening (safe) / narrowing (handled — see scan notes) / rename (handled — see scan notes).
+- Systemic finding promoted: `<Sn>` with brief rationale (omit if none surfaced this batch).
 ```
 
 The summary is the durable record. Future batches scan summaries first when picking the next cluster.
@@ -86,11 +106,26 @@ The summary is the durable record. Future batches scan summaries first when pick
 
 Recorded once in `IMPL_AUDIT_REPORT.md` Systemic Findings section (`S1`, `S2`, `S3`). Not repeated per-module audit. The playbook adds two more that aren't in the report yet because they don't fit the per-module-vs-systemic-dimension frame; they're project-level facts that shape every audit.
 
-- **S1 — Port-colour semantics.** Direction-based (impl) vs signal-type-based (spec). `fix-toward-spec (blocked: cross-cutting overhaul requires its own brainstorm + plan due to scope and visual-design implications)`. See `IMPL_AUDIT_REPORT.md:60-65`.
-- **S2 — Attenuator-type metadata.** No Type I/II/III metadata anywhere in `src/`. `fix-toward-spec (blocked: requires threading attenuator behavior through MODULE_DEFS and the cable-drag UI — substantial cross-cutting change)`. See `IMPL_AUDIT_REPORT.md:67-72`.
-- **S3 — Layout encoding.** No panel illustration encoding outside `customUIHeight`. `fix-toward-spec (blocked: visual-layout fidelity deferred to its own batch with its own methodology)`. See `IMPL_AUDIT_REPORT.md:74-79`.
+- **S1 — Port-colour semantics.** Direction-based (impl) vs signal-type-based (spec). `fix-toward-spec (blocked: cross-cutting overhaul requires its own brainstorm + plan due to scope and visual-design implications)`. See `IMPL_AUDIT_REPORT.md` — Systemic Findings §S1.
+- **S2 — Attenuator-type metadata.** No Type I/II/III metadata anywhere in `src/`. `fix-toward-spec (blocked: requires threading attenuator behavior through MODULE_DEFS and the cable-drag UI — substantial cross-cutting change)`. See `IMPL_AUDIT_REPORT.md` — Systemic Findings §S2.
+- **S3 — Layout encoding.** No panel illustration encoding outside `customUIHeight`. `fix-toward-spec (blocked: visual-layout fidelity deferred to its own batch with its own methodology)`. See `IMPL_AUDIT_REPORT.md` — Systemic Findings §S3.
+- **S4 — Non-oscillator master/slave architecture absence.** Spec extends the `Slv → Mst` port pattern to LFOA, ClkGen, RandomGen, RndStepGen, and other slave-class generators in the LFO group; impl plumbing is wired only for oscillators. `fix-toward-spec (blocked: cross-cutting architectural extension — requires its own brainstorm + plan)`. Surfaced 2026-05-06 during Unit 3 batch audit. See `IMPL_AUDIT_REPORT.md` — Systemic Findings §S4.
 - **No test harness.** Verification is manual: `npm start`, drop the module on the canvas, exercise patch chains, listen / watch. Every audit batch's verification depends on this. If a future batch introduces tests, the playbook gets a verification update; until then, "manual" is the convention, not a gap.
 - **System Features (Morphing, Variations) absent.** Out of the spec PDF excerpt and out of `src/`. Not a per-module finding; surfaces here so future audits don't try to record it as one.
+
+### When to promote a per-module finding to systemic
+
+If ≥2 per-module findings across one or more batches share the same architectural root cause — same missing pattern, same impl-vs-spec gap, same downstream blocker — propose promotion in that batch's cluster summary. Promotion looks like:
+
+1. Add a new entry (`Sn`) to the Systemic Findings section in `IMPL_AUDIT_REPORT.md`. Keep the entry shape consistent with S1-S3: spec ref, impl ref, severity, disposition (typically `fix-toward-spec (blocked: ...)`), surfaced date.
+2. Update the per-module findings that contributed to point at it via `(folds to <Sn>)` in their disposition or rationale.
+3. Note the promotion in the cluster summary's `Systemic finding promoted:` line.
+
+A single per-module finding doesn't need promotion; the cost is in restating the same rationale across N modules. Two is the threshold because at one finding the gap is local; at two it's a pattern. S4 (non-oscillator master/slave architecture absence) was promoted under this rule from C4/R1/R4 in batch 2.
+
+### Spec layout-element substring scan
+
+Spec entries often include "Display" as a panel element (e.g., "Rate (Knob + Display)" in §3.9). Impl uniformly lacks per-module numeric readouts — every "Display" substring becomes a finding that folds into S3 (layout encoding absence). When auditing, scan for "Display" as a recognizable pattern and fold those findings to S3 directly instead of treating each one as a fresh per-module audit dimension.
 
 ## 4. Batch sizing
 
@@ -121,6 +156,30 @@ Before applying any range-narrowing or param-rename `fix-toward-spec`:
 3. If any saved values would be affected, either: widen back, document the breakage explicitly in the cluster summary's patch-load-impact line, or implement a load-time migration shim. Don't ship the change silently.
 
 Scope is best-effort. User-exported patch JSON files outside the repo are out of reach; the scan can't cover them. Document this honestly in the cluster summary rather than claiming patches were preserved when they weren't checked.
+
+## 6. After-batch retrospective
+
+Running log of executed batches. Each entry: date, cluster, finding count by disposition, effort class, and the playbook delta the batch produced. Future-self scans this section first when picking the next cluster and when deciding whether the playbook is still earning its keep.
+
+### Batch 1 — Amplifier (2026-05-04)
+
+- **Cluster:** `Amplifier` alone (single module, spec §6.13).
+- **Findings:** 7 in-scope + 1 out-of-scope = 8 total.
+- **Dispositions** (current state, post-2026-05-06 re-disposition under the corrected spec-as-source-of-truth frame): 1 `fix-toward-spec` applied (F2b — `level.max: 1 → 4`), 1 `fix-toward-spec (blocked)` (F2a — patch-load scan needed), 5 `undecided` (F1, F3, F4, F5, F7), 1 out-of-scope (F6).
+- **Effort class:** 1 module × range tweak = 1 effort point.
+- **Playbook delta:** Batch 1 produced the friction notes that fed playbook v0 in Unit 2; the playbook itself didn't exist during this batch.
+
+### Batch 2 — ClkGen + RandomGen (2026-05-06)
+
+- **Cluster:** `ClkGen` (spec §3.9) + `RandomGen` (spec §3.12).
+- **Findings:** 9 in-scope + 2 out-of-scope = 11 total.
+- **Dispositions:** 0 `fix-toward-spec` applied (audit-only batch), 6 `fix-toward-spec (blocked)` (C1, C3, C4, C5, R1, R4), 2 `keep-as-divergence` (R2, R3 — extensions, category 2), 1 `undecided` (C2 — folds to S3), 2 out-of-scope (C6, R5).
+- **Effort class:** 2 modules × range/param-add audit-only = ~2 effort points.
+- **Playbook delta:**
+  - **Mid-batch framing correction** (commit `742a647`): the audit methodology had been defaulting spec divergences to `keep-as-divergence` via a backwards rule. Reversed across CLAUDE.md, parent plan, playbook §2.3, and audit report's Disposition section. Spec corpus is now explicitly the source of truth; `keep-as-divergence` requires concrete rationale fitting one of three categories (DSP approximation / spec-tolerated extension / durable design rationale).
+  - **New systemic finding S4** promoted: non-oscillator master/slave architecture absence. C4 / R1 / R4 fold into it.
+  - **Codifications added in Unit 4** (this revision): `fix-toward-spec (blocked: <reason>)` named-blocker shape; severity for impl-only spec-silent params; consequence-finding notation; systemic-promotion threshold (≥2 per-module findings sharing root cause); "Display" substring as S3 indicator.
+  - **CLAUDE.md → playbook link** added in this revision (the playbook is now promoted; Units 1-3 deliberately left it unlinked while it proved itself).
 
 ---
 
