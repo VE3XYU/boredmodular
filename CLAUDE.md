@@ -65,6 +65,8 @@ Each module is defined in **both** `moduleDefs.js` (UI metadata: label, color, c
 4. `case "<Type>":` in `AudioEngine.createModule()` switch
 5. If the module needs cross-param updates, add a branch in `setParam`
 
+For module fidelity work — auditing existing modules against the spec corpus, classifying divergences, applying fixes, recording dispositions — see `sourcemats/MODULE_PLAYBOOK.md`. It carries the audit methodology, the divergence rationale rule (when `keep-as-divergence` is justified vs. when the divergence is a defect to fix or defer), batch sizing guidance, patch-load safety rules, and the per-batch retrospective log. The playbook references CLAUDE.md back for the module-system mechanics this section covers.
+
 ### Modules (39 total, by category)
 
 - **Oscillators** (14): `OscA`, `OscB`, `OscC`, `MasterOsc`, `OscSlvA`–`OscSlvE`, `OscSlvFM`, `OscSineBank`, `Noise`, `DrumSynth`, `FormantOsc`
