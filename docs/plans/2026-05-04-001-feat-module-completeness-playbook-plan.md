@@ -32,14 +32,19 @@ The spec corpus is solid (`sourcemats/SPEC_AUDIT_REPORT.md` confirms `BORED_MODU
 
 The user-stated pain is per-module overhead from planning, branching, and merging one module at a time. The actual time cost of a fidelity fix in this repo is plausibly dominated by **diagnosis** (reading PDF, comparing impl, deciding what "matches" means) and **manual verification** (no test harness), not by `ce-plan` overhead. The plan addresses both: scoped per-batch audits compress diagnosis to the cluster at hand; the playbook codifies "what verified looks like" patterns; no per-batch `ce-plan` cycle is needed once the playbook stabilizes.
 
-## Identity frame: homage, not clone
+## Identity frame: spec is the source of truth
 
-`CLAUDE.md` positions the project as "a spiritual homage to the patch-cord modular tradition, not a clone of any specific hardware. The goal is usable sound design — accurate workflow and sonic character, not cycle-accurate DSP." The audit must respect that. Several plausibly-divergent impl choices are arguably improvements over the spec:
+The PDF (`sourcemats/Bored Modular English User Manual - module reference only.pdf`) and derived `sourcemats/BORED_MODULAR_DESIGN.md` are canonical for what each module should do — params, ranges, IO, behavior. CLAUDE.md's "spiritual homage … not cycle-accurate DSP" framing scopes narrowly to *implementation-level* fidelity: Web Audio is allowed to approximate, AudioWorklet is optional, exact DSP graphs are not required. It does not extend to feature/parameter/IO divergence.
 
-- **Port colours by direction** (red=output / blue=audio-in / yellow=mod-in, see `src/BoredModularEmulator.jsx:184`) vs spec by signal-type (red=audio / blue=control / yellow=logic / gray=slave). The impl convention is more learnable for users who haven't internalized modular-synth conventions; the spec convention encodes more information for users who have.
-- Some impl choices reduce DSP cost or sidestep AudioWorklet dependencies entirely.
+Default disposition for spec divergences is `fix-toward-spec`. `keep-as-divergence` requires concrete rationale that fits one of three categories:
 
-The audit's tri-state disposition makes this explicit. Default disposition for new findings is `undecided`. A finding gets fixed only after deliberate consideration. The audit is a design log, not a homework list.
+- **DSP-level approximation** the spec implicitly tolerates (e.g., a Web Audio BiquadFilter standing in for a virtual-analog ladder filter — equivalent musical behavior, lower implementation cost).
+- **Extension** the spec doesn't preclude (an impl-only utility param that doesn't replace any spec feature and doesn't change spec-required behavior).
+- **Durable design rationale** that survives spec adherence as the baseline. "More learnable" / "useful" / "saves implementation work" alone do not qualify.
+
+`undecided` is the right shelf when a fix is correct in principle but blocked on a concrete design call (e.g., adding a Reset input requires choosing between subscriber-pattern and audio-rate input). It is not a comfortable resting state for "we just decided to do it differently."
+
+The audit's tri-state disposition makes this explicit. The audit is a record of where impl drifts from spec, with each entry's resolution path tracked. It is not a defense of every divergence the impl currently exhibits.
 
 ## Requirements Trace
 
@@ -122,12 +127,12 @@ The first draft of this plan claimed "the dimensions translate cleanly." Multipl
 - **Inverted ordering: batch first, playbook from friction, audit per batch.** First draft of this plan front-loaded playbook v0 + 39-module audit before any module fix. Reviewers (product-lens, adversarial) consistently pushed back: "playbook becomes truly usable only after it has been used" was the original plan's own thesis; inverting the order is more honest with it.
 - **Playbook lives at `sourcemats/MODULE_PLAYBOOK.md`** — co-located with spec corpus. CLAUDE.md alternative weighed and rejected (see Context & Research).
 - **Audit report at `sourcemats/IMPL_AUDIT_REPORT.md`** — name parallels `SPEC_AUDIT_REPORT.md`. Built incrementally; never claimed to be complete.
-- **Tri-state disposition on findings** — `fix-toward-spec` / `keep-as-divergence` / `undecided`. Default `undecided`. Severity and disposition are independent.
+- **Tri-state disposition on findings** — `fix-toward-spec` / `keep-as-divergence` / `undecided`. Default for spec divergences is `fix-toward-spec`; `keep-as-divergence` requires concrete rationale per the Identity frame; `undecided` for fixes blocked on a design call. Severity and disposition are independent.
 - **Systemic vs per-module dimension split** — instead of asserting all 8 spec-vs-PDF dimensions translate, the playbook explicitly lists 6 per-module dimensions and 3 systemic dimensions.
 - **Batch sizing rule with effort-class qualifier** — for per-module clusters: `1 PR = 1 cluster (≤5 modules)`, where worklet-class fixes count as 3 modules and range/param-add fixes count as 1. Systemic findings (port-colour, attenuator-type encoding, layout) are out of this workflow's batch shape — each goes to its own brainstorm + plan, not a "batch."
 - **First-batch cluster: small surface, decision-rich.** Recommendation: `Amplifier` alone (single module, smallest surface), or escalate to `Amplifier` + a second small module (e.g., `Panner`, `XFade`) if the friction signal is too thin to write a playbook from. The Filter group is *not* recommended (spec has 11 entries, impl has 3, no clean name mapping). Honest about what the audit will find:
-  - Impl `Amplifier`'s name maps to spec §6.13 Amplifier, but functionally the impl is closer to spec §6.3 GainControl (VCA): impl has `GainMod` mod input and range 0-1; spec §6.13 is fixed-gain (no mod input) with range 0.25x-4.0x. The audit's first concrete exercise of the tri-state framework will be deciding the disposition for this name-vs-function mismatch.
-  - Impl `Mixer2` has 2 inputs; spec has §6.1 (3-input) and §6.2 (8-input). Mixer2 is impl-only — disposition almost certainly `keep-as-divergence`, recorded as such in the audit. Useful exercise; not a fidelity-fix target.
+  - Impl `Amplifier`'s name maps to spec §6.13 Amplifier, but functionally the impl is closer to spec §6.3 GainControl (VCA): impl has `GainMod` mod input and range 0-1; spec §6.13 is fixed-gain (no mod input) with range 0.25x-4.0x. Under the spec-as-source-of-truth frame this is a structural divergence — disposition will likely be `undecided` (resolution requires choosing between rename, split into two modules, or other) rather than `keep-as-divergence`.
+  - Impl `Mixer2` has 2 inputs; spec has §6.1 (3-input) and §6.2 (8-input). Mixer2 is impl-only relative to §6.1 (closest spec match). Disposition to be decided when the Mixer cluster is audited; under the corrected frame, "smaller-format mixer than spec defines" is a divergence, not an extension, so disposition is more likely `undecided` (does Mixer2 stay, get reshaped to §6.1's 3-input, or get supplemented by a spec-faithful Mixer3?) than `keep-as-divergence`.
   - Impl `Mixer8` maps to spec §6.2 with known gaps (`-6dB` button, default attenuation, level LED). These are genuine fidelity findings.
 - **Patch-load regression: range narrowing is unsafe.** `loadPatchData` (`src/BoredModularEmulator.jsx`) calls `setParam` (`src/AudioEngine.js:1603`) which silently tolerates unknown keys (renames are safe in the sense of "no error" — but values associated with renamed keys are silently dropped) and does not clamp values (range narrowing leaves the underlying `AudioParam` set to the now-stale saved value). The playbook's pre-batch checklist requires scanning saved-patch JSON for outside-range values before narrowing AND checking which renames will silently drop saved data. The scan covers the maintainer's localStorage and any committed example patches; user-exported patches are out of reach (best-effort only).
 - **Success signals anchored to playbook usage, not raw time.** Naïve "batch 2 < batch 1 time" is confounded by learning curve and cluster difficulty. Better: during batch 2, did I open the playbook? Did it answer the question I had? Did I find myself re-deriving things the playbook should have captured? Plus the second signal: momentum — does the maintainer want batch 3? Either can fail. Unit 5 makes the call.
@@ -151,7 +156,7 @@ The first draft of this plan claimed "the dimensions translate cleanly." Multipl
 - *Final cluster choice for batch 1* — `Amplifier` or `Mixer2`+`Mixer8` recommended; final pick made when Unit 1 starts.
 - *Whether the playbook stays as one file or splits* — start as one; split if it crosses ~300 lines (revised down from 600 — leaner v0 reaches the goal sooner).
 - *Test scenarios template within the playbook* — repo has no test harness; verification is "spin up dev server, exercise patch chain" until that changes.
-- *Whether to surface the homage-vs-clone tension as a docs-only section in CLAUDE.md too* — defer until the playbook stabilizes; adding to CLAUDE.md too early risks duplication that drifts.
+- *Whether to surface the spec-as-source-of-truth scoping in CLAUDE.md* — addressed 2026-05-06: a clarifying note added to CLAUDE.md to prevent the "homage" framing from being read more broadly than DSP-level fidelity. The narrow scoping is now codified across CLAUDE.md, the playbook, and this plan.
 
 ## Implementation Units
 
@@ -170,7 +175,7 @@ The first draft of this plan claimed "the dimensions translate cleanly." Multipl
 
 **Approach:**
 - Pick the cluster (default: `Amplifier` alone). See Key Technical Decisions for the cluster-mapping reality (impl Amplifier diverges from spec §6.13 in range and mod-input presence; Mixer2 has no spec counterpart; Mixer8 has known gaps). The audit's first concrete exercise of the tri-state framework will be deciding dispositions for these.
-- Open the spec entry for each module; read the impl. Write findings as a list. For each finding, set a disposition: `fix-toward-spec` / `keep-as-divergence` / `undecided`. Default `undecided`. **For any `fix-toward-spec` finding that touches user-visible behavior** (port count or direction, param names, default values, control ranges that change feel), require a one-line rationale on why the spec value is right for the homage product — not just default acceptance.
+- Open the spec entry for each module; read the impl. Write findings as a list. For each finding, set a disposition: `fix-toward-spec` / `keep-as-divergence` / `undecided`. Default for spec divergences is `fix-toward-spec`. **For any `keep-as-divergence` finding that touches user-visible behavior** (port count or direction, param names, default values, control ranges that change feel), require a one-line rationale fitting one of three categories: a DSP-level approximation the spec implicitly tolerates, an extension the spec doesn't preclude, or a durable design rationale that survives spec adherence as the baseline. "More learnable" / "useful" / "saves work" alone don't qualify.
 - Apply only `fix-toward-spec` findings. Verify manually (`npm start`, exercise the module on the canvas, audible/visible behavior matches expectation).
 - Record the cluster's audit in `IMPL_AUDIT_REPORT.md` using the systemic-vs-per-module structure. Seed the systemic findings section with at least port-colour and attenuator-type entries, using this template:
 
@@ -181,13 +186,13 @@ The first draft of this plan claimed "the dimensions translate cleanly." Multipl
   - Spec: signal-type-based (red=audio / blue=control / yellow=logic / gray=slave) — `BORED_MODULAR_DESIGN.md:13-17`.
   - Impl: direction-based (red=output / blue=audio-in / yellow=mod-in) — `src/BoredModularEmulator.jsx:184`.
   - Severity: Critical (cross-cutting).
-  - Disposition: `keep-as-divergence` — see Identity frame (homage, not clone). Direction-based is more learnable for users without prior modular-synth fluency.
+  - Disposition: `fix-toward-spec (blocked: cross-cutting overhaul carries scope and visual-design implications; requires its own brainstorm + plan)`. The "more learnable" argument for direction-based is feature-level and does not survive the spec-as-source-of-truth frame (see Identity frame); spec convention is canonical pending a deliberate design call to keep the divergence.
 
   ### S2. Attenuator-type metadata
   - Spec: every mod input tagged Type I (linear) / II (exp) / III (bipolar) — see `BORED_MODULAR_DESIGN.md` examples.
   - Impl: no metadata at all; all mod inputs are raw `AudioParam` references (`src/AudioEngine.js`).
   - Severity: Critical.
-  - Disposition: `undecided` — fix would need to thread attenuator behavior through `MODULE_DEFS` and the cable-drag UI.
+  - Disposition: `fix-toward-spec (blocked: requires threading attenuator behavior through MODULE_DEFS and the cable-drag UI — substantial cross-cutting change)`.
   ```
 
 - Capture friction notes throughout: anything slower than expected, anything surprising, anything that felt re-derivable. Write them into `sourcemats/_friction_notes_unit1.md` as you go — short bullets, not prose. Sparse notes are a signal: if the cluster surfaced fewer than ~3 distinct friction items, expect Unit 2's playbook v0 to be thin and Unit 3 to need a richer cluster (one touching `_slaveTargets`, `_clockSubscribers`, `_pitchTargets`, or `customUIHeight`) to test playbook leverage honestly.
@@ -211,7 +216,7 @@ The first draft of this plan claimed "the dimensions translate cleanly." Multipl
 
 ---
 
-- [x] **Unit 2: Author `MODULE_PLAYBOOK.md` v0 from friction notes** — **COMPLETED 2026-05-05 in PR #7** (`feat/module-playbook-v0`). File: `sourcemats/MODULE_PLAYBOOK.md` (5 sections, 121 lines, well under the 300-line lean target). Sections: modify-a-module checklist (with the `removeModule` cleanup step CLAUDE.md's 5-step list omits), audit methodology (6+3 dimension split rationale + severity-vs-disposition independence + user-visible-fix rationale rule with both acceptance and rejection worked examples + cluster summary template), known systemic divergences, batch sizing, patch-load safety. Three conditional sections from this plan's Unit 2 list (when-to-use, conventions reference, per-batch brief format) deferred to Unit 4 — none surfaced friction in Unit 1. Sub-plan locking the v0 shape: `docs/plans/2026-05-05-001-feat-module-playbook-v0-plan.md`. Friction notes deleted (git history retains). **Next agent: do not re-execute. Start at Unit 3.**
+- [x] **Unit 2: Author `MODULE_PLAYBOOK.md` v0 from friction notes** — **COMPLETED 2026-05-05 in PR #7** (`feat/module-playbook-v0`). File: `sourcemats/MODULE_PLAYBOOK.md` (5 sections, well under the 300-line lean target). Sections: modify-a-module checklist (with the `removeModule` cleanup step CLAUDE.md's 5-step list omits), audit methodology (6+3 dimension split rationale + severity-vs-disposition independence + rationale rule for `keep-as-divergence` with worked examples + cluster summary template), known systemic divergences, batch sizing, patch-load safety. The rationale rule was reformulated 2026-05-06 (originally written as "user-visible-fix rationale rule" requiring justification to fix; reversed to "divergence rationale rule" requiring justification to keep, after the spec-as-source-of-truth framing was clarified). Three conditional sections from this plan's Unit 2 list (when-to-use, conventions reference, per-batch brief format) deferred to Unit 4 — none surfaced friction in Unit 1. Sub-plan locking the v0 shape: `docs/plans/2026-05-05-001-feat-module-playbook-v0-plan.md`. Friction notes deleted (git history retains). **Next agent: do not re-execute. Start at Unit 3.**
 
 **Goal:** Codify what Unit 1's friction proves is needed. Lean v0. Future batches grow it.
 
@@ -229,7 +234,7 @@ The first draft of this plan claimed "the dimensions translate cleanly." Multipl
 
   **Mandatory** (seeded from this plan + `CLAUDE.md` regardless of Unit 1's friction):
   1. **Modify-a-module checklist** — refactor of `CLAUDE.md`'s 5-step "Adding a module requires" list with verification anchors per step. Includes the `removeModule` cleanup symmetry that `CLAUDE.md` flags as easy-to-forget.
-  2. **Audit methodology** — per-module vs systemic dimension split (6 + 3 — see Context & Research), tri-state disposition rule (default `undecided`), severity grades (Critical / Minor / Formatting / Out-of-scope reused from `SPEC_AUDIT_REPORT.md`), severity-vs-disposition independence with worked example (port-colour as `Critical` + `keep-as-divergence`), and the user-visible-fix rationale rule (any `fix-toward-spec` touching user-visible behavior needs a one-line "why this isn't a homage divergence" note).
+  2. **Audit methodology** — per-module vs systemic dimension split (6 + 3 — see Context & Research), tri-state disposition rule (default for spec divergences is `fix-toward-spec`; `keep-as-divergence` requires concrete rationale; `undecided` for fixes blocked on a design call), severity grades (Critical / Minor / Formatting / Out-of-scope reused from `SPEC_AUDIT_REPORT.md`), severity-vs-disposition independence with worked example (port-colour as `Critical` + `fix-toward-spec (blocked)`), and the divergence rationale rule (any `keep-as-divergence` touching user-visible behavior needs a one-line rationale fitting one of three categories: DSP-level approximation, spec-tolerated extension, or durable design rationale that survives spec-as-baseline).
   3. **Known systemic divergences** — port-colour semantics, attenuator-type encoding absence, layout encoding absence, no test harness, missing System Features (Morphing, Variations).
 
   **Conditional** (include only if Unit 1's friction motivates them):
@@ -253,8 +258,8 @@ The first draft of this plan claimed "the dimensions translate cleanly." Multipl
 - File exists at `sourcemats/MODULE_PLAYBOOK.md`.
 - All three mandatory sections populated.
 - Conditional sections populated only where Unit 1 surfaced real need.
-- Audit methodology section documents the 6+3 dimension split, tri-state disposition with `undecided` default, and the user-visible-fix rationale rule.
-- Severity-vs-disposition independence is documented with the port-colour worked example.
+- Audit methodology section documents the 6+3 dimension split, tri-state disposition with `fix-toward-spec` as the default for spec divergences, and the divergence rationale rule (rationale required to keep, not to fix).
+- Severity-vs-disposition independence is documented with the port-colour worked example (`Critical` severity + `fix-toward-spec (blocked)` disposition).
 - `_friction_notes_unit1.md` deleted; the codification is complete.
 - `CLAUDE.md` is *not* yet linked to the playbook; the link waits for Unit 4 after Unit 3 has stress-tested the playbook.
 
@@ -372,7 +377,7 @@ The first draft of this plan claimed "the dimensions translate cleanly." Multipl
 | Effort-class fixes (AudioWorklet-class) break the batch-sizing heuristic | Effort-class qualifier in the rule: worklet-class = 3 modules, range/param-add = 1 module. |
 | Audit incrementality means the report is always "incomplete" | That's the design intent. The report is a design-decision log of *examined* modules, not a "done" backlog. CLAUDE.md/playbook link to it for context, not as a checklist. |
 | Spec module names diverge from impl names (e.g., `Filter` impl vs spec `FilterA-F`) and the audit's per-module subsection title gets confusing | Per-module subsections carry both spec name and impl name where they differ. Module Count Summary at the end of `IMPL_AUDIT_REPORT.md` reconciles names and counts. |
-| Reviewers / future-self forget the homage-vs-clone frame and fix divergent-but-good impl choices "to spec" out of habit | Identity-frame section preserved into the playbook's audit methodology. Tri-state disposition with `undecided` default forces the question instead of letting it slide. User-visible-fix rationale rule (one-line "why this isn't a homage divergence") puts a specific friction in the path of drive-by fixes. |
+| Reviewers / future-self forget that spec is the source of truth and accept divergent impl choices as `keep-as-divergence` out of habit | Identity-frame section explicitly scopes "homage" to DSP-level fidelity only. Divergence rationale rule in the playbook (one-line "is this a DSP approximation, a spec-tolerated extension, or a durable design call?") puts a specific friction in the path of drive-by `keep-as-divergence`. Default disposition for spec divergences is `fix-toward-spec`; "more learnable" / "useful" / "saves work" alone don't qualify as keep rationale. |
 | Findings sit in `undecided` indefinitely; the audit becomes a graveyard of unresolved dispositions | Unit 4's after-batch retrospective surfaces the `undecided` count per disposition. Playbook can codify a per-batch rule (e.g., "no more than 3 carryover undecided per cluster") if the graveyard pattern emerges. |
 
 ## Documentation / Operational Notes

@@ -44,17 +44,23 @@ The split exists because attenuator-type and layout findings would, recorded per
 
 Severity describes magnitude of deviation; disposition describes intent. A `Critical` finding can be `keep-as-divergence`, and a `Minor` finding can be `fix-toward-spec`. The two axes don't constrain each other.
 
-**Worked example.** Systemic finding S1 (port-colour semantics, `IMPL_AUDIT_REPORT.md:60-65`) is **Critical** because the divergence is cross-cutting and every module reads differently than spec. Its disposition is **`keep-as-divergence`** because direction-based colour is more learnable for users without prior modular-synth fluency, and the homage frame in `CLAUDE.md` accommodates UX-improving divergences. Severity is the magnitude; disposition is the call.
+**Worked example.** Systemic finding S1 (port-colour semantics, `IMPL_AUDIT_REPORT.md:60-65`) is **Critical** because the divergence is cross-cutting and every module reads differently than spec. Its disposition is **`fix-toward-spec (blocked: cross-cutting overhaul carries scope and visual-design implications; requires its own brainstorm + plan)`**. Severity is the magnitude; disposition is the call. The "more learnable" argument for direction-based does not survive the spec-as-source-of-truth frame (see §2.3); spec convention is canonical pending a deliberate design call to keep the divergence.
 
-### User-visible-fix rationale rule
+### Divergence rationale rule
 
-For any `fix-toward-spec` finding that touches user-visible behaviour (port count or direction, param names, default values, control ranges that change feel), require a one-line rationale on why the spec value is right *for the homage product* — not just default acceptance of the spec.
+The PDF/spec corpus (`sourcemats/Bored Modular English User Manual - module reference only.pdf`, derived into `sourcemats/BORED_MODULAR_DESIGN.md`) is the source of truth for module shape: params, ranges, IO, behavior. CLAUDE.md's "spiritual homage … not cycle-accurate DSP" framing scopes narrowly to *implementation-level* fidelity — Web Audio approximations are allowed, AudioWorklet is optional, exact DSP graphs are not required. It does not extend to feature/parameter/IO divergence.
 
-Default-acceptance is the failure mode this rule prevents: the audit surfaces a divergence, the impl gets "fixed" toward spec out of reflex, and the homage-vs-clone frame quietly erodes one fix at a time.
+For any `keep-as-divergence` finding that touches user-visible behaviour (port count or direction, param names, default values, control ranges that change feel), require a one-line rationale fitting one of these three categories:
 
-**Worked example (acceptance).** Finding F2b in `IMPL_AUDIT_REPORT.md:98` widened the `Amplifier` `level.max` from 1.0 to 4.0 to match spec §6.13's range. Rationale: signal boost is useful for amplifying low-level inputs and for envelope-modulated dynamics where the modulator briefly drives gain above unity. Range *widening* is patch-load-safe (see §5). The rationale is one line, concrete, and product-aware. Accepted.
+1. **DSP-level approximation** the spec implicitly tolerates (e.g., a Web Audio BiquadFilter standing in for a virtual-analog ladder filter; same musical character, lower implementation cost).
+2. **Extension** the spec doesn't preclude (an impl-only utility param that doesn't replace any spec feature and doesn't change spec-required behavior).
+3. **Durable design rationale** that survives spec adherence as the baseline — concrete enough that "more learnable" / "useful" / "saves implementation work" alone don't qualify.
 
-**Worked example (rejection).** Suppose someone proposes: rename the `Amplifier` `level` param key to `amplification` to match spec terminology. The rationale rule asks: *why is the spec name right for the homage product?* The honest answer is "it isn't, by enough to justify the cost" — renaming the param key silently drops saved values from any pre-existing patch, because `setParam` no-ops on unknown keys (`src/AudioEngine.js:1603`). The spec-fidelity gain (one word in the UI) doesn't justify the data-loss cost. Rejected; finding stays `undecided` until either a label-only change is preferred or a patch-migration path exists. (See finding F7 in the audit report for the actual undecided entry.)
+Default-acceptance of divergences — letting "we just decided to do it differently" become an indistinguishable-from-default disposition — is the failure mode this rule prevents.
+
+**Worked example (rejection).** Finding F2a in `IMPL_AUDIT_REPORT.md` — Amplifier `level.min`: impl 0, spec §6.13 0.25. Initially proposed `keep-as-divergence` with rationale "full-mute is a useful patch operation in modular synthesis." The rationale rule asks: is this a DSP-level approximation, a spec-tolerated extension, or a durable design rationale that survives spec-as-baseline? Full-mute is a feature-level affordance, not a DSP-level approximation; spec defines 0.25 as the minimum; "useful" alone doesn't qualify. Rejected. Disposition flips to `fix-toward-spec (blocked: range narrowing requires patch-load scan per §5; revisit when narrowing is safe to apply)`.
+
+**Worked example (acceptance).** Findings R2/R3 in `IMPL_AUDIT_REPORT.md` — RandomGen impl-only `smoothing` (BiquadFilter LP cutoff) and `amount` (output gain stage), neither described in spec §3.12. Rationale: extensions the spec doesn't preclude — they don't replace any spec feature and don't change spec-required behavior; they let users dial fluid-vs-stepped random and scale to target ranges without an external utility module. Accepted as `keep-as-divergence` under category 2.
 
 ### What counts as a batch outcome
 
@@ -80,9 +86,9 @@ The summary is the durable record. Future batches scan summaries first when pick
 
 Recorded once in `IMPL_AUDIT_REPORT.md` Systemic Findings section (`S1`, `S2`, `S3`). Not repeated per-module audit. The playbook adds two more that aren't in the report yet because they don't fit the per-module-vs-systemic-dimension frame; they're project-level facts that shape every audit.
 
-- **S1 — Port-colour semantics.** Direction-based (impl) vs signal-type-based (spec). `keep-as-divergence`. See `IMPL_AUDIT_REPORT.md:60-65`.
-- **S2 — Attenuator-type metadata.** No Type I/II/III metadata anywhere in `src/`. `undecided`. See `IMPL_AUDIT_REPORT.md:67-72`.
-- **S3 — Layout encoding.** No panel illustration encoding outside `customUIHeight`. `undecided`; visual-layout fidelity deferred to its own batch. See `IMPL_AUDIT_REPORT.md:74-79`.
+- **S1 — Port-colour semantics.** Direction-based (impl) vs signal-type-based (spec). `fix-toward-spec (blocked: cross-cutting overhaul requires its own brainstorm + plan due to scope and visual-design implications)`. See `IMPL_AUDIT_REPORT.md:60-65`.
+- **S2 — Attenuator-type metadata.** No Type I/II/III metadata anywhere in `src/`. `fix-toward-spec (blocked: requires threading attenuator behavior through MODULE_DEFS and the cable-drag UI — substantial cross-cutting change)`. See `IMPL_AUDIT_REPORT.md:67-72`.
+- **S3 — Layout encoding.** No panel illustration encoding outside `customUIHeight`. `fix-toward-spec (blocked: visual-layout fidelity deferred to its own batch with its own methodology)`. See `IMPL_AUDIT_REPORT.md:74-79`.
 - **No test harness.** Verification is manual: `npm start`, drop the module on the canvas, exercise patch chains, listen / watch. Every audit batch's verification depends on this. If a future batch introduces tests, the playbook gets a verification update; until then, "manual" is the convention, not a gap.
 - **System Features (Morphing, Variations) absent.** Out of the spec PDF excerpt and out of `src/`. Not a per-module finding; surfaces here so future audits don't try to record it as one.
 
@@ -90,7 +96,7 @@ Recorded once in `IMPL_AUDIT_REPORT.md` Systemic Findings section (`S1`, `S2`, `
 
 - **One PR = one cluster.** A cluster is up to 5 modules with related impl↔spec mappings. Smaller is fine; larger needs splitting.
 - **Effort-class qualifier.** Range / param-add / metadata fixes count as 1 module each. AudioWorklet-class fixes (new worklet, custom DSP node) count as 3. So a worklet-class fix to one module fills a cluster on its own; routine metadata fixes to a Mixer pair fill a cluster lightly.
-- **Systemic findings are not "batches".** Port-colour overhaul, attenuator-type encoding, layout encoding — each gets its own brainstorm + plan because each carries identity-decision weight (see `CLAUDE.md`'s homage framing) and needs its own scope conversation. Don't squeeze them into a fidelity batch.
+- **Systemic findings are not "batches".** Port-colour overhaul, attenuator-type encoding, layout encoding — each gets its own brainstorm + plan because each is cross-cutting (touches every module's UI or schema) and needs its own scope conversation. Don't squeeze them into a fidelity batch.
 - **Picking the next cluster.** Read recent cluster summaries in `IMPL_AUDIT_REPORT.md`. Prefer clusters with clean spec↔impl name mapping (or honest known divergence) over clusters with messy mapping. The Filter group is *not* a good early cluster for this reason — spec has 11 entries, impl has 3, no clean mapping.
 
 ## 5. Patch-load safety

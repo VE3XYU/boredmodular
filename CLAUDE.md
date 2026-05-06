@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Browser-based modular synthesizer — a spiritual homage to the patch-cord modular tradition, not a clone of any specific hardware. Users drop modules on an SVG canvas, patch them with virtual cables (output → input), tweak params, and hear the result through the Web Audio API. The goal is usable sound design — accurate workflow and sonic character, not cycle-accurate DSP.
 
+**Spec is the source of truth for module shape.** The PDF (`sourcemats/Bored Modular English User Manual - module reference only.pdf`) and derived `sourcemats/BORED_MODULAR_DESIGN.md` are canonical for what each module should do — params, ranges, IO, behavior. The "homage, not clone" framing above scopes narrowly to *implementation-level* fidelity (Web Audio approximations, AudioWorklet optional, DSP graph freedom) — not to feature/parameter/IO divergence. See `sourcemats/MODULE_PLAYBOOK.md` §2 for the audit methodology and disposition rules that codify this.
+
 Built with Create React App, React 18, no extra runtime deps. The published name is "bored modular".
 
 ## Commands
