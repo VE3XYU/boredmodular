@@ -2,7 +2,7 @@
 
 A growing record of how the implementation in `src/` compares to the spec corpus, audited per batch. Each batch appends its scoped audit; the report is allowed to be incomplete.
 
-**Status: 2026-05-04 — Initial seed.** First batch (Unit 1 of `docs/plans/2026-05-04-001-feat-module-completeness-playbook-plan.md`) audits `Amplifier`. Systemic findings header seeded with port-colour and attenuator-type entries. Most modules remain unaudited — this is by design; lazy/incremental.
+**Status: 2026-05-06.** Two batches landed; 3 modules audited (`Amplifier`, `ClkGen`, `RandomGen`). Systemic findings: S1-S4 (port-colour, attenuator-type, layout, non-oscillator master/slave architecture). On 2026-05-06 the disposition framework was reframed to make spec the source of truth (see Disposition section); Amplifier findings F1/F2a/F3 were re-dispositioned. Most modules remain unaudited — by design; lazy/incremental.
 
 ## Sources
 
@@ -78,11 +78,69 @@ These cross-cutting findings affect every module. Recording once here; not repea
 - **Severity:** Out-of-scope at the per-module level. Critical at the systemic level if visual fidelity becomes a goal.
 - **Disposition:** `fix-toward-spec (blocked: visual-layout fidelity deferred to its own batch with its own methodology)`. See plan Scope Boundaries: "visual-layout audit … future batch with explicit methodology run".
 
+### S4. Non-oscillator master/slave architecture absence
+
+- **Spec:** the master/slave port pattern extends to non-oscillator masters and slaves throughout the spec. Examples:
+  - `LFOA` (§3.1) provides `Slv` output (gray); `LFOSlvA-E` (§3.4-3.8) take `Mst` input (gray) for master rate.
+  - `ClkGen` (§3.9) provides `Slv` output (gray): "1 BPM = 1 Hz on connected slave LFO at 1:1 ratio."
+  - `RandomGen` (§3.12) is described as "Slave LFO" with `Mst` input (gray) and a master-relative rate (0.025 to 38.05x).
+  - `RndStepGen` (§3.11) and other slave-class generators in the LFO group follow the same pattern.
+- **Impl:** master/slave plumbing exists (`Slv → Mst` virtual port handling in `connect`/`disconnect`, `_slaveTargets[]`, `_recalcFreq()`, `_propagateToSlaves()`) but only oscillator participants are wired. Master oscillators (`OscA`, `OscB`, `OscC`, `MasterOsc`) and slave oscillators (`OscSlvA-E`, `OscSlvFM`, `OscSineBank`) participate; no LFO masters export `Slv`, no LFO slaves are implemented, `ClkGen` has no `Slv` output, `RandomGen` has no `Mst` input.
+- **Severity:** Critical (cross-cutting; affects multiple implemented modules — `LFOA`'s missing `Slv` output, `ClkGen`'s missing `Slv` output, `RandomGen`'s missing `Mst` input — plus the absent `LFOSlvA-E`, `RndStepGen`, `ClkRndGen`, `RndPulsGen` modules).
+- **Disposition:** `fix-toward-spec (blocked: cross-cutting architectural extension — requires extending the existing Slv → Mst plumbing to non-oscillator masters and slaves, plus implementing the absent LFO/random slave modules; needs its own brainstorm + plan)`.
+- **Surfaced:** 2026-05-06 during Unit 3 batch audit. Findings folding to S4: `ClkGen` C4 (missing `Slv` output), `RandomGen` R1 (standalone vs slave-class), `RandomGen` R4 (missing `Mst` input).
+
 ---
 
 ## Per-module audits
 
 Group sections appear as their batches are run. Modules not yet audited are listed in the Module Count Summary at the end.
+
+## 3. LFO Group
+
+### 3.9 ClkGen (impl: `ClkGen`) — audited 2026-05-06, batch 2
+
+- **Spec:** `BORED_MODULAR_DESIGN.md:375-383` (ClkGen — internal clock generator, independent of MIDI clock).
+- **Impl:** `src/AudioEngine.js:798-871` (`_createClkGen`), `src/moduleDefs.js:196-204` (`MODULE_DEFS.ClkGen`).
+
+Internal clock running at 24 PPQN with quarter-note (`Clk4`), bar (`Sync`), and per-tick (`Clk24`) outputs. Subscribers register via virtual `Clk` and `Rst` ports on consuming modules; the module has no audio inputs of its own. Timer cleanup is handled in `removeModule` (`src/AudioEngine.js:1565-1569`) — the cross-cutting system most stressed by this audit.
+
+- **Finding C1 — `active` selector vs spec "On/Off button".** Spec calls a button widget; impl uses a select dropdown (`active: ["on", "off"]` at `src/AudioEngine.js:820`). **Severity:** Minor. **Disposition:** `fix-toward-spec (blocked: MODULE_DEFS schema does not currently distinguish button-style binary widgets from selector-style options; introducing a button param type is a small but cross-cutting UI rendering change)`.
+- **Finding C2 — Rate display absent.** Spec lists "Rate (Knob + Display)"; impl renders a slider with no separate numeric readout. **Severity:** Minor. **Disposition:** `undecided`. Folds into systemic finding S3 (layout encoding); the impl has no per-module numeric-display affordance, so this surfaces broadly when visual-layout fidelity becomes a goal.
+- **Finding C3 — Missing `Reset` input.** Spec defines a yellow `Reset` input that restarts the clock on positive edge and triggers `Sync` output. Impl has no `Reset` input (`inputs: []`, `modInputs: []` at `src/moduleDefs.js:200,202`). **Severity:** Critical. **Disposition:** `fix-toward-spec (blocked: pattern choice required between (a) audio-rate AudioParam input polled by the schedule loop with edge detection — closer to spec's logic-signal semantics — and (b) virtual subscriber-pattern input handled in connect/disconnect — closer to existing impl conventions for Clk/Rst on sequencers)`. Both patterns exist in the codebase; choice has follow-on implications for how other modules send reset signals to ClkGen.
+- **Finding C4 — Missing `Slv` output.** Spec defines a gray `Slv` output for slave-rate control on connected slave LFOs (1 BPM = 1 Hz at 1:1). Impl has no `Slv` output (`outputs: ["Clk24", "Clk4", "Sync"]` at `src/moduleDefs.js:201`). **Severity:** Critical. **Disposition:** `fix-toward-spec (blocked: depends on systemic finding S4 — non-oscillator master/slave architecture)`. Adding the output without slave-side recipients (no `LFOSlvA-E` implemented) would be dangling.
+- **Finding C5 — Output port name divergence.** Impl outputs `Clk24` / `Clk4` / `Sync`; spec names them `24 Pulses/B` / `4 Pulses/B` / `Sync`. **Severity:** Minor. **Disposition:** `fix-toward-spec (blocked: MODULE_DEFS currently uses port-name strings as both keys and visible labels at src/moduleDefs.js:201; renaming the keys would silently drop saved patches via the setParam no-op branch — see playbook §5)`. A label-only change (introducing key/label separation in `MODULE_DEFS`) is the cleanest fix path; `Sync` is already aligned.
+- **Finding C6 — Default BPM 120 (spec silent).** **Severity:** Out-of-scope (spec doesn't state a default).
+
+**Cluster summary (ClkGen subsection):**
+- Findings: 5 in-scope + 1 out-of-scope = 6 total.
+- Dispositions: 4 `fix-toward-spec (blocked)` (C1, C3, C4, C5), 1 `undecided` (C2 — folds to S3), 1 out-of-scope (C6).
+
+### 3.12 RandomGen (impl: `RandomGen`) — audited 2026-05-06, batch 2
+
+- **Spec:** `BORED_MODULAR_DESIGN.md:398-402` (RandomGen — slave LFO generating smooth random control signal).
+- **Impl:** `src/AudioEngine.js:873-907` (`_createRandomGen`), `src/moduleDefs.js:205-213` (`MODULE_DEFS.RandomGen`).
+
+The spec defines `RandomGen` as a slave-class module: master-relative rate (0.025-38.05x via `Mst` input), single bipolar smooth-random output. The impl is standalone: absolute Hz rate, plus impl-only `smoothing` (BiquadFilter LP cutoff) and `amount` (output gain stage) params, no `Mst` input. The slave-class shape would require S4 (non-oscillator master/slave architecture) to land first.
+
+- **Finding R1 — Standalone vs slave-class.** Spec is "Slave LFO" with `Mst` input and master-relative rate; impl is standalone with absolute Hz rate (`rate: { value: 1, min: 0.1, max: 20, audioParam: source.playbackRate }` at `src/AudioEngine.js:902`). **Severity:** Critical (architectural divergence in module class). **Disposition:** `fix-toward-spec (blocked: depends on systemic finding S4 — non-oscillator master/slave architecture)`. Once S4 lands, the impl could become a true slave (replacing the standalone behavior) or a spec-shape `RandomGen` could be added as a separate module alongside the existing impl-only standalone (which would migrate to a different name). That call is downstream of S4.
+- **Finding R2 — Impl-only `smoothing` param.** Impl has a `smoothing` param (BiquadFilter lowpass cutoff, 0.5-100 Hz, default 5) that smooths the random buffer (`src/AudioEngine.js:903`); spec has no equivalent. **Severity:** Minor. **Disposition:** `keep-as-divergence`. Rationale: extension the spec doesn't preclude (category 2 of playbook §2.3). The smoothing affordance lets users dial fluid-vs-stepped random without an external Smooth utility module; doesn't replace any spec feature, doesn't change spec-required behavior.
+- **Finding R3 — Impl-only `amount` param.** Impl has an `amount` param (output gain stage, 0-2000, default 100) that scales the bipolar random signal (`src/AudioEngine.js:904`); spec output is "Bipolar smooth random" with no defined amplitude. **Severity:** Minor. **Disposition:** `keep-as-divergence`. Rationale: extension the spec doesn't preclude (category 2). The gain stage lets users scale to target param ranges (e.g., cents-of-pitch, filter Hz) without an external Amplifier between RandomGen and target; doesn't replace any spec feature.
+- **Finding R4 — Missing `Mst` input.** Spec defines a gray `Mst` input for master rate control. Impl has no `Mst` input (`inputs: []`, `modInputs: []` at `src/moduleDefs.js:209,211`). **Severity:** Critical (consequence of R1). **Disposition:** `fix-toward-spec (blocked: consequence of R1; depends on systemic finding S4)`.
+- **Finding R5 — Default values.** Impl defaults: `rate=1`, `smoothing=5`, `amount=100`. Spec is silent on defaults for §3.12 RandomGen. **Severity:** Out-of-scope.
+
+**Cluster summary (RandomGen subsection):**
+- Findings: 4 in-scope + 1 out-of-scope = 5 total.
+- Dispositions: 2 `fix-toward-spec (blocked)` (R1, R4), 2 `keep-as-divergence` (R2, R3 — extensions spec doesn't preclude), 1 out-of-scope (R5).
+
+**Cluster summary (LFO Group, batch 2 — combined):**
+- Findings: 9 in-scope + 2 out-of-scope = 11 total.
+- Dispositions: 6 `fix-toward-spec (blocked)` (C1, C3, C4, C5, R1, R4), 2 `keep-as-divergence` (R2, R3), 1 `undecided` (C2 — folds to S3), 2 out-of-scope (C6, R5).
+- Code change applied: none (audit-only batch — every `fix-toward-spec` finding is blocked on a dependency or design call).
+- Patch-load impact: none (no rename, no narrowing).
+- Systemic finding promoted: S4 (non-oscillator master/slave architecture absence). Findings folding to S4: C4, R1, R4.
+
+---
 
 ## 6. Mixer Group
 
@@ -115,11 +173,13 @@ The spec's `Amplifier` (§6.13) is a fixed-gain attenuation module with no modul
 
 - **Spec total:** 109 modules across 10 groups (`BORED_MODULAR_DESIGN.md:1059-1080`).
 - **Impl total:** 39 modules across 6 categories (`src/moduleDefs.js`).
-- **Audited so far:** 1 (`Amplifier`).
-- **Spec-only modules (coverage gaps, ~70):** every spec module without an impl counterpart. Includes the entire Logic group (§9), most of Audio Modifier (§7) and Control Modifier (§8), and many partial group entries. Coverage closure is deferred to a separate plan.
-- **Impl-only modules:** notable impl-only entries surface as audit batches reach them. Currently identified: `Mixer2` (impl 2-input mixer; spec has §6.1 3-input and §6.2 8-input — Mixer2 is impl-only).
+- **Audited so far:** 3 (`Amplifier`, `ClkGen`, `RandomGen`).
+- **Spec-only modules (coverage gaps, ~70):** every spec module without an impl counterpart. Includes the entire Logic group (§9), most of Audio Modifier (§7) and Control Modifier (§8), the LFO/random slave-class modules (`LFOSlvA-E`, `RndStepGen`, `ClkRndGen`, `RndPulsGen`, `PatternGen`), and many partial group entries. Coverage closure is deferred to a separate plan.
+- **Impl-only modules:** notable impl-only entries surface as audit batches reach them. Currently identified: `Mixer2` (impl 2-input mixer; spec has §6.1 3-input and §6.2 8-input — Mixer2 is impl-only relative to §6.1).
 
-Names diverging between impl and spec where audited:
+Names and shapes diverging between impl and spec where audited:
 - impl `Amplifier` is a hybrid: name from spec §6.13 Amplifier, function from spec §6.3 GainControl. See per-module audit above.
+- impl `ClkGen` matches spec §3.9 in name; output port keys diverge (`Clk24`/`Clk4` vs spec `24 Pulses/B`/`4 Pulses/B`); missing `Reset` input and `Slv` output. See finding C5 and S4.
+- impl `RandomGen` matches spec §3.12 in name but is standalone (absolute rate) where spec is slave-class (master-relative rate via `Mst` input). See finding R1 and S4.
 
 The Module Count Summary grows as batches audit additional clusters. Modules without subsections in this report have not yet been audited; their absence is not a finding, just a not-yet.
