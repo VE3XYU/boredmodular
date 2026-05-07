@@ -207,7 +207,7 @@ function Port({ x, y, name, isOutput, isMod, onMouseDown, onMouseUp, isConnected
         textAnchor="middle"
         fill="#889"
         fontSize={9}
-        fontFamily="'DM Mono', monospace"
+        fontFamily="'Pixel Operator', 'DM Mono', monospace"
         pointerEvents="none"
       >
         {name}
@@ -269,7 +269,7 @@ function ModuleNode({
       <rect x={0} y={0} width={MODULE_WIDTH} height={headerH} rx={6} fill={def.color} opacity={0.85} />
       <rect x={0} y={headerH - 6} width={MODULE_WIDTH} height={6} fill={def.color} opacity={0.85} />
       {/* Label */}
-      <text x={10} y={21} fill="#fff" fontSize={13} fontWeight={700} fontFamily="'DM Mono', monospace">
+      <text x={10} y={21} fill="#fff" fontSize={13} fontWeight={700} fontFamily="'Pixel Operator', 'DM Mono', monospace">
         {def.label}
       </text>
       {/* Close */}
@@ -279,7 +279,7 @@ function ModuleNode({
         fill="rgba(255,255,255,0.6)"
         fontSize={14}
         fontWeight={700}
-        fontFamily="monospace"
+        fontFamily="'Pixel Operator', 'DM Mono', monospace"
         style={{ cursor: "pointer" }}
         onClick={(e) => {
           e.stopPropagation();
@@ -295,7 +295,7 @@ function ModuleNode({
         if (p.options) {
           return (
             <g key={key}>
-              <text x={8} y={py + 14} fill="#99a" fontSize={10} fontFamily="'DM Mono', monospace">
+              <text x={8} y={py + 14} fill="#99a" fontSize={10} fontFamily="'Pixel Operator', 'DM Mono', monospace">
                 {p.label || key}
               </text>
               <foreignObject x={60} y={py} width={102} height={24}>
@@ -308,7 +308,7 @@ function ModuleNode({
                     border: `1px solid ${def.color}44`,
                     borderRadius: 3,
                     fontSize: 10,
-                    fontFamily: "'DM Mono', monospace",
+                    fontFamily: "'Pixel Operator', 'DM Mono', monospace",
                     padding: "0 4px",
                     outline: "none",
                   }}
@@ -329,7 +329,7 @@ function ModuleNode({
         const range = p.max - p.min;
         return (
           <g key={key}>
-            <text x={8} y={py + 14} fill="#99a" fontSize={10} fontFamily="'DM Mono', monospace">
+            <text x={8} y={py + 14} fill="#99a" fontSize={10} fontFamily="'Pixel Operator', 'DM Mono', monospace">
               {p.label || key}
             </text>
             <SvgSlider
@@ -356,7 +356,7 @@ function ModuleNode({
                     border: `1px solid ${def.color}`,
                     borderRadius: 2,
                     fontSize: 10,
-                    fontFamily: "'DM Mono', monospace",
+                    fontFamily: "'Pixel Operator', 'DM Mono', monospace",
                     padding: "0 3px",
                     outline: "none",
                     boxSizing: "border-box",
@@ -385,7 +385,7 @@ function ModuleNode({
                 y={py + 14}
                 fill="#aab"
                 fontSize={9}
-                fontFamily="'DM Mono', monospace"
+                fontFamily="'Pixel Operator', 'DM Mono', monospace"
                 textAnchor="end"
                 style={{ cursor: "text" }}
                 onDoubleClick={(e) => {
@@ -1181,7 +1181,7 @@ export default function BoredModularEmulator() {
         height: "100vh",
         background: "#0e0e10",
         display: "flex",
-        fontFamily: "'DM Mono', monospace",
+        fontFamily: "'Pixel Operator', 'DM Mono', monospace",
         color: "#ccc",
         overflow: "hidden",
         userSelect: "none",
@@ -1472,7 +1472,7 @@ export default function BoredModularEmulator() {
 
         {/* Empty state */}
         {modules.length === 0 && (
-          <text x="50%" y="50%" textAnchor="middle" fill="#333" fontSize={14} fontFamily="'DM Mono', monospace">
+          <text x="50%" y="50%" textAnchor="middle" fill="#333" fontSize={14} fontFamily="'Pixel Operator', 'DM Mono', monospace">
             Click a module in the sidebar to begin patching
           </text>
         )}
