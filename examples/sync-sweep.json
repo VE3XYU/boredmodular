@@ -1,0 +1,75 @@
+{
+  "modules": [
+    {
+      "id": "mod_1",
+      "type": "Keyboard",
+      "x": 40,
+      "y": 280,
+      "params": {}
+    },
+    {
+      "id": "mod_2",
+      "type": "OscA",
+      "x": 280,
+      "y": 40,
+      "params": {
+        "frequency": 220,
+        "waveform": "sawtooth",
+        "level": 0.5
+      }
+    },
+    {
+      "id": "mod_3",
+      "type": "OscSlvA",
+      "x": 540,
+      "y": 40,
+      "params": {
+        "partials": 4,
+        "waveform": "sawtooth",
+        "fmDepth": 400,
+        "level": 0.7
+      }
+    },
+    {
+      "id": "mod_4",
+      "type": "LFOA",
+      "x": 280,
+      "y": 480,
+      "params": {
+        "rate": 0.3,
+        "amount": 1,
+        "waveform": "triangle",
+        "range": "hi"
+      }
+    },
+    {
+      "id": "mod_5",
+      "type": "ADSREnv",
+      "x": 800,
+      "y": 280,
+      "params": {
+        "attack": 0.02,
+        "decay": 0.4,
+        "sustain": 0.5,
+        "release": 0.6
+      }
+    },
+    {
+      "id": "mod_7",
+      "type": "Output",
+      "x": 1060,
+      "y": 280,
+      "params": {
+        "level": 0.5
+      }
+    }
+  ],
+  "connections": [
+    { "fromId": "mod_2", "fromPort": "Slv", "toId": "mod_3", "toPort": "Mst", "color": "hsl(40, 70%, 55%)" },
+    { "fromId": "mod_2", "fromPort": "Out", "toId": "mod_3", "toPort": "Sync", "color": "hsl(180, 70%, 55%)" },
+    { "fromId": "mod_4", "fromPort": "Out", "toId": "mod_3", "toPort": "FMA", "color": "hsl(280, 70%, 55%)" },
+    { "fromId": "mod_3", "fromPort": "Out", "toId": "mod_5", "toPort": "In", "color": "hsl(120, 70%, 55%)" },
+    { "fromId": "mod_1", "fromPort": "Gate", "toId": "mod_5", "toPort": "Gate", "color": "hsl(60, 70%, 55%)" },
+    { "fromId": "mod_5", "fromPort": "Out", "toId": "mod_7", "toPort": "InL", "color": "hsl(330, 70%, 55%)" }
+  ]
+}

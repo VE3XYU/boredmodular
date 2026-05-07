@@ -4,6 +4,9 @@
 // Note-to-frequency conversion
 const NOTE_FREQ = (note) => 440 * Math.pow(2, (note - 69) / 12);
 
+// sync-osc-processor waveform encoding
+const WAVE_INT = { sine: 0, sawtooth: 1, square: 2, triangle: 3 };
+
 // Pink noise filter (Paul Kellet refined coefficients) — fills a Float32Array in place
 function _fillPinkBuffer(data) {
   let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
@@ -42,15 +45,17 @@ class AudioEngine {
     this.analyser.fftSize = 512;
     this.masterGain.connect(this.analyser);
     this.analyser.connect(this.ctx.destination);
-    this._workletReady = this.ctx.audioWorklet
-      .addModule('/pulse-processor.js')
-      .catch((err) => { console.error('pulse worklet load failed', err); });
+    const base = process.env.PUBLIC_URL || '';
+    this._workletReady = Promise.all([
+      this.ctx.audioWorklet.addModule(`${base}/pulse-processor.js`),
+      this.ctx.audioWorklet.addModule(`${base}/sync-osc-processor.js`),
+    ]).catch((err) => { console.error('worklet load failed', err); });
     this.isRunning = true;
   }
 
   async createModule(id, type) {
     if (!this.ctx) this.init();
-    if (type === 'OscC' || type === 'OscSlvB') {
+    if (type === 'OscC' || type === 'OscSlvB' || type === 'OscA' || type === 'OscSlvA' || type === 'OscSlvFM' || type === 'OscSineBank') {
       await this._workletReady;
     }
     let mod;
@@ -90,6 +95,8 @@ class AudioEngine {
       case "OscSlvE": mod = this._createOscSlvE(id); break;
       case "OscSlvFM": mod = this._createOscSlvFM(id); break;
       case "OscSineBank": mod = this._createOscSineBank(id); break;
+      case "SpectralOsc": mod = this._createSpectralOsc(id); break;
+      case "PercOsc": mod = this._createPercOsc(id); break;
       case "EventSeq": mod = this._createEventSeq(id); break;
       case "CtrlSeq": mod = this._createCtrlSeq(id); break;
       case "NoteSeqA": mod = this._createNoteSeqA(id); break;
@@ -103,31 +110,40 @@ class AudioEngine {
   // ── Oscillators ──────────────────────────────────────────────────────────
 
   _createOscA(id) {
-    const osc = this.ctx.createOscillator();
+    const osc = new AudioWorkletNode(this.ctx, 'sync-osc-processor', { numberOfInputs: 1 });
+    const freqParam = osc.parameters.get('frequency');
+    const pwParam = osc.parameters.get('pulseWidth');
+    const waveParam = osc.parameters.get('waveform');
+    freqParam.value = 220;
+    waveParam.value = WAVE_INT.sawtooth;
+
     const gain = this.ctx.createGain();
     const slaveGain = this.ctx.createGain();
     const fmGain = this.ctx.createGain();
-    osc.type = "sawtooth";
-    osc.frequency.value = 220;
+    const pwModGain = this.ctx.createGain();
     gain.gain.value = 0.8;
     slaveGain.gain.value = 0.8;
     fmGain.gain.value = 0;
+    pwModGain.gain.value = 0;
     osc.connect(gain);
     osc.connect(slaveGain);
-    fmGain.connect(osc.frequency);
-    osc.start();
+    fmGain.connect(freqParam);
+    pwModGain.connect(pwParam);
+
     return {
       id, type: "OscA", node: osc, outputNode: gain,
       outputs: { Out: gain, Slv: slaveGain },
-      inputs: { PitchMod1: osc.frequency, PitchMod2: osc.frequency, FmMod: fmGain },
-      _nodes: [osc, gain, slaveGain, fmGain],
+      inputs: { PitchMod1: freqParam, PitchMod2: freqParam, FmMod: fmGain, Sync: osc, PWMod: pwModGain },
+      _nodes: [osc, gain, slaveGain, fmGain, pwModGain],
       _slaveTargets: [],
       _frequency: 220,
       params: {
-        frequency: { value: 220, min: 20, max: 8000, audioParam: osc.frequency, label: "Freq" },
-        coarse: { value: 0, min: -24, max: 24, label: "Coarse" },
+        frequency: { value: 220, min: 20, max: 8000, audioParam: freqParam, label: "Freq" },
+        coarse: { value: 0, min: -60, max: 60, label: "Coarse" },
         fine: { value: 0, min: -100, max: 100, label: "Fine" },
         waveform: { value: "sawtooth", options: ["sine", "sawtooth", "square", "triangle"], label: "Wave" },
+        pulseWidth: { value: 0.5, min: 0.01, max: 0.99, audioParam: pwParam, label: "PW" },
+        pwModDepth: { value: 0, min: 0, max: 1, audioParam: pwModGain.gain, label: "PW Mod" },
         fmDepth: { value: 0, min: 0, max: 1000, audioParam: fmGain.gain, label: "FM Depth" },
         level: { value: 0.8, min: 0, max: 1, audioParam: gain.gain, label: "Level" },
       },
@@ -211,6 +227,173 @@ class AudioEngine {
     };
   }
 
+  _createSpectralOsc(id) {
+    const ctx = this.ctx;
+    const PARTIAL_COUNT = 8;
+    const output = ctx.createGain();
+    const slvOut = ctx.createConstantSource();
+    output.gain.value = 0.5;
+    slvOut.offset.value = 220;
+    slvOut.start();
+
+    const freqSrc = ctx.createConstantSource();
+    freqSrc.offset.value = 220;
+    freqSrc.start();
+
+    const fmGain = ctx.createGain();
+    fmGain.gain.value = 0;
+
+    // Upper-partials bus: partials 2..N feed here, gain set by spectralShape and modulated by ShapeMod
+    const partialBus = ctx.createGain();
+    partialBus.gain.value = 0.4;
+    partialBus.connect(output);
+
+    const partials = [];
+    for (let i = 0; i < PARTIAL_COUNT; i++) {
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.value = 220 * (i + 1);
+      const partialFreqSrc = ctx.createGain();
+      partialFreqSrc.gain.value = i + 1;
+      freqSrc.connect(partialFreqSrc);
+      partialFreqSrc.connect(osc.frequency);
+      // FMA contributes to every partial, scaled by ratio (preserves harmonic stack under FM)
+      const partialFmGain = ctx.createGain();
+      partialFmGain.gain.value = i + 1;
+      fmGain.connect(partialFmGain);
+      partialFmGain.connect(osc.frequency);
+      const g = ctx.createGain();
+      // Per-partial rolloff stays constant; shapeBus gates them collectively
+      const rolloff = i === 0 ? 1 : 1 / Math.sqrt(i + 1);
+      g.gain.value = rolloff;
+      osc.connect(g);
+      // Fundamental routes direct to output; upper partials route through shape bus
+      g.connect(i === 0 ? output : partialBus);
+      osc.start();
+      partials.push({ osc, gain: g, partialFreqSrc, partialFmGain, rolloff });
+    }
+
+    const mod = {
+      id, type: "SpectralOsc", node: partials[0].osc, outputNode: output,
+      outputs: { Out: output, Slv: slvOut },
+      inputs: { PitchMod1: freqSrc.offset, PitchMod2: freqSrc.offset, FMA: fmGain, ShapeMod: partialBus.gain },
+      _nodes: [output, slvOut, freqSrc, fmGain, partialBus,
+        ...partials.flatMap(p => [p.osc, p.gain, p.partialFreqSrc, p.partialFmGain])],
+      _slaveTargets: [],
+      _frequency: 220,
+      _partials: partials,
+      _freqSrc: freqSrc,
+      _slvOut: slvOut,
+      _partialBus: partialBus,
+      params: {
+        frequency: { value: 220, min: 20, max: 8000, label: "Freq" },
+        coarse: { value: 0, min: -24, max: 24, label: "Coarse" },
+        fine: { value: 0, min: -100, max: 100, label: "Fine" },
+        kbt: { value: "on", options: ["on", "off"], label: "KBT" },
+        spectralShape: { value: 0.4, min: 0, max: 1, audioParam: partialBus.gain, label: "Shape" },
+        partialsMode: { value: "all", options: ["all", "odd"], label: "Parts" },
+        fmDepth: { value: 0, min: 0, max: 1000, audioParam: fmGain.gain, label: "FM Dep" },
+        level: { value: 0.5, min: 0, max: 1, audioParam: output.gain, label: "Level" },
+      },
+    };
+    mod._recalcSpectralGains = () => {
+      const oddOnly = mod.params.partialsMode.value === "odd";
+      const now = ctx.currentTime;
+      for (let i = 0; i < partials.length; i++) {
+        const harmonicNum = i + 1;
+        const isEven = harmonicNum % 2 === 0;
+        const target = (oddOnly && isEven) ? 0 : partials[i].rolloff;
+        partials[i].gain.gain.setValueAtTime(target, now);
+      }
+    };
+    mod._recalcSpectralGains();
+    return mod;
+  }
+
+  _createPercOsc(id) {
+    const osc = this.ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.value = 110;
+    osc.start();
+
+    // Body amp envelope
+    const bodyGain = this.ctx.createGain();
+    bodyGain.gain.value = 0;
+    osc.connect(bodyGain);
+
+    // Click: short noise burst
+    const bufferSize = this.ctx.sampleRate * 0.5;
+    const noiseBuf = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const nd = noiseBuf.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) nd[i] = Math.random() * 2 - 1;
+    const noiseSrc = this.ctx.createBufferSource();
+    noiseSrc.buffer = noiseBuf;
+    noiseSrc.loop = true;
+    const clickFilter = this.ctx.createBiquadFilter();
+    clickFilter.type = "highpass";
+    clickFilter.frequency.value = 2000;
+    const clickGain = this.ctx.createGain();
+    clickGain.gain.value = 0;
+    noiseSrc.connect(clickFilter);
+    clickFilter.connect(clickGain);
+    noiseSrc.start();
+
+    // Output stage
+    const output = this.ctx.createGain();
+    output.gain.value = 0.8;
+    bodyGain.connect(output);
+    clickGain.connect(output);
+
+    // Trig input: dummy gain receiver (gate-target tracking calls trigger())
+    const trigIn = this.ctx.createGain();
+    trigIn.gain.value = 0;
+
+    const perc = {
+      id, type: "PercOsc", node: osc, outputNode: output,
+      outputs: { Out: output },
+      inputs: { Trig: trigIn, Amp: output.gain, PitchMod: osc.frequency },
+      _nodes: [osc, bodyGain, noiseSrc, clickFilter, clickGain, output, trigIn],
+      params: {
+        frequency: { value: 110, min: 20, max: 8000, audioParam: osc.frequency, label: "Pitch" },
+        fine: { value: 0, min: -50, max: 50, label: "Fine" },
+        decay: { value: 0.3, min: 0.005, max: 4, label: "Dec" },
+        click: { value: 0.3, min: 0, max: 1, label: "Click" },
+        punch: { value: "off", options: ["off", "on"], label: "Punch" },
+        level: { value: 0.8, min: 0, max: 1, audioParam: output.gain, label: "Level" },
+      },
+      trigger: () => {
+        const now = this.ctx.currentTime;
+        const p = perc.params;
+        const baseFreq = p.frequency.value * Math.pow(2, p.fine.value / 1200);
+        const punchOn = p.punch.value === "on";
+
+        // Body envelope: instant attack, exponential decay
+        bodyGain.gain.cancelScheduledValues(now);
+        bodyGain.gain.setValueAtTime(1, now);
+        bodyGain.gain.exponentialRampToValueAtTime(0.0001, now + p.decay.value);
+
+        // Pitch: punch adds high-to-low sweep; otherwise straight
+        osc.frequency.cancelScheduledValues(now);
+        if (punchOn) {
+          osc.frequency.setValueAtTime(baseFreq * 4, now);
+          osc.frequency.exponentialRampToValueAtTime(Math.max(baseFreq, 1), now + Math.min(0.05, p.decay.value * 0.2));
+        } else {
+          osc.frequency.setValueAtTime(baseFreq, now);
+        }
+
+        // Click: noise burst, ~5-15ms duration scaled by Click knob, tiny exponential decay
+        const clickAmt = p.click.value;
+        clickGain.gain.cancelScheduledValues(now);
+        clickGain.gain.setValueAtTime(clickAmt, now);
+        clickGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.005 + clickAmt * 0.015);
+      },
+      releaseEnv: () => {
+        // Percussive: release is implicit in decay envelope; no-op so gate-target tracking accepts us
+      },
+    };
+    return perc;
+  }
+
   _createNoise(id) {
     const bufferSize = this.ctx.sampleRate * 2;
     const whiteBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
@@ -275,11 +458,18 @@ class AudioEngine {
     oscGain.connect(output);
     noiseGain.connect(output);
 
+    // Trig: dummy gain receiver, gate-target tracking calls trigger()
+    const trigIn = this.ctx.createGain();
+    trigIn.gain.value = 0;
+
+    // Vel Mod: scales output gain via control connection. Static level still set by Level slider;
+    // Vel Mod adds on top so an unconnected input doesn't change behaviour.
+    // Pitch Mod: routed to osc.frequency, additive
     const drum = {
       id, type: "DrumSynth", node: osc, outputNode: output,
       outputs: { Out: output },
-      inputs: {},
-      _nodes: [osc, oscGain, noiseSrc, noiseFilter, noiseGain, output],
+      inputs: { Trig: trigIn, VelMod: output.gain, PitchMod: osc.frequency },
+      _nodes: [osc, oscGain, noiseSrc, noiseFilter, noiseGain, output, trigIn],
       params: {
         oscFreq: { value: 60, min: 20, max: 500, audioParam: osc.frequency, label: "Freq" },
         oscDecay: { value: 0.15, min: 0.01, max: 2, label: "OscDec" },
@@ -306,6 +496,7 @@ class AudioEngine {
         osc.frequency.setValueAtTime(p.oscFreq.value + p.pitchBend.value, now);
         osc.frequency.exponentialRampToValueAtTime(Math.max(p.oscFreq.value, 1), now + p.bendTime.value);
       },
+      releaseEnv: () => {},
     };
     return drum;
   }
@@ -377,7 +568,7 @@ class AudioEngine {
       _frequency: 220,
       params: {
         frequency: { value: 220, min: 20, max: 8000, label: "Freq" },
-        coarse: { value: 0, min: -36, max: 36, label: "Coarse" },
+        coarse: { value: 0, min: -60, max: 60, label: "Coarse" },
         fine: { value: 0, min: -50, max: 50, label: "Fine" },
         kbt: { value: "on", options: ["on", "off"], label: "KBT" },
       },
@@ -421,7 +612,7 @@ class AudioEngine {
     }
 
     const params = {
-      partials: { value: 1, min: 0.25, max: 16, label: "Partials" },
+      partials: { value: 1, min: 0.03125, max: 32, label: "Partials" },
       detune: { value: 0, min: -24, max: 24, label: "Detune" },
       fine: { value: 0, min: -50, max: 50, label: "Fine" },
       level: { value: 0.8, min: 0, max: 1, audioParam: gain.gain, label: "Level" },
@@ -462,8 +653,79 @@ class AudioEngine {
     };
   }
 
+  _makeSyncSlaveOsc(id, type, waveform, modInputDefs) {
+    // Slave factory using sync-osc-processor (Sync input + selectable waveform).
+    const osc = new AudioWorkletNode(this.ctx, 'sync-osc-processor', { numberOfInputs: 1 });
+    const freqParam = osc.parameters.get('frequency');
+    const waveParam = osc.parameters.get('waveform');
+    freqParam.value = 220;
+    waveParam.value = WAVE_INT[waveform] ?? WAVE_INT.sawtooth;
+
+    const gain = this.ctx.createGain();
+    gain.gain.value = 0.8;
+    osc.connect(gain);
+
+    const inputs = { Mst: null, Sync: osc };
+    const modGains = {};
+    if (modInputDefs.FMA) {
+      const fmGain = this.ctx.createGain();
+      fmGain.gain.value = 0;
+      fmGain.connect(freqParam);
+      inputs.FMA = fmGain;
+      modGains._fmGain = fmGain;
+    }
+    if (modInputDefs.FMB) {
+      const fmGain = this.ctx.createGain();
+      fmGain.gain.value = 0;
+      fmGain.connect(freqParam);
+      inputs.FMB = fmGain;
+      modGains._fmGain = fmGain;
+    }
+    if (modInputDefs.AM) {
+      inputs.AM = gain.gain;
+    }
+
+    const params = {
+      partials: { value: 1, min: 0.03125, max: 32, label: "Partials" },
+      detune: { value: 0, min: -24, max: 24, label: "Detune" },
+      fine: { value: 0, min: -50, max: 50, label: "Fine" },
+      level: { value: 0.8, min: 0, max: 1, audioParam: gain.gain, label: "Level" },
+    };
+    if (modInputDefs.FMA || modInputDefs.FMB) {
+      params.fmDepth = { value: 0, min: 0, max: 1000, audioParam: modGains._fmGain.gain, label: "FM Dep" };
+    }
+    if (type === "OscSlvA") {
+      params.waveform = { value: waveform, options: ["sine", "sawtooth", "square", "triangle"], label: "Wave" };
+    }
+    if (type === "OscSlvFM") {
+      params.octShift = { value: 0, min: -3, max: 3, label: "Oct" };
+    }
+
+    const allNodes = [osc, gain, ...Object.values(modGains)];
+    return {
+      id, type, node: osc, outputNode: gain,
+      outputs: { Out: gain },
+      inputs,
+      _nodes: allNodes,
+      _masterFreq: 0,
+      _masterModId: null,
+      _freqParam: freqParam,
+      _recalcFreq() {
+        if (!this._masterFreq) return;
+        const p = this.params;
+        const partial = p.partials.value;
+        const det = p.detune.value;
+        const fn = p.fine.value;
+        const octShift = p.octShift ? p.octShift.value : 0;
+        const freq = this._masterFreq * partial * Math.pow(2, det / 12) * Math.pow(2, fn / 1200) * Math.pow(2, octShift);
+        this._freqParam.setValueAtTime(freq, osc.context.currentTime);
+      },
+      params,
+    };
+  }
+
   _createOscSlvA(id) {
-    return this._makeSlaveOsc(id, "OscSlvA", "sawtooth", { FMA: true, AM: true });
+    return this._makeSyncSlaveOsc(id, "OscSlvA", "sawtooth", { FMA: true, AM: true });
   }
   _createOscSlvB(id) {
     const pulse = new AudioWorkletNode(this.ctx, 'pulse-processor');
@@ -488,7 +750,7 @@ class AudioEngine {
         pulse.parameters.get('frequency').setValueAtTime(freq, pulse.context.currentTime);
       },
       params: {
-        partials: { value: 1, min: 0.25, max: 16, label: "Partials" },
+        partials: { value: 1, min: 0.03125, max: 32, label: "Partials" },
         detune: { value: 0, min: -24, max: 24, label: "Detune" },
         fine: { value: 0, min: -50, max: 50, label: "Fine" },
         pulseWidth: { value: 0.5, min: 0.01, max: 0.99, audioParam: pulse.parameters.get('pulseWidth'), label: "PW" },
@@ -506,31 +768,42 @@ class AudioEngine {
     return this._makeSlaveOsc(id, "OscSlvE", "sine", { FMA: true, AM: true });
   }
   _createOscSlvFM(id) {
-    return this._makeSlaveOsc(id, "OscSlvFM", "sine", { FMB: true });
+    return this._makeSyncSlaveOsc(id, "OscSlvFM", "sine", { FMB: true });
   }
 
   _createOscSineBank(id) {
     const output = this.ctx.createGain();
     output.gain.value = 0.6;
+    // Sync fan-out: a single Sync input connects here; we route to all 6 worklets
+    const syncFanOut = this.ctx.createGain();
+    syncFanOut.gain.value = 1;
+    // MixIn: external audio mixed straight into output bus
+    const mixInGain = this.ctx.createGain();
+    mixInGain.gain.value = 1;
+    mixInGain.connect(output);
+
     const oscs = [];
     const gains = [];
-    const inputs = { Mst: null };
+    const freqParams = [];
+    const inputs = { Mst: null, Sync: syncFanOut, MixIn: mixInGain };
     const params = {};
 
     for (let i = 0; i < 6; i++) {
       const n = i + 1;
-      const osc = this.ctx.createOscillator();
-      osc.type = "sine";
-      osc.frequency.value = 220 * n;
+      const osc = new AudioWorkletNode(this.ctx, 'sync-osc-processor', { numberOfInputs: 1 });
+      const fp = osc.parameters.get('frequency');
+      fp.value = 220 * n;
+      osc.parameters.get('waveform').value = WAVE_INT.sine;
       const g = this.ctx.createGain();
       g.gain.value = i === 0 ? 1 : 0.5 / n;
       osc.connect(g);
       g.connect(output);
-      osc.start();
+      syncFanOut.connect(osc);
       oscs.push(osc);
       gains.push(g);
+      freqParams.push(fp);
       inputs[`AM${n}`] = g.gain;
-      params[`tune${n}`] = { value: n, min: 0.25, max: 16, label: `Tune${n}` };
+      params[`tune${n}`] = { value: n, min: 0.03125, max: 32, label: `Tune${n}` };
       params[`fine${n}`] = { value: 0, min: -50, max: 50, label: `Fine${n}` };
       params[`level${n}`] = { value: i === 0 ? 1 : +(0.5 / n).toFixed(2), min: 0, max: 1, audioParam: g.gain, label: `Lvl${n}` };
     }
@@ -539,19 +812,21 @@ class AudioEngine {
       id, type: "OscSineBank", node: oscs[0], outputNode: output,
       outputs: { Out: output },
       inputs,
-      _nodes: [...oscs, ...gains, output],
+      _nodes: [...oscs, ...gains, output, syncFanOut, mixInGain],
       _oscs: oscs,
+      _freqParams: freqParams,
       _masterFreq: 0,
       _masterModId: null,
       _recalcFreq() {
         if (!this._masterFreq) return;
         const p = this.params;
+        const now = oscs[0].context.currentTime;
         for (let i = 0; i < 6; i++) {
           const n = i + 1;
           const tune = p[`tune${n}`].value;
           const fine = p[`fine${n}`].value;
           const freq = this._masterFreq * tune * Math.pow(2, fine / 1200);
-          oscs[i].frequency.setValueAtTime(freq, oscs[i].context.currentTime);
+          freqParams[i].setValueAtTime(freq, now);
         }
       },
       params: {
@@ -1744,9 +2019,16 @@ class AudioEngine {
       const fine = mod.params.fine.value;
       const semitones = coarse + fine / 100;
       const freq = baseFreq * Math.pow(2, semitones / 12);
-      mod.node.frequency.setValueAtTime(freq, this.ctx.currentTime);
+      mod.params.frequency.audioParam.setValueAtTime(freq, this.ctx.currentTime);
       mod._frequency = freq;
       this._propagateToSlaves(mod);
+    }
+    // OscA: waveform string -> integer for sync-osc-processor
+    if (mod.type === "OscA" && paramName === "waveform") {
+      const w = WAVE_INT[value];
+      if (w !== undefined) {
+        mod.node.parameters.get("waveform").setValueAtTime(w, this.ctx.currentTime);
+      }
     }
     // MasterOsc: coarse/fine tuning + propagate to slaves
     if (mod.type === "MasterOsc" && (paramName === "coarse" || paramName === "fine" || paramName === "frequency")) {
@@ -1773,9 +2055,28 @@ class AudioEngine {
     if (mod.type === "OscSineBank" && (paramName.startsWith("tune") || paramName.startsWith("fine"))) {
       if (mod._recalcFreq) mod._recalcFreq();
     }
-    // Slave waveform change
+    // OscSlvA waveform string -> integer for sync-osc-processor
     if (mod.type === "OscSlvA" && paramName === "waveform") {
-      mod.node.type = value;
+      const w = WAVE_INT[value];
+      if (w !== undefined) {
+        mod.node.parameters.get("waveform").setValueAtTime(w, this.ctx.currentTime);
+      }
+    }
+    // SpectralOsc: coarse/fine tuning + propagate to slaves; shape/partials -> recalc gains
+    if (mod.type === "SpectralOsc") {
+      if (paramName === "coarse" || paramName === "fine" || paramName === "frequency") {
+        const baseFreq = mod.params.frequency.value;
+        const coarse = mod.params.coarse.value;
+        const fine = mod.params.fine.value;
+        const semitones = coarse + fine / 100;
+        const freq = baseFreq * Math.pow(2, semitones / 12);
+        mod._frequency = freq;
+        mod._freqSrc.offset.setValueAtTime(freq, this.ctx.currentTime);
+        mod._slvOut.offset.setValueAtTime(freq, this.ctx.currentTime);
+        this._propagateToSlaves(mod);
+      } else if (paramName === "partialsMode") {
+        if (mod._recalcSpectralGains) mod._recalcSpectralGains();
+      }
     }
   }
 
