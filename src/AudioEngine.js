@@ -535,15 +535,27 @@ class AudioEngine {
       filterGains.push(g);
     }
 
+    // Slv output: ConstantSource carrying the master pitch for slave oscillators
+    const slvOut = this.ctx.createConstantSource();
+    slvOut.offset.value = 150;
+    slvOut.start();
+
     const mod = {
       id, type: "FormantOsc", node: osc, outputNode: output,
-      outputs: { Out: output },
-      inputs: { PitchMod: osc.frequency },
-      _nodes: [osc, ...filters, ...filterGains, output],
+      outputs: { Out: output, Slv: slvOut },
+      // PitchMod is a legacy alias for PitchMod1; preserves load of patches saved before split
+      inputs: { PitchMod1: osc.frequency, PitchMod2: osc.frequency, PitchMod: osc.frequency },
+      _nodes: [osc, ...filters, ...filterGains, output, slvOut],
+      _slaveTargets: [],
+      _frequency: 150,
+      _slvOut: slvOut,
       _filters: filters,
       _formantTable: FORMANT_TABLE,
       params: {
-        frequency: { value: 150, min: 50, max: 1000, audioParam: osc.frequency, label: "Freq" },
+        frequency: { value: 150, min: 20, max: 8000, audioParam: osc.frequency, label: "Freq" },
+        coarse: { value: 0, min: -60, max: 60, label: "Coarse" },
+        fine: { value: 0, min: -50, max: 50, label: "Fine" },
+        kbt: { value: 1, min: 0, max: 2, label: "KBT" },
         vowel: { value: "A", options: ["A", "E", "I", "O", "U"], label: "Vowel" },
         timbre: { value: 0, min: 0, max: 1, label: "Timbre" },
         level: { value: 0.5, min: 0, max: 1, audioParam: output.gain, label: "Level" },
@@ -2011,6 +2023,18 @@ class AudioEngine {
         const freq = fromFreqs[i] + (toFreqs[i] - fromFreqs[i]) * t;
         f.frequency.setValueAtTime(freq, this.ctx.currentTime);
       });
+    }
+    // FormantOsc: coarse/fine tuning + propagate to slaves
+    if (mod.type === "FormantOsc" && (paramName === "coarse" || paramName === "fine" || paramName === "frequency")) {
+      const baseFreq = mod.params.frequency.value;
+      const coarse = mod.params.coarse.value;
+      const fine = mod.params.fine.value;
+      const semitones = coarse + fine / 100;
+      const freq = baseFreq * Math.pow(2, semitones / 12);
+      mod.node.frequency.setValueAtTime(freq, this.ctx.currentTime);
+      mod._slvOut.offset.setValueAtTime(freq, this.ctx.currentTime);
+      mod._frequency = freq;
+      this._propagateToSlaves(mod);
     }
     // OscA: coarse/fine tuning + propagate to slaves
     if (mod.type === "OscA" && (paramName === "coarse" || paramName === "fine" || paramName === "frequency")) {
