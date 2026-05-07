@@ -167,12 +167,16 @@ class AudioEngine {
     return {
       id, type: "OscB", node: osc, outputNode: gain,
       outputs: { Out: gain, Slv: slaveGain },
-      inputs: { PitchMod: osc.frequency, FmMod: fmGain },
+      // PitchMod is a legacy alias for PitchMod1; preserves load of patches saved before split
+      inputs: { PitchMod1: osc.frequency, PitchMod2: osc.frequency, PitchMod: osc.frequency, FmMod: fmGain },
       _nodes: [osc, gain, slaveGain, fmGain],
       _slaveTargets: [],
       _frequency: 220,
       params: {
         frequency: { value: 220, min: 20, max: 8000, audioParam: osc.frequency, label: "Freq" },
+        coarse: { value: 0, min: -60, max: 60, label: "Coarse" },
+        fine: { value: 0, min: -50, max: 50, label: "Fine" },
+        kbt: { value: 1, min: 0, max: 2, label: "KBT" },
         waveform: { value: "sawtooth", options: ["sine", "sawtooth", "square", "triangle"], label: "Wave" },
         fmDepth: { value: 0, min: 0, max: 1000, audioParam: fmGain.gain, label: "FM Depth" },
         level: { value: 0.8, min: 0, max: 1, audioParam: gain.gain, label: "Level" },
@@ -2116,9 +2120,15 @@ class AudioEngine {
       mod.node.offset.setValueAtTime(freq, this.ctx.currentTime);
       this._propagateToSlaves(mod);
     }
-    // OscB: update _frequency for slave propagation (legacy single-param branch)
-    if (mod.type === "OscB" && paramName === "frequency") {
-      mod._frequency = value;
+    // OscB: coarse/fine tuning + propagate to slaves
+    if (mod.type === "OscB" && (paramName === "coarse" || paramName === "fine" || paramName === "frequency")) {
+      const baseFreq = mod.params.frequency.value;
+      const coarse = mod.params.coarse.value;
+      const fine = mod.params.fine.value;
+      const semitones = coarse + fine / 100;
+      const freq = baseFreq * Math.pow(2, semitones / 12);
+      mod.node.frequency.setValueAtTime(freq, this.ctx.currentTime);
+      mod._frequency = freq;
       this._propagateToSlaves(mod);
     }
     // OscC: coarse/fine tuning + propagate to slaves

@@ -17,7 +17,7 @@ const MODULE_DEFS = {
     color: "#c33",
     inputs: [],
     outputs: ["Out", "Slv"],
-    modInputs: ["PitchMod", "FmMod"],
+    modInputs: ["PitchMod1", "PitchMod2", "FmMod"],
     description: "Oscillator B - Classic analog waveforms with FM",
   },
   OscC: {
