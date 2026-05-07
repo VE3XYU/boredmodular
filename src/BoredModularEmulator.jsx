@@ -868,12 +868,24 @@ export default function BoredModularEmulator() {
       // Clear existing
       modules.forEach((m) => engineRef.current.removeModule(m.id));
       initAudio();
-      // Rebuild modules
+      // Rebuild modules — start from the engine's param shape (with min/max/etc),
+      // overlay the patch's values. Patches may store params as raw values
+      // ({freq: 220}) or as full objects ({freq: {value: 220, ...}}); both work.
+      const rebuilt = [];
       for (const m of patch.modules) {
-        await engineRef.current.createModule(m.id, m.type);
-        Object.entries(m.params).forEach(([k, v]) => {
-          engineRef.current.setParam(m.id, k, v.value != null ? v.value : v);
+        const audioMod = await engineRef.current.createModule(m.id, m.type);
+        const params = {};
+        if (audioMod) {
+          Object.entries(audioMod.params).forEach(([k, v]) => {
+            params[k] = { ...v };
+          });
+        }
+        Object.entries(m.params || {}).forEach(([k, v]) => {
+          const value = v && typeof v === "object" && "value" in v ? v.value : v;
+          if (params[k]) params[k].value = value;
+          engineRef.current.setParam(m.id, k, value);
         });
+        rebuilt.push({ id: m.id, type: m.type, x: m.x, y: m.y, params });
       }
       // Update _idCounter
       const maxId = Math.max(...patch.modules.map((m) => parseInt(m.id.split("_")[1]) || 0), 0);
@@ -882,7 +894,7 @@ export default function BoredModularEmulator() {
       patch.connections.forEach((c) => {
         engineRef.current.connect(c.fromId, c.fromPort, c.toId, c.toPort);
       });
-      setModules(patch.modules);
+      setModules(rebuilt);
       setConnections(patch.connections);
     },
     [modules, initAudio]
