@@ -26,8 +26,8 @@ const MODULE_DEFS = {
     color: "#c55",
     inputs: [],
     outputs: ["Out", "Slv"],
-    modInputs: ["PitchMod"],
-    description: "Oscillator C - With pulse width",
+    modInputs: ["PitchMod", "FMA", "AM"],
+    description: "Oscillator C - Sine with AM and FMA",
   },
   Noise: {
     label: "Noise",
