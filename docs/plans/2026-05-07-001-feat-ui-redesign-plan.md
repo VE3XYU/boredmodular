@@ -142,6 +142,12 @@ Before Phase 3 (the big layout shift) we need calls on these. Phase 1 (knob) and
 - Decide on fixed-width vs variable-width modules (Q1 above) — affects knob component sizing.
 - Pick a bitmap font and stage it (Q6) — the knob's value display will use it, so a reasonable default avoids re-touching every component.
 
+## Decisions Log
+
+- **2026-05-07 — Bitmap font:** Pixel Operator. Phase 2 will self-host the font under `public/fonts/` and declare `@font-face` in `App.css`.
+- **2026-05-07 — Module width:** uniform / fixed-width across all modules. Variable-height per module is still allowed (sub-section frames in Phase 8 may want a 2-row module). Updates Q1.
+- **2026-05-07 — Screenshot:** capture deferred — user is remote and can't add the file in this session. Plan continues using the in-document description as reference; checked-in screenshot remains a TODO before final visual sign-off.
+
 ## Status / Next Action
 
-Plan in `draft`. Pre-flight items above are blocking Phase 1. Once those land — even informally — we can open `feat/ui-knob-component` as the first concrete branch.
+Plan in `draft`. Two of three pre-flight items are decided (font, width). Screenshot capture is deferred but non-blocking. Phase 2 (font) opens next as the first concrete branch — visual-only, lowest risk, doesn't disturb the existing layout.
