@@ -45,7 +45,7 @@ const MODULE_DEFS = {
     inputs: [],
     outputs: ["Out"],
     modInputs: ["Trig", "VelMod", "PitchMod"],
-    description: "Drum synthesizer - Osc + noise + filter",
+    description: "Drum synth - Dual osc, multimode noise filter, bend",
   },
   FormantOsc: {
     label: "Formant",
