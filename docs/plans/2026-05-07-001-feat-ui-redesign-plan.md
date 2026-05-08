@@ -147,7 +147,31 @@ Before Phase 3 (the big layout shift) we need calls on these. Phase 1 (knob) and
 - **2026-05-07 — Bitmap font:** Pixel Operator. Phase 2 will self-host the font under `public/fonts/` and declare `@font-face` in `App.css`.
 - **2026-05-07 — Module width:** uniform / fixed-width across all modules. Variable-height per module is still allowed (sub-section frames in Phase 8 may want a 2-row module). Updates Q1.
 - **2026-05-07 — Screenshot:** capture deferred — user is remote and can't add the file in this session. Plan continues using the in-document description as reference; checked-in screenshot remains a TODO before final visual sign-off.
+- **2026-05-08 — Workspace width:** the canvas should fit roughly **4 modules wide**. This sets the per-module width as a fraction of viewport rather than an absolute pixel constant. Settles the sizing question Phase 3 has to answer.
+- **2026-05-08 — Phase 1 (knob) shipped.** `SvgKnob` replaced `SvgSlider` at the single `ModuleNode` call site. Drop-in API; no layout shift. PR #21.
+
+## Reference observations (2026-05-08)
+
+User shared three Nord Modular Editor reference screenshots in chat — used as the visual ground truth for the redesign. The screenshots are not yet checked in (still pending the `sourcemats/screenshots/` capture from earlier deferred item). Key observations from reviewing them:
+
+- **Header is inline at top-left** of each module body — not a separate title bar above the body. Saves vertical space.
+- **Module body is pale gray** (~`#b8b8b8`-ish), not the dark theme the current impl uses. The current dark canvas + per-category-colored headers diverges from this. **Open question:** do we shift to a light-gray module body for visual fidelity, or stay dark and treat color as the homage divergence? Folds into Phase 3 visual polish.
+- **Modules tile flush vertically** within a column (no gap). Multiple columns sit side by side; cables sag freely between columns.
+- **LCD blue boxes** are the canonical numeric display:
+  - Hz/note name (e.g., `329.6Hz`) — pairs with a knob.
+  - Envelope segment times (e.g., `32m 122m 48.5 260m` for ADSR or `132m 103m` for AD) — multi-value LCD.
+  - Signed integers in CV ranges (e.g., `-64`, `+15`, `+64`).
+  - Multipliers (e.g., `x0.96`).
+  - Sequencer steps and other counters.
+  Phase 4 should support both single-value and multi-segment LCDs.
+- **Waveform selection is icon-row toggles** (sine / triangle / saw / square glyphs as a row of mutually-exclusive buttons), not a `<select>` dropdown. Phase 4 or Phase 5 should add this control type — extends `MODULE_DEFS` param schema.
+- **M (mute) button** is small, consistent, present on virtually every module. Phase 6 lands cleanly with this as the visual reference.
+- **Port symbology**: yellow circles = gate/trigger (digital), red = audio out, blue = audio/CV in. Some ports show small flag/arrow glyphs indicating signal type. Resolves S1's spec-by-signal-type direction.
+- **Slave-osc indicator**: vertical "Slv" tab on the left edge of slave oscillators (visible on `OscSlvE1`, `OscSlvFM1`, `Synced Osc`). Suggests a per-module decoration system for marking master/slave relationship.
+- **Module label includes instance number** (`MasterOsc1`, `OscSlvE1`, `ADSR-Env1`, `2 outputs1`). Current impl shows only the type name. Possible Phase 5+ refinement: append a per-type counter so duplicates are distinguishable.
 
 ## Status / Next Action
 
-Plan in `draft`. Two of three pre-flight items are decided (font, width). Screenshot capture is deferred but non-blocking. Phase 2 (font) opens next as the first concrete branch — visual-only, lowest risk, doesn't disturb the existing layout.
+Plan in `draft`. Phase 1 (knob) and Phase 2 (font) shipped. Screenshot reference observations recorded above (see "Reference observations (2026-05-08)").
+
+Next phase candidate: **Phase 4 (LCD display)** — visual-only, complements the rotary knob aesthetic, and the screenshots show LCDs are the canonical numeric readout across nearly every module. Alternative: jump to **Phase 3 (horizontal layout)** now that the workspace-width decision (4 modules wide) is locked; Phase 3 carries higher risk (cables, hit math) but unblocks the bigger density win.
