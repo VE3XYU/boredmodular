@@ -206,7 +206,7 @@ function Port({ x, y, name, isOutput, isMod, onMouseDown, onMouseUp, isConnected
         y={y - 14}
         textAnchor="middle"
         fill="#889"
-        fontSize={9}
+        fontSize={16}
         fontFamily="'Pixel Operator', 'DM Mono', monospace"
         pointerEvents="none"
       >
@@ -269,7 +269,7 @@ function ModuleNode({
       <rect x={0} y={0} width={MODULE_WIDTH} height={headerH} rx={6} fill={def.color} opacity={0.85} />
       <rect x={0} y={headerH - 6} width={MODULE_WIDTH} height={6} fill={def.color} opacity={0.85} />
       {/* Label */}
-      <text x={10} y={21} fill="#fff" fontSize={13} fontWeight={700} fontFamily="'Pixel Operator', 'DM Mono', monospace">
+      <text x={10} y={21} fill="#fff" fontSize={16} fontWeight={700} fontFamily="'Pixel Operator', 'DM Mono', monospace">
         {def.label}
       </text>
       {/* Close */}
@@ -277,7 +277,7 @@ function ModuleNode({
         x={MODULE_WIDTH - 16}
         y={21}
         fill="rgba(255,255,255,0.6)"
-        fontSize={14}
+        fontSize={16}
         fontWeight={700}
         fontFamily="'Pixel Operator', 'DM Mono', monospace"
         style={{ cursor: "pointer" }}
@@ -295,7 +295,7 @@ function ModuleNode({
         if (p.options) {
           return (
             <g key={key}>
-              <text x={8} y={py + 14} fill="#99a" fontSize={10} fontFamily="'Pixel Operator', 'DM Mono', monospace">
+              <text x={8} y={py + 14} fill="#99a" fontSize={16} fontFamily="'Pixel Operator', 'DM Mono', monospace">
                 {p.label || key}
               </text>
               <foreignObject x={60} y={py} width={102} height={24}>
@@ -307,7 +307,7 @@ function ModuleNode({
                     color: "#ddd",
                     border: `1px solid ${def.color}44`,
                     borderRadius: 3,
-                    fontSize: 10,
+                    fontSize: 14,
                     fontFamily: "'Pixel Operator', 'DM Mono', monospace",
                     padding: "0 4px",
                     outline: "none",
@@ -329,7 +329,7 @@ function ModuleNode({
         const range = p.max - p.min;
         return (
           <g key={key}>
-            <text x={8} y={py + 14} fill="#99a" fontSize={10} fontFamily="'Pixel Operator', 'DM Mono', monospace">
+            <text x={8} y={py + 14} fill="#99a" fontSize={16} fontFamily="'Pixel Operator', 'DM Mono', monospace">
               {p.label || key}
             </text>
             <SvgSlider
@@ -355,7 +355,7 @@ function ModuleNode({
                     color: "#fff",
                     border: `1px solid ${def.color}`,
                     borderRadius: 2,
-                    fontSize: 10,
+                    fontSize: 14,
                     fontFamily: "'Pixel Operator', 'DM Mono', monospace",
                     padding: "0 3px",
                     outline: "none",
@@ -384,7 +384,7 @@ function ModuleNode({
                 x={138}
                 y={py + 14}
                 fill="#aab"
-                fontSize={9}
+                fontSize={16}
                 fontFamily="'Pixel Operator', 'DM Mono', monospace"
                 textAnchor="end"
                 style={{ cursor: "text" }}
@@ -1208,9 +1208,9 @@ export default function BoredModularEmulator() {
             borderBottom: "1px solid #222",
           }}
         >
-          <div style={{ fontSize: 11, letterSpacing: 3, color: "#666", textTransform: "uppercase" }}>bored</div>
-          <div style={{ fontSize: 16, fontWeight: 500, color: "#e33", letterSpacing: 1 }}>modular</div>
-          <div style={{ fontSize: 9, color: "#555", marginTop: 2 }}>v0.1</div>
+          <div style={{ fontSize: 14, letterSpacing: 3, color: "#666", textTransform: "uppercase" }}>bored</div>
+          <div style={{ fontSize: 20, fontWeight: 500, color: "#e33", letterSpacing: 1 }}>modular</div>
+          <div style={{ fontSize: 14, color: "#555", marginTop: 2 }}>v0.1</div>
         </div>
 
         {/* Module palette */}
@@ -1219,7 +1219,7 @@ export default function BoredModularEmulator() {
             <div key={cat.key} style={{ marginBottom: 4 }}>
               <div
                 style={{
-                  fontSize: 9,
+                  fontSize: 14,
                   color: "#555",
                   textTransform: "uppercase",
                   letterSpacing: 2,
@@ -1266,7 +1266,7 @@ export default function BoredModularEmulator() {
                         display: "flex",
                         alignItems: "center",
                         gap: 6,
-                        fontSize: 12,
+                        fontSize: 14,
                         color: "#ddd",
                         whiteSpace: "nowrap",
                       }}
@@ -1284,8 +1284,8 @@ export default function BoredModularEmulator() {
                       }}
                     />
                     <div>
-                      <div style={{ fontSize: 12, color: "#bbb" }}>{d.label}</div>
-                      <div style={{ fontSize: 9, color: "#555" }}>{d.description}</div>
+                      <div style={{ fontSize: 14, color: "#bbb" }}>{d.label}</div>
+                      <div style={{ fontSize: 14, color: "#555" }}>{d.description}</div>
                     </div>
                   </div>
                 );
@@ -1296,7 +1296,7 @@ export default function BoredModularEmulator() {
 
         {/* Patches */}
         <div style={{ padding: "8px 10px", borderTop: "1px solid #222" }}>
-          <div style={{ fontSize: 9, color: "#555", textTransform: "uppercase", letterSpacing: 2, marginBottom: 6 }}>
+          <div style={{ fontSize: 14, color: "#555", textTransform: "uppercase", letterSpacing: 2, marginBottom: 6 }}>
             Patches
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
@@ -1315,7 +1315,7 @@ export default function BoredModularEmulator() {
                   background: "#222",
                   borderRadius: 3,
                   cursor: "pointer",
-                  fontSize: 10,
+                  fontSize: 14,
                   color: "#999",
                   border: "1px solid #333",
                 }}
@@ -1328,13 +1328,13 @@ export default function BoredModularEmulator() {
           </div>
           <input ref={fileInputRef} type="file" accept=".json" style={{ display: "none" }} onChange={importPatch} />
           {patchMsg && (
-            <div style={{ fontSize: 10, color: "#6c6", textAlign: "center", marginTop: 4 }}>{patchMsg}</div>
+            <div style={{ fontSize: 14, color: "#6c6", textAlign: "center", marginTop: 4 }}>{patchMsg}</div>
           )}
         </div>
 
         {/* Scope & controls */}
         <div style={{ padding: "8px 10px 12px", borderTop: "1px solid #222" }}>
-          <div style={{ fontSize: 9, color: "#555", textTransform: "uppercase", letterSpacing: 2, marginBottom: 4 }}>
+          <div style={{ fontSize: 14, color: "#555", textTransform: "uppercase", letterSpacing: 2, marginBottom: 4 }}>
             Scope
           </div>
           <Scope engine={engineRef} />
@@ -1363,7 +1363,7 @@ export default function BoredModularEmulator() {
                 color: keyHeld ? "#fff" : "#888",
                 borderRadius: 4,
                 cursor: "pointer",
-                fontSize: 11,
+                fontSize: 14,
                 transition: "all 0.1s",
                 border: "1px solid #333",
               }}
@@ -1371,7 +1371,7 @@ export default function BoredModularEmulator() {
               {keyHeld ? "▶ GATE ON" : "GATE (Space / Click)"}
             </div>
           </div>
-          <div style={{ marginTop: 8, fontSize: 9, color: "#444", lineHeight: 1.5 }}>
+          <div style={{ marginTop: 8, fontSize: 14, color: "#444", lineHeight: 1.5 }}>
             Drag from output (red) to input (blue/yellow) to patch.
             <br />
             Double-click cable to remove.
@@ -1472,7 +1472,7 @@ export default function BoredModularEmulator() {
 
         {/* Empty state */}
         {modules.length === 0 && (
-          <text x="50%" y="50%" textAnchor="middle" fill="#333" fontSize={14} fontFamily="'Pixel Operator', 'DM Mono', monospace">
+          <text x="50%" y="50%" textAnchor="middle" fill="#333" fontSize={16} fontFamily="'Pixel Operator', 'DM Mono', monospace">
             Click a module in the sidebar to begin patching
           </text>
         )}
