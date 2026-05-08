@@ -239,7 +239,7 @@ function Port({ x, y, name, isOutput, isMod, onMouseDown, onMouseUp, isConnected
         x={x}
         y={y - 9}
         textAnchor="middle"
-        fill="#889"
+        fill="#222"
         fontSize={12}
         fontFamily="'Pixel Operator', 'DM Mono', monospace"
         pointerEvents="none"
@@ -295,22 +295,24 @@ function ModuleNode({
         width={MODULE_WIDTH}
         height={height}
         rx={6}
-        fill="#1a1a1e"
+        fill="#bdbdbd"
         stroke={def.color}
         strokeWidth={1.5}
       />
       {/* Header bar */}
-      <rect x={0} y={0} width={MODULE_WIDTH} height={headerH} rx={6} fill={def.color} opacity={0.85} />
-      <rect x={0} y={headerH - 6} width={MODULE_WIDTH} height={6} fill={def.color} opacity={0.85} />
+      <rect x={0} y={0} width={MODULE_WIDTH} height={headerH} rx={6} fill="#a8a8a8" />
+      <rect x={0} y={headerH - 6} width={MODULE_WIDTH} height={6} fill="#a8a8a8" />
+      {/* Header underline accents the category color */}
+      <rect x={0} y={headerH - 1} width={MODULE_WIDTH} height={1} fill={def.color} />
       {/* Label */}
-      <text x={10} y={21} fill="#fff" fontSize={16} fontWeight={700} fontFamily="'Pixel Operator', 'DM Mono', monospace">
+      <text x={10} y={21} fill="#111" fontSize={16} fontWeight={700} fontFamily="'Pixel Operator', 'DM Mono', monospace">
         {def.label}
       </text>
       {/* Close */}
       <text
         x={MODULE_WIDTH - 16}
         y={21}
-        fill="rgba(255,255,255,0.6)"
+        fill="#444"
         fontSize={16}
         fontWeight={700}
         fontFamily="'Pixel Operator', 'DM Mono', monospace"
@@ -329,7 +331,7 @@ function ModuleNode({
         if (p.options) {
           return (
             <g key={key}>
-              <text x={8} y={py + 14} fill="#99a" fontSize={16} fontFamily="'Pixel Operator', 'DM Mono', monospace">
+              <text x={8} y={py + 14} fill="#111" fontSize={16} fontFamily="'Pixel Operator', 'DM Mono', monospace">
                 {p.label || key}
               </text>
               <foreignObject x={60} y={py} width={102} height={24}>
@@ -363,7 +365,7 @@ function ModuleNode({
         const range = p.max - p.min;
         return (
           <g key={key}>
-            <text x={8} y={py + 14} fill="#99a" fontSize={16} fontFamily="'Pixel Operator', 'DM Mono', monospace">
+            <text x={8} y={py + 14} fill="#111" fontSize={16} fontFamily="'Pixel Operator', 'DM Mono', monospace">
               {p.label || key}
             </text>
             <SvgKnob
@@ -417,7 +419,7 @@ function ModuleNode({
               <text
                 x={138}
                 y={py + 14}
-                fill="#aab"
+                fill="#000"
                 fontSize={16}
                 fontFamily="'Pixel Operator', 'DM Mono', monospace"
                 textAnchor="end"
