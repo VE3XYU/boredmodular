@@ -52,9 +52,9 @@ const MODULE_DEFS = {
     category: "oscillator",
     color: "#c55",
     inputs: [],
-    outputs: ["Out"],
-    modInputs: ["PitchMod"],
-    description: "Formant oscillator - Vowel synthesis",
+    outputs: ["Out", "Slv"],
+    modInputs: ["PitchMod1", "PitchMod2"],
+    description: "Formant oscillator - Vowel synthesis with slave output",
   },
   MasterOsc: {
     label: "MstOsc",
