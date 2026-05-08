@@ -3,24 +3,25 @@ import ReactDOM from 'react-dom/client';
 import BoredModularEmulator from './BoredModularEmulator';
 
 // Load the Pixel Operator bitmap typeface from public/fonts/.
-// The PUBLIC_URL prefix ensures the path resolves under GitHub Pages's
-// /boredmodular/ subpath. If the font file isn't present, .load() rejects
-// silently and the fallback chain (DM Mono → system monospace) renders.
+// PUBLIC_URL prefix makes paths resolve under GitHub Pages's /boredmodular/
+// subpath. Try woff2 first (smaller); on failure fall back to ttf. The
+// FontFace API does not auto-fall-back through comma-separated url() like
+// CSS @font-face does — a 404 on the first url() rejects the load even if a
+// later url() would have worked. So we manually retry.
 const _fontBase = process.env.PUBLIC_URL || '';
-[
-  { weight: 'normal', file: 'PixelOperator' },
-  { weight: 'bold',   file: 'PixelOperator-Bold' },
-].forEach(({ weight, file }) => {
-  const face = new FontFace(
-    'Pixel Operator',
-    `url(${_fontBase}/fonts/${file}.woff2) format('woff2'),
-     url(${_fontBase}/fonts/${file}.ttf) format('truetype')`,
+const _tryLoadFont = (family, file, weight) => {
+  const make = (ext, format) => new FontFace(
+    family,
+    `url(${_fontBase}/fonts/${file}.${ext}) format('${format}')`,
     { weight }
   );
-  face.load()
+  return make('woff2', 'woff2').load()
+    .catch(() => make('ttf', 'truetype').load())
     .then((loaded) => document.fonts.add(loaded))
-    .catch(() => { /* file missing — fallback chain handles it */ });
-});
+    .catch(() => { /* both formats missing — fallback chain handles it */ });
+};
+_tryLoadFont('Pixel Operator', 'PixelOperator', 'normal');
+_tryLoadFont('Pixel Operator', 'PixelOperator-Bold', 'bold');
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
