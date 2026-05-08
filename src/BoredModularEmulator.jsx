@@ -127,18 +127,35 @@ function Scope({ engine }) {
   return <canvas ref={canvasRef} width={280} height={90} style={{ borderRadius: 4, border: "1px solid #1a2a1a" }} />;
 }
 
-function SvgSlider({ x, y, width, min, max, value, onChange, color }) {
+function SvgKnob({ x, y, width, min, max, value, onChange, color }) {
   const range = max - min;
   const pct = Math.max(0, Math.min(1, (value - min) / range));
-  const trackH = 5;
-  const thumbR = 5;
+
+  const radius = 10;
+  const cx = x + width / 2;
+  const cy = y + 9;
+
+  // 0° points up; sweep -135° (7 o'clock) clockwise through 0° to +135° (5 o'clock).
+  const minAngle = -135;
+  const maxAngle = 135;
+  const angle = minAngle + pct * (maxAngle - minAngle);
+  const angleRad = (angle * Math.PI) / 180;
+  const ix = cx + Math.sin(angleRad) * (radius - 2);
+  const iy = cy - Math.cos(angleRad) * (radius - 2);
+
+  const arcR = radius + 2.5;
+  const arcPoint = (a) => {
+    const rad = (a * Math.PI) / 180;
+    return [cx + Math.sin(rad) * arcR, cy - Math.cos(rad) * arcR];
+  };
+  const [tx0, ty0] = arcPoint(minAngle);
+  const [tx1, ty1] = arcPoint(maxAngle);
+  const [fx, fy] = arcPoint(angle);
+  const fillLargeFlag = angle - minAngle > 180 ? 1 : 0;
 
   const handleMouseDown = (e) => {
     e.stopPropagation();
     e.preventDefault();
-    const track = e.currentTarget.querySelector(".slider-track");
-    const ctm = track.getScreenCTM();
-    if (!ctm) return;
 
     const roundVal = (val) => {
       if (range > 100) return Math.round(val);
@@ -146,18 +163,14 @@ function SvgSlider({ x, y, width, min, max, value, onChange, color }) {
       return Math.round(val * 1000) / 1000;
     };
 
-    // Set initial value from click position
-    const localX0 = (e.clientX - ctm.e) / ctm.a;
-    const ratio0 = Math.max(0, Math.min(1, (localX0 - x) / width));
-    const startValue = roundVal(Math.max(min, Math.min(max, min + ratio0 * range)));
-    onChange(startValue);
-
-    const startClientX = e.clientX;
+    const startClientY = e.clientY;
+    const startValue = value;
+    const DRAG_RANGE_PX = 140;
 
     const move = (me) => {
       const fine = me.shiftKey ? 0.2 : 1;
-      const deltaX = (me.clientX - startClientX) / ctm.a;
-      const deltaRatio = (deltaX / width) * fine;
+      const deltaY = -(me.clientY - startClientY);
+      const deltaRatio = (deltaY / DRAG_RANGE_PX) * fine;
       let val = startValue + deltaRatio * range;
       val = roundVal(Math.max(min, Math.min(max, val)));
       onChange(val);
@@ -171,11 +184,32 @@ function SvgSlider({ x, y, width, min, max, value, onChange, color }) {
   };
 
   return (
-    <g onMouseDown={handleMouseDown} style={{ cursor: "pointer" }}>
-      <rect className="slider-track" x={x} y={y} width={width} height={trackH} rx={2.5} fill="#333" />
-      <rect x={x} y={y} width={Math.max(0, pct * width)} height={trackH} rx={2.5} fill={color} opacity={0.6} />
-      <circle cx={x + pct * width} cy={y + trackH / 2} r={thumbR} fill={color} stroke="#1a1a1e" strokeWidth={1.5} />
-      <rect x={x - 2} y={y - 6} width={width + 4} height={trackH + 12} fill="transparent" />
+    <g onMouseDown={handleMouseDown} style={{ cursor: "ns-resize" }}>
+      <path
+        d={`M ${tx0} ${ty0} A ${arcR} ${arcR} 0 1 1 ${tx1} ${ty1}`}
+        stroke="#333"
+        strokeWidth={1.5}
+        fill="none"
+      />
+      <path
+        d={`M ${tx0} ${ty0} A ${arcR} ${arcR} 0 ${fillLargeFlag} 1 ${fx} ${fy}`}
+        stroke={color}
+        strokeWidth={1.5}
+        fill="none"
+        opacity={0.7}
+      />
+      <circle cx={cx} cy={cy} r={radius} fill="#1a1a1e" stroke="#333" strokeWidth={1} />
+      <circle cx={cx} cy={cy} r={radius - 2} fill="#2a2a2e" />
+      <line
+        x1={cx + Math.sin(angleRad) * 2.5}
+        y1={cy - Math.cos(angleRad) * 2.5}
+        x2={ix}
+        y2={iy}
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+      />
+      <circle cx={cx} cy={cy} r={radius + 5} fill="transparent" />
     </g>
   );
 }
@@ -332,7 +366,7 @@ function ModuleNode({
             <text x={8} y={py + 14} fill="#99a" fontSize={16} fontFamily="'Pixel Operator', 'DM Mono', monospace">
               {p.label || key}
             </text>
-            <SvgSlider
+            <SvgKnob
               x={56}
               y={py + 5}
               width={78}
