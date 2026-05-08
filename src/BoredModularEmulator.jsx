@@ -7,7 +7,7 @@ import { MODULE_DEFS, CATEGORIES } from "./moduleDefs";
 let _idCounter = 0;
 const genId = () => `mod_${++_idCounter}`;
 
-const PORT_SIZE = 10;
+const PORT_SIZE = 5;
 const MODULE_WIDTH = 170;
 
 function getPortPosition(moduleState, portName, isOutput) {
@@ -190,7 +190,7 @@ function Port({ x, y, name, isOutput, isMod, onMouseDown, onMouseUp, isConnected
         r={PORT_SIZE}
         fill={isConnected ? color : "#111"}
         stroke={color}
-        strokeWidth={2}
+        strokeWidth={1.5}
         style={{ cursor: "pointer", filter: isConnected ? `drop-shadow(0 0 4px ${color})` : "none" }}
         onMouseDown={(e) => {
           e.stopPropagation();
@@ -203,10 +203,10 @@ function Port({ x, y, name, isOutput, isMod, onMouseDown, onMouseUp, isConnected
       />
       <text
         x={x}
-        y={y - 14}
+        y={y - 9}
         textAnchor="middle"
         fill="#889"
-        fontSize={16}
+        fontSize={12}
         fontFamily="'Pixel Operator', 'DM Mono', monospace"
         pointerEvents="none"
       >
@@ -1192,7 +1192,7 @@ export default function BoredModularEmulator() {
       {/* Sidebar */}
       <div
         style={{
-          width: 200,
+          width: 220,
           background: "#141416",
           borderRight: "1px solid #222",
           display: "flex",
@@ -1208,8 +1208,8 @@ export default function BoredModularEmulator() {
             borderBottom: "1px solid #222",
           }}
         >
-          <div style={{ fontSize: 14, letterSpacing: 3, color: "#666", textTransform: "uppercase" }}>bored</div>
-          <div style={{ fontSize: 20, fontWeight: 500, color: "#e33", letterSpacing: 1 }}>modular</div>
+          <div style={{ fontSize: 16, letterSpacing: 3, color: "#666", textTransform: "uppercase" }}>bored</div>
+          <div style={{ fontSize: 24, fontWeight: 500, color: "#e33", letterSpacing: 1 }}>modular</div>
           <div style={{ fontSize: 14, color: "#555", marginTop: 2 }}>v0.1</div>
         </div>
 
@@ -1219,7 +1219,7 @@ export default function BoredModularEmulator() {
             <div key={cat.key} style={{ marginBottom: 4 }}>
               <div
                 style={{
-                  fontSize: 14,
+                  fontSize: 16,
                   color: "#555",
                   textTransform: "uppercase",
                   letterSpacing: 2,
@@ -1284,8 +1284,8 @@ export default function BoredModularEmulator() {
                       }}
                     />
                     <div>
-                      <div style={{ fontSize: 14, color: "#bbb" }}>{d.label}</div>
-                      <div style={{ fontSize: 14, color: "#555" }}>{d.description}</div>
+                      <div style={{ fontSize: 16, color: "#bbb" }}>{d.label}</div>
+                      <div style={{ fontSize: 12, color: "#555" }}>{d.description}</div>
                     </div>
                   </div>
                 );
@@ -1296,7 +1296,7 @@ export default function BoredModularEmulator() {
 
         {/* Patches */}
         <div style={{ padding: "8px 10px", borderTop: "1px solid #222" }}>
-          <div style={{ fontSize: 14, color: "#555", textTransform: "uppercase", letterSpacing: 2, marginBottom: 6 }}>
+          <div style={{ fontSize: 16, color: "#555", textTransform: "uppercase", letterSpacing: 2, marginBottom: 6 }}>
             Patches
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
@@ -1334,7 +1334,7 @@ export default function BoredModularEmulator() {
 
         {/* Scope & controls */}
         <div style={{ padding: "8px 10px 12px", borderTop: "1px solid #222" }}>
-          <div style={{ fontSize: 14, color: "#555", textTransform: "uppercase", letterSpacing: 2, marginBottom: 4 }}>
+          <div style={{ fontSize: 16, color: "#555", textTransform: "uppercase", letterSpacing: 2, marginBottom: 4 }}>
             Scope
           </div>
           <Scope engine={engineRef} />
