@@ -425,76 +425,122 @@ class AudioEngine {
   }
 
   _createDrumSynth(id) {
-    // Sine osc for body
-    const osc = this.ctx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.value = 60;
-    const oscGain = this.ctx.createGain();
-    oscGain.gain.value = 0;
-    osc.connect(oscGain);
-    osc.start();
+    // Spec §2.16: dual-osc (master + slave with ratio), noise filter (HP/BP/LP)
+    // with sweep, bend section, click. Presets deferred.
+    const ctx = this.ctx;
 
-    // Noise for transient
-    const bufferSize = this.ctx.sampleRate * 2;
-    const noiseBuf = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    // Master oscillator (sine)
+    const masterOsc = ctx.createOscillator();
+    masterOsc.type = "sine";
+    masterOsc.frequency.value = 60;
+    const masterGain = ctx.createGain();
+    masterGain.gain.value = 0;
+    masterOsc.connect(masterGain);
+    masterOsc.start();
+
+    // Slave oscillator (sine, frequency = master * ratio at trigger time)
+    const slaveOsc = ctx.createOscillator();
+    slaveOsc.type = "sine";
+    slaveOsc.frequency.value = 60;
+    const slaveGain = ctx.createGain();
+    slaveGain.gain.value = 0;
+    slaveOsc.connect(slaveGain);
+    slaveOsc.start();
+
+    // Noise + multimode filter
+    const bufferSize = ctx.sampleRate * 2;
+    const noiseBuf = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const noiseData = noiseBuf.getChannelData(0);
     for (let i = 0; i < bufferSize; i++) noiseData[i] = Math.random() * 2 - 1;
-    const noiseSrc = this.ctx.createBufferSource();
+    const noiseSrc = ctx.createBufferSource();
     noiseSrc.buffer = noiseBuf;
     noiseSrc.loop = true;
-    const noiseGain = this.ctx.createGain();
-    noiseGain.gain.value = 0;
-    const noiseFilter = this.ctx.createBiquadFilter();
+    const noiseFilter = ctx.createBiquadFilter();
     noiseFilter.type = "bandpass";
     noiseFilter.frequency.value = 3000;
     noiseFilter.Q.value = 1;
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.value = 0;
     noiseSrc.connect(noiseFilter);
     noiseFilter.connect(noiseGain);
     noiseSrc.start();
 
-    // Mix to output
-    const output = this.ctx.createGain();
-    output.gain.value = 0.8;
-    oscGain.connect(output);
-    noiseGain.connect(output);
+    // Click: short noise burst at attack
+    const clickGain = ctx.createGain();
+    clickGain.gain.value = 0;
+    noiseSrc.connect(clickGain);
 
-    // Trig: dummy gain receiver, gate-target tracking calls trigger()
-    const trigIn = this.ctx.createGain();
+    // Mix
+    const output = ctx.createGain();
+    output.gain.value = 0.8;
+    masterGain.connect(output);
+    slaveGain.connect(output);
+    noiseGain.connect(output);
+    clickGain.connect(output);
+
+    const trigIn = ctx.createGain();
     trigIn.gain.value = 0;
 
-    // Vel Mod: scales output gain via control connection. Static level still set by Level slider;
-    // Vel Mod adds on top so an unconnected input doesn't change behaviour.
-    // Pitch Mod: routed to osc.frequency, additive
     const drum = {
-      id, type: "DrumSynth", node: osc, outputNode: output,
+      id, type: "DrumSynth", node: masterOsc, outputNode: output,
       outputs: { Out: output },
-      inputs: { Trig: trigIn, VelMod: output.gain, PitchMod: osc.frequency },
-      _nodes: [osc, oscGain, noiseSrc, noiseFilter, noiseGain, output, trigIn],
+      inputs: { Trig: trigIn, VelMod: output.gain, PitchMod: masterOsc.frequency },
+      _nodes: [masterOsc, masterGain, slaveOsc, slaveGain, noiseSrc, noiseFilter, noiseGain, clickGain, output, trigIn],
+      _noiseFilter: noiseFilter,
       params: {
-        oscFreq: { value: 60, min: 20, max: 500, audioParam: osc.frequency, label: "Freq" },
-        oscDecay: { value: 0.15, min: 0.01, max: 2, label: "OscDec" },
+        masterPitch: { value: 60, min: 20, max: 784, audioParam: masterOsc.frequency, label: "MstPitch" },
+        masterDecay: { value: 0.15, min: 0.0005, max: 45, label: "MstDec" },
+        masterLevel: { value: 1, min: 0, max: 1, label: "MstLvl" },
+        slaveRatio: { value: 1, min: 1, max: 6.26, label: "SlvRatio" },
+        slaveDecay: { value: 0.15, min: 0.0005, max: 45, label: "SlvDec" },
+        slaveLevel: { value: 0.5, min: 0, max: 1, label: "SlvLvl" },
+        filterMode: { value: "BP", options: ["LP", "BP", "HP"], label: "FltMode" },
+        filterFreq: { value: 3000, min: 10, max: 15800, audioParam: noiseFilter.frequency, label: "FltFreq" },
+        filterRes: { value: 1, min: 0.1, max: 30, audioParam: noiseFilter.Q, label: "FltRes" },
+        filterSweep: { value: 0, min: 0, max: 5, label: "FltSweep" },
+        filterDecay: { value: 0.05, min: 0.0005, max: 45, label: "FltDec" },
+        bendAmt: { value: 0, min: 0, max: 5, label: "BendAmt" },
+        bendDecay: { value: 0.04, min: 0.0005, max: 45, label: "BendDcy" },
+        click: { value: 0.3, min: 0, max: 1, label: "Click" },
         noiseLevel: { value: 0.5, min: 0, max: 1, label: "NsLvl" },
-        noiseDecay: { value: 0.05, min: 0.01, max: 1, label: "NsDec" },
-        pitchBend: { value: 200, min: 0, max: 1000, label: "Bend" },
-        bendTime: { value: 0.04, min: 0.005, max: 0.5, label: "BdTm" },
-        filterFreq: { value: 3000, min: 200, max: 10000, audioParam: noiseFilter.frequency, label: "FltFq" },
         level: { value: 0.8, min: 0, max: 1, audioParam: output.gain, label: "Level" },
       },
       trigger: () => {
-        const now = this.ctx.currentTime;
+        const now = ctx.currentTime;
         const p = drum.params;
-        // Osc envelope
-        oscGain.gain.cancelScheduledValues(now);
-        oscGain.gain.setValueAtTime(1, now);
-        oscGain.gain.exponentialRampToValueAtTime(0.001, now + p.oscDecay.value);
-        // Noise envelope
+        const masterFreq = p.masterPitch.value;
+        const slaveFreq = masterFreq * p.slaveRatio.value;
+        const bendMul = Math.pow(2, p.bendAmt.value);
+
+        // Master osc: pitch bend down + amplitude decay
+        masterOsc.frequency.cancelScheduledValues(now);
+        masterOsc.frequency.setValueAtTime(masterFreq * bendMul, now);
+        masterOsc.frequency.exponentialRampToValueAtTime(Math.max(masterFreq, 1), now + p.bendDecay.value);
+        masterGain.gain.cancelScheduledValues(now);
+        masterGain.gain.setValueAtTime(p.masterLevel.value, now);
+        masterGain.gain.exponentialRampToValueAtTime(0.0001, now + p.masterDecay.value);
+
+        // Slave osc: same bend ratio applied; ratio of master pitch
+        slaveOsc.frequency.cancelScheduledValues(now);
+        slaveOsc.frequency.setValueAtTime(slaveFreq * bendMul, now);
+        slaveOsc.frequency.exponentialRampToValueAtTime(Math.max(slaveFreq, 1), now + p.bendDecay.value);
+        slaveGain.gain.cancelScheduledValues(now);
+        slaveGain.gain.setValueAtTime(p.slaveLevel.value, now);
+        slaveGain.gain.exponentialRampToValueAtTime(0.0001, now + p.slaveDecay.value);
+
+        // Noise filter: cutoff sweep from (set freq * 2^sweep) down to set freq, gain decays
+        const sweepMul = Math.pow(2, p.filterSweep.value);
+        noiseFilter.frequency.cancelScheduledValues(now);
+        noiseFilter.frequency.setValueAtTime(p.filterFreq.value * sweepMul, now);
+        noiseFilter.frequency.exponentialRampToValueAtTime(Math.max(p.filterFreq.value, 10), now + p.filterDecay.value);
         noiseGain.gain.cancelScheduledValues(now);
         noiseGain.gain.setValueAtTime(p.noiseLevel.value, now);
-        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + p.noiseDecay.value);
-        // Pitch bend
-        osc.frequency.cancelScheduledValues(now);
-        osc.frequency.setValueAtTime(p.oscFreq.value + p.pitchBend.value, now);
-        osc.frequency.exponentialRampToValueAtTime(Math.max(p.oscFreq.value, 1), now + p.bendTime.value);
+        noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + p.filterDecay.value);
+
+        // Click: short unfiltered noise burst, scaled by Click knob
+        clickGain.gain.cancelScheduledValues(now);
+        clickGain.gain.setValueAtTime(p.click.value, now);
+        clickGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.005 + p.click.value * 0.015);
       },
       releaseEnv: () => {},
     };
@@ -1987,6 +2033,11 @@ class AudioEngine {
       const isSquare = value === "square";
       mod._oscMix.gain.setValueAtTime(isSquare ? 0 : 1, this.ctx.currentTime);
       mod._pulseMix.gain.setValueAtTime(isSquare ? 1 : 0, this.ctx.currentTime);
+    }
+    // DrumSynth: filterMode -> noise filter type
+    if (mod.type === "DrumSynth" && paramName === "filterMode") {
+      const map = { LP: "lowpass", BP: "bandpass", HP: "highpass" };
+      mod._noiseFilter.type = map[value] || "bandpass";
     }
     // Noise: swap source buffer when color changes (buffer can't change after start())
     if (mod.type === "Noise" && paramName === "color") {
