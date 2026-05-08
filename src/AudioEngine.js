@@ -55,7 +55,7 @@ class AudioEngine {
 
   async createModule(id, type) {
     if (!this.ctx) this.init();
-    if (type === 'OscC' || type === 'OscSlvB' || type === 'OscA' || type === 'OscSlvA' || type === 'OscSlvFM' || type === 'OscSineBank') {
+    if (type === 'OscSlvB' || type === 'OscA' || type === 'OscSlvA' || type === 'OscSlvFM' || type === 'OscSineBank') {
       await this._workletReady;
     }
     let mod;
@@ -181,47 +181,35 @@ class AudioEngine {
   }
 
   _createOscC(id) {
+    // Spec §2.4 OscC: sine-only master oscillator with AM and FMA.
     const osc = this.ctx.createOscillator();
-    const pulse = new AudioWorkletNode(this.ctx, 'pulse-processor');
-    const oscMix = this.ctx.createGain();   // active when waveform != "square"
-    const pulseMix = this.ctx.createGain(); // active when waveform == "square"
+    osc.type = "sine";
+    osc.frequency.value = 220;
+    osc.start();
+
     const gain = this.ctx.createGain();
     const slaveGain = this.ctx.createGain();
-    const freqSrc = this.ctx.createConstantSource();
-
-    osc.type = "square";
-    osc.frequency.value = 0;
-    pulse.parameters.get('frequency').value = 0;
-    pulse.parameters.get('pulseWidth').value = 0.5;
-    freqSrc.offset.value = 330;
-    freqSrc.connect(osc.frequency);
-    freqSrc.connect(pulse.parameters.get('frequency'));
-    freqSrc.start();
-
-    oscMix.gain.value = 0;
-    pulseMix.gain.value = 1;
+    const fmGain = this.ctx.createGain();
     gain.gain.value = 0.6;
     slaveGain.gain.value = 0.6;
-
-    osc.connect(oscMix);
-    pulse.connect(pulseMix);
-    oscMix.connect(gain); oscMix.connect(slaveGain);
-    pulseMix.connect(gain); pulseMix.connect(slaveGain);
-    osc.start();
+    fmGain.gain.value = 0;
+    osc.connect(gain);
+    osc.connect(slaveGain);
+    fmGain.connect(osc.frequency);
 
     return {
       id, type: "OscC", node: osc, outputNode: gain,
       outputs: { Out: gain, Slv: slaveGain },
-      inputs: { PitchMod: freqSrc.offset },
-      _nodes: [osc, pulse, oscMix, pulseMix, gain, slaveGain, freqSrc],
+      inputs: { PitchMod: osc.frequency, FMA: fmGain, AM: gain.gain },
+      _nodes: [osc, gain, slaveGain, fmGain],
       _slaveTargets: [],
-      _frequency: 330,
-      _oscMix: oscMix,
-      _pulseMix: pulseMix,
+      _frequency: 220,
       params: {
-        frequency: { value: 330, min: 20, max: 8000, audioParam: freqSrc.offset, label: "Freq" },
-        waveform: { value: "square", options: ["sine", "sawtooth", "square", "triangle"], label: "Wave" },
-        pulseWidth: { value: 0.5, min: 0, max: 1, audioParam: pulse.parameters.get('pulseWidth'), label: "PW" },
+        frequency: { value: 220, min: 20, max: 8000, audioParam: osc.frequency, label: "Freq" },
+        coarse: { value: 0, min: -60, max: 60, label: "Coarse" },
+        fine: { value: 0, min: -50, max: 50, label: "Fine" },
+        kbt: { value: 1, min: 0, max: 2, label: "KBT" },
+        fmDepth: { value: 0, min: 0, max: 1000, audioParam: fmGain.gain, label: "FM Dep" },
         level: { value: 0.6, min: 0, max: 1, audioParam: gain.gain, label: "Level" },
       },
     };
@@ -2028,12 +2016,6 @@ class AudioEngine {
       }
       mod._shaper.curve = curve;
     }
-    // OscC: route to pulse worklet when waveform is "square", oscillator otherwise
-    if (mod.type === "OscC" && paramName === "waveform") {
-      const isSquare = value === "square";
-      mod._oscMix.gain.setValueAtTime(isSquare ? 0 : 1, this.ctx.currentTime);
-      mod._pulseMix.gain.setValueAtTime(isSquare ? 1 : 0, this.ctx.currentTime);
-    }
     // DrumSynth: filterMode -> noise filter type
     if (mod.type === "DrumSynth" && paramName === "filterMode") {
       const map = { LP: "lowpass", BP: "bandpass", HP: "highpass" };
@@ -2134,9 +2116,20 @@ class AudioEngine {
       mod.node.offset.setValueAtTime(freq, this.ctx.currentTime);
       this._propagateToSlaves(mod);
     }
-    // OscB/OscC: update _frequency for slave propagation
-    if ((mod.type === "OscB" || mod.type === "OscC") && paramName === "frequency") {
+    // OscB: update _frequency for slave propagation (legacy single-param branch)
+    if (mod.type === "OscB" && paramName === "frequency") {
       mod._frequency = value;
+      this._propagateToSlaves(mod);
+    }
+    // OscC: coarse/fine tuning + propagate to slaves
+    if (mod.type === "OscC" && (paramName === "coarse" || paramName === "fine" || paramName === "frequency")) {
+      const baseFreq = mod.params.frequency.value;
+      const coarse = mod.params.coarse.value;
+      const fine = mod.params.fine.value;
+      const semitones = coarse + fine / 100;
+      const freq = baseFreq * Math.pow(2, semitones / 12);
+      mod.node.frequency.setValueAtTime(freq, this.ctx.currentTime);
+      mod._frequency = freq;
       this._propagateToSlaves(mod);
     }
     // Slave oscillators: recalc on partial/detune/fine/octShift change
