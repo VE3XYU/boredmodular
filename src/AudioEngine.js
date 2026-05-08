@@ -1310,9 +1310,14 @@ class AudioEngine {
         const now = this.ctx.currentTime;
         const gateOn = seq._gatePattern[step];
         noteOut.offset.setValueAtTime(freq, now);
-        // Set pitch targets directly
-        seq._pitchTargets.forEach(({ audioParam }) => {
+        // Set pitch targets directly; propagate to slaves when target is a master osc
+        seq._pitchTargets.forEach(({ audioParam, moduleId }) => {
           audioParam.setValueAtTime(freq, now);
+          const targetMod = this.modules.get(moduleId);
+          if (targetMod && targetMod._slaveTargets) {
+            targetMod._frequency = freq;
+            this._propagateToSlaves(targetMod);
+          }
         });
         if (gateOn) {
           gateOut.offset.setValueAtTime(1, now);
@@ -1361,8 +1366,14 @@ class AudioEngine {
         const now = this.ctx.currentTime;
         const gateOn = seq._gatePattern[step];
         noteOut.offset.setValueAtTime(freq, now);
-        seq._pitchTargets.forEach(({ audioParam }) => {
+        // Propagate to slaves when the pitch target is a master oscillator
+        seq._pitchTargets.forEach(({ audioParam, moduleId }) => {
           audioParam.setValueAtTime(freq, now);
+          const targetMod = this.modules.get(moduleId);
+          if (targetMod && targetMod._slaveTargets) {
+            targetMod._frequency = freq;
+            this._propagateToSlaves(targetMod);
+          }
         });
         if (gateOn) {
           gateOut.offset.setValueAtTime(1, now);
@@ -1661,9 +1672,16 @@ class AudioEngine {
         gateOut.offset.setValueAtTime(1, now);
         velOut.offset.setValueAtTime(0.8, now);
         kbd._currentNote = midiNote;
-        // Directly set frequency on connected oscillator pitch targets
-        kbd._pitchTargets.forEach(({ audioParam }) => {
+        // Directly set frequency on connected oscillator pitch targets.
+        // When the target is a master oscillator, also update its _frequency
+        // and propagate to slaves so master/slave keyboard tracking works.
+        kbd._pitchTargets.forEach(({ audioParam, moduleId }) => {
           audioParam.setValueAtTime(freq, now);
+          const targetMod = this.modules.get(moduleId);
+          if (targetMod && targetMod._slaveTargets) {
+            targetMod._frequency = freq;
+            this._propagateToSlaves(targetMod);
+          }
         });
         // Trigger connected envelopes
         kbd._gateTargetEnvelopes.forEach(envId => {
