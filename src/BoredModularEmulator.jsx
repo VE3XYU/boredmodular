@@ -1285,7 +1285,7 @@ export default function BoredModularEmulator() {
                     />
                     <div>
                       <div style={{ fontSize: 16, color: "#bbb" }}>{d.label}</div>
-                      <div style={{ fontSize: 12, color: "#555" }}>{d.description}</div>
+                      <div style={{ fontSize: 12, color: "#888" }}>{d.description}</div>
                     </div>
                   </div>
                 );
