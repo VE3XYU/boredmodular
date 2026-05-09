@@ -16,6 +16,31 @@ const PORTS_H_WITH = 44;
 const PORTS_H_NONE = 6;
 const PORT_OUTPUT_OFFSET = 10;
 const PORT_INPUT_OFFSET = 30;
+const PARAM_STRIP_H = 56;
+
+function buildParamLayout(def, params) {
+  const items = [];
+  const paramRowMap = new Map();
+  (def.paramRows || []).forEach((r) => r.knobs.forEach((k) => paramRowMap.set(k, r)));
+
+  const seen = new Set();
+  let y = 4;
+  Object.entries(params || {}).forEach(([key, p]) => {
+    if (seen.has(key)) return;
+    if (paramRowMap.has(key)) {
+      const row = paramRowMap.get(key);
+      items.push({ kind: "row", row, y });
+      row.knobs.forEach((k) => seen.add(k));
+      y += PARAM_STRIP_H;
+    } else {
+      items.push({ kind: "single", key, p, y });
+      seen.add(key);
+      y += PARAM_ROW_H;
+    }
+  });
+  const totalH = y - 4 + PARAMS_PAD_BOTTOM;
+  return { items, totalH };
+}
 
 function getPortPosition(moduleState, portName, isOutput) {
   const def = MODULE_DEFS[moduleState.type];
@@ -25,7 +50,7 @@ function getPortPosition(moduleState, portName, isOutput) {
   const idx = list.indexOf(portName);
   if (idx === -1) return { x: 0, y: 0 };
 
-  const paramsH = Object.keys(moduleState.params || {}).length * PARAM_ROW_H + PARAMS_PAD_BOTTOM;
+  const paramsH = buildParamLayout(def, moduleState.params).totalH;
   const customH = def.customUIHeight || 0;
   const baseY = HEADER_H + paramsH + customH;
 
@@ -40,8 +65,7 @@ function getPortPosition(moduleState, portName, isOutput) {
 
 function getModuleHeight(type, params) {
   const def = MODULE_DEFS[type];
-  const paramCount = Object.keys(params || {}).length;
-  const paramsH = paramCount * PARAM_ROW_H + PARAMS_PAD_BOTTOM;
+  const paramsH = buildParamLayout(def, params).totalH;
   const allInputs = [...(def.inputs || []), ...(def.modInputs || [])];
   const hasPorts = allInputs.length > 0 || (def.outputs || []).length > 0;
   const portsH = hasPorts ? PORTS_H_WITH : PORTS_H_NONE;
@@ -359,8 +383,53 @@ function ModuleNode({
       </text>
 
       {/* Params */}
-      {Object.entries(params).map(([key, p], i) => {
-        const py = paramsStartY + 4 + i * PARAM_ROW_H;
+      {buildParamLayout(def, params).items.map((item, idx) => {
+        const py = paramsStartY + item.y;
+        if (item.kind === "row") {
+          const knobs = item.row.knobs;
+          const lcdText = knobs
+            .map((k) => {
+              const v = params[k]?.value ?? 0;
+              return v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : Math.round(v);
+            })
+            .join("  ");
+          return (
+            <g key={`row-${idx}`}>
+              <LcdDisplay x={6} y={py} width={MODULE_WIDTH - 12} height={14} text={lcdText} />
+              {knobs.map((k, ki) => {
+                const p = params[k];
+                if (!p) return null;
+                const slot = MODULE_WIDTH / knobs.length;
+                const cx = ki * slot + slot / 2;
+                return (
+                  <g key={k}>
+                    <SvgKnob
+                      x={cx - 20}
+                      y={py + 18}
+                      width={40}
+                      min={p.min}
+                      max={p.max}
+                      value={p.value}
+                      onChange={(v) => onParamChange(moduleState.id, k, v)}
+                      color={def.color}
+                    />
+                    <text
+                      x={cx}
+                      y={py + 50}
+                      textAnchor="middle"
+                      fill="#111"
+                      fontSize={11}
+                      fontFamily="'Pixel Operator', 'DM Mono', monospace"
+                    >
+                      {p.label || k}
+                    </text>
+                  </g>
+                );
+              })}
+            </g>
+          );
+        }
+        const { key, p } = item;
         if (p.options) {
           return (
             <g key={key}>
