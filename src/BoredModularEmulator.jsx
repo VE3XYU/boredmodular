@@ -295,13 +295,13 @@ function ModuleNode({
         width={MODULE_WIDTH}
         height={height}
         rx={6}
-        fill="#bdbdbd"
+        fill="#9a9a9a"
         stroke={def.color}
         strokeWidth={1.5}
       />
       {/* Header bar */}
-      <rect x={0} y={0} width={MODULE_WIDTH} height={headerH} rx={6} fill="#a8a8a8" />
-      <rect x={0} y={headerH - 6} width={MODULE_WIDTH} height={6} fill="#a8a8a8" />
+      <rect x={0} y={0} width={MODULE_WIDTH} height={headerH} rx={6} fill="#828282" />
+      <rect x={0} y={headerH - 6} width={MODULE_WIDTH} height={6} fill="#828282" />
       {/* Header underline accents the category color */}
       <rect x={0} y={headerH - 1} width={MODULE_WIDTH} height={1} fill={def.color} />
       {/* Label */}
