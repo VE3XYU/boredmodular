@@ -7,8 +7,15 @@ import { MODULE_DEFS, CATEGORIES } from "./moduleDefs";
 let _idCounter = 0;
 const genId = () => `mod_${++_idCounter}`;
 
-const PORT_SIZE = 5;
-const MODULE_WIDTH = 170;
+const PORT_SIZE = 4;
+const MODULE_WIDTH = 220;
+const HEADER_H = 22;
+const PARAM_ROW_H = 24;
+const PARAMS_PAD_BOTTOM = 6;
+const PORTS_H_WITH = 44;
+const PORTS_H_NONE = 6;
+const PORT_OUTPUT_OFFSET = 10;
+const PORT_INPUT_OFFSET = 30;
 
 function getPortPosition(moduleState, portName, isOutput) {
   const def = MODULE_DEFS[moduleState.type];
@@ -18,30 +25,28 @@ function getPortPosition(moduleState, portName, isOutput) {
   const idx = list.indexOf(portName);
   if (idx === -1) return { x: 0, y: 0 };
 
-  const headerH = 32;
-  const paramsH = Object.keys(moduleState.params || {}).length * 32 + 8;
+  const paramsH = Object.keys(moduleState.params || {}).length * PARAM_ROW_H + PARAMS_PAD_BOTTOM;
   const customH = def.customUIHeight || 0;
-  const baseY = headerH + paramsH + customH + 12;
+  const baseY = HEADER_H + paramsH + customH;
 
   if (isOutput) {
     const spacing = MODULE_WIDTH / (allOutputs.length + 1);
-    return { x: moduleState.x + spacing * (idx + 1), y: moduleState.y + baseY + 8 };
+    return { x: moduleState.x + spacing * (idx + 1), y: moduleState.y + baseY + PORT_OUTPUT_OFFSET };
   } else {
     const spacing = MODULE_WIDTH / (allInputs.length + 1);
-    return { x: moduleState.x + spacing * (idx + 1), y: moduleState.y + baseY + 34 };
+    return { x: moduleState.x + spacing * (idx + 1), y: moduleState.y + baseY + PORT_INPUT_OFFSET };
   }
 }
 
 function getModuleHeight(type, params) {
   const def = MODULE_DEFS[type];
-  const headerH = 32;
   const paramCount = Object.keys(params || {}).length;
-  const paramsH = paramCount * 32 + 8;
+  const paramsH = paramCount * PARAM_ROW_H + PARAMS_PAD_BOTTOM;
   const allInputs = [...(def.inputs || []), ...(def.modInputs || [])];
   const hasPorts = allInputs.length > 0 || (def.outputs || []).length > 0;
-  const portsH = hasPorts ? 60 : 10;
+  const portsH = hasPorts ? PORTS_H_WITH : PORTS_H_NONE;
   const customH = def.customUIHeight || 0;
-  return headerH + paramsH + customH + portsH;
+  return HEADER_H + paramsH + customH + portsH;
 }
 
 // Keyboard note mapping: computer keys -> MIDI notes (relative to C4=60)
@@ -131,9 +136,9 @@ function SvgKnob({ x, y, width, min, max, value, onChange, color }) {
   const range = max - min;
   const pct = Math.max(0, Math.min(1, (value - min) / range));
 
-  const radius = 10;
+  const radius = 9;
   const cx = x + width / 2;
-  const cy = y + 9;
+  const cy = y + radius - 1;
 
   // 0° points up; sweep -135° (7 o'clock) clockwise through 0° to +135° (5 o'clock).
   const minAngle = -135;
@@ -237,10 +242,10 @@ function Port({ x, y, name, isOutput, isMod, onMouseDown, onMouseUp, isConnected
       />
       <text
         x={x}
-        y={y - 9}
+        y={y - 7}
         textAnchor="middle"
         fill="#222"
-        fontSize={12}
+        fontSize={10}
         fontFamily="'Pixel Operator', 'DM Mono', monospace"
         pointerEvents="none"
       >
@@ -268,7 +273,7 @@ function ModuleNode({
   const allOutputs = def.outputs || [];
   const height = getModuleHeight(moduleState.type, params);
 
-  const headerH = 32;
+  const headerH = HEADER_H;
   const paramsStartY = headerH;
 
   const connectedPorts = new Set();
@@ -302,18 +307,18 @@ function ModuleNode({
       {/* Header bar */}
       <rect x={0} y={0} width={MODULE_WIDTH} height={headerH} rx={6} fill="#828282" />
       <rect x={0} y={headerH - 6} width={MODULE_WIDTH} height={6} fill="#828282" />
-      {/* Header underline accents the category color */}
+      {/* Header underline accents the category colour */}
       <rect x={0} y={headerH - 1} width={MODULE_WIDTH} height={1} fill={def.color} />
       {/* Label */}
-      <text x={10} y={21} fill="#111" fontSize={16} fontWeight={700} fontFamily="'Pixel Operator', 'DM Mono', monospace">
+      <text x={8} y={15} fill="#111" fontSize={14} fontWeight={700} fontFamily="'Pixel Operator', 'DM Mono', monospace">
         {def.label}
       </text>
       {/* Close */}
       <text
-        x={MODULE_WIDTH - 16}
-        y={21}
+        x={MODULE_WIDTH - 12}
+        y={15}
         fill="#444"
-        fontSize={16}
+        fontSize={14}
         fontWeight={700}
         fontFamily="'Pixel Operator', 'DM Mono', monospace"
         style={{ cursor: "pointer" }}
@@ -327,14 +332,14 @@ function ModuleNode({
 
       {/* Params */}
       {Object.entries(params).map(([key, p], i) => {
-        const py = paramsStartY + 6 + i * 32;
+        const py = paramsStartY + 4 + i * PARAM_ROW_H;
         if (p.options) {
           return (
             <g key={key}>
-              <text x={8} y={py + 14} fill="#111" fontSize={16} fontFamily="'Pixel Operator', 'DM Mono', monospace">
+              <text x={6} y={py + 12} fill="#111" fontSize={13} fontFamily="'Pixel Operator', 'DM Mono', monospace">
                 {p.label || key}
               </text>
-              <foreignObject x={60} y={py} width={102} height={24}>
+              <foreignObject x={64} y={py + 1} width={152} height={20}>
                 <select
                   style={{
                     width: "100%",
@@ -342,10 +347,10 @@ function ModuleNode({
                     background: "#111",
                     color: "#ddd",
                     border: `1px solid ${def.color}44`,
-                    borderRadius: 3,
-                    fontSize: 14,
+                    borderRadius: 2,
+                    fontSize: 12,
                     fontFamily: "'Pixel Operator', 'DM Mono', monospace",
-                    padding: "0 4px",
+                    padding: "0 3px",
                     outline: "none",
                   }}
                   value={p.value}
@@ -362,16 +367,15 @@ function ModuleNode({
             </g>
           );
         }
-        const range = p.max - p.min;
         return (
           <g key={key}>
-            <text x={8} y={py + 14} fill="#111" fontSize={16} fontFamily="'Pixel Operator', 'DM Mono', monospace">
+            <text x={6} y={py + 12} fill="#111" fontSize={13} fontFamily="'Pixel Operator', 'DM Mono', monospace">
               {p.label || key}
             </text>
             <SvgKnob
-              x={56}
-              y={py + 5}
-              width={78}
+              x={64}
+              y={py + 3}
+              width={80}
               min={p.min}
               max={p.max}
               value={p.value}
@@ -379,7 +383,7 @@ function ModuleNode({
               color={def.color}
             />
             {editingParam === key ? (
-              <foreignObject x={100} y={py} width={62} height={20}>
+              <foreignObject x={156} y={py + 1} width={58} height={18}>
                 <input
                   type="text"
                   defaultValue={p.value < 10 ? p.value.toFixed(2) : p.value < 100 ? p.value.toFixed(1) : Math.round(p.value)}
@@ -391,7 +395,7 @@ function ModuleNode({
                     color: "#fff",
                     border: `1px solid ${def.color}`,
                     borderRadius: 2,
-                    fontSize: 14,
+                    fontSize: 12,
                     fontFamily: "'Pixel Operator', 'DM Mono', monospace",
                     padding: "0 3px",
                     outline: "none",
@@ -417,10 +421,10 @@ function ModuleNode({
               </foreignObject>
             ) : (
               <text
-                x={138}
-                y={py + 14}
+                x={214}
+                y={py + 12}
                 fill="#000"
-                fontSize={16}
+                fontSize={13}
                 fontFamily="'Pixel Operator', 'DM Mono', monospace"
                 textAnchor="end"
                 style={{ cursor: "text" }}
@@ -438,7 +442,7 @@ function ModuleNode({
 
       {/* Custom UI renderers */}
       {moduleState.type === "Keyboard" && (() => {
-        const kbY = paramsStartY + Object.keys(params).length * 32 + 12;
+        const kbY = paramsStartY + Object.keys(params).length * PARAM_ROW_H + PARAMS_PAD_BOTTOM + 4;
         const whiteKeys = PIANO_KEYS.filter(k => !k.black);
         const ww = MODULE_WIDTH / whiteKeys.length; // white key width
         let whiteIdx = 0;
@@ -525,7 +529,7 @@ function ModuleNode({
 
       {/* EventSeq custom UI */}
       {moduleState.type === "EventSeq" && (() => {
-        const seqY = paramsStartY + Object.keys(params).length * 32 + 8;
+        const seqY = paramsStartY + Object.keys(params).length * PARAM_ROW_H + PARAMS_PAD_BOTTOM + 2;
         const mod = engine.current?.modules?.get(moduleState.id);
         const step = mod?._currentStep || 0;
         const cellW = MODULE_WIDTH / 16;
@@ -562,7 +566,7 @@ function ModuleNode({
 
       {/* CtrlSeq custom UI */}
       {moduleState.type === "CtrlSeq" && (() => {
-        const seqY = paramsStartY + Object.keys(params).length * 32 + 8;
+        const seqY = paramsStartY + Object.keys(params).length * PARAM_ROW_H + PARAMS_PAD_BOTTOM + 2;
         const mod = engine.current?.modules?.get(moduleState.id);
         const step = mod?._currentStep || 0;
         const cellW = MODULE_WIDTH / 16;
@@ -608,7 +612,7 @@ function ModuleNode({
 
       {/* NoteSeqA custom UI */}
       {moduleState.type === "NoteSeqA" && (() => {
-        const seqY = paramsStartY + Object.keys(params).length * 32 + 8;
+        const seqY = paramsStartY + Object.keys(params).length * PARAM_ROW_H + PARAMS_PAD_BOTTOM + 2;
         const mod = engine.current?.modules?.get(moduleState.id);
         const step = mod?._currentStep || 0;
         const cellW = MODULE_WIDTH / 16;
@@ -664,7 +668,7 @@ function ModuleNode({
 
       {/* NoteSeqB custom UI (Piano Roll) */}
       {moduleState.type === "NoteSeqB" && (() => {
-        const seqY = paramsStartY + Object.keys(params).length * 32 + 8;
+        const seqY = paramsStartY + Object.keys(params).length * PARAM_ROW_H + PARAMS_PAD_BOTTOM + 2;
         const mod = engine.current?.modules?.get(moduleState.id);
         const step = mod?._currentStep || 0;
         const cellW = MODULE_WIDTH / 16;
