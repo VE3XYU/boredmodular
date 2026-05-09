@@ -149,6 +149,10 @@ Before Phase 3 (the big layout shift) we need calls on these. Phase 1 (knob) and
 - **2026-05-07 — Screenshot:** capture deferred — user is remote and can't add the file in this session. Plan continues using the in-document description as reference; checked-in screenshot remains a TODO before final visual sign-off.
 - **2026-05-08 — Workspace width:** the canvas should fit roughly **4 modules wide**. This sets the per-module width as a fraction of viewport rather than an absolute pixel constant. Settles the sizing question Phase 3 has to answer.
 - **2026-05-08 — Phase 1 (knob) shipped.** `SvgKnob` replaced `SvgSlider` at the single `ModuleNode` call site. Drop-in API; no layout shift. PR #21.
+- **2026-05-08 — Grey re-skin shipped.** Module body `#9a9a9a`, header `#828282`, label/value/port text dark on grey, category colour preserved as 1.5px stroke + 1px header underline. PR #23.
+- **2026-05-08 — Phase 3a (denser layout) shipped.** `MODULE_WIDTH` 170→220, `HEADER_H` 32→22, `PARAM_ROW_H` 32→24, knob radius 10→9, font sizes scaled down. Sync-sweep round-trip verified. PR #25.
+- **2026-05-08 — Phase 4 (LCD display) shipped.** `LcdDisplay` component (deep navy `#1a3a6a` + cyan `#7ec8e3` text) replaces the per-row plain-text value. PR #26.
+- **2026-05-09 — Phase 3b (multi-knob row) opened, parked.** Opt-in `paramRows: [{ knobs: [...] }]` field on a module def renders a strip with shared multi-segment LCD on top and small knobs below. Applied to ADSREnv only as a pattern proof. PR #27 — open, awaiting tweaks before merge per user.
 
 ## Reference observations (2026-05-08)
 
@@ -172,6 +176,52 @@ User shared three Nord Modular Editor reference screenshots in chat — used as 
 
 ## Status / Next Action
 
-Plan in `draft`. Phase 1 (knob) and Phase 2 (font) shipped. Screenshot reference observations recorded above (see "Reference observations (2026-05-08)").
+Plan in `draft`. **Shipped:** Phase 1 (knob), Phase 2 (font), grey re-skin, Phase 3a (density), Phase 4 (LCD). **Parked:** Phase 3b (multi-knob row) — pattern works on ADSREnv (PR #27) but the user wants to live with it before fanning out and possibly tweaking the strip dimensions.
 
-Next phase candidate: **Phase 4 (LCD display)** — visual-only, complements the rotary knob aesthetic, and the screenshots show LCDs are the canonical numeric readout across nearly every module. Alternative: jump to **Phase 3 (horizontal layout)** now that the workspace-width decision (4 modules wide) is locked; Phase 3 carries higher risk (cables, hit math) but unblocks the bigger density win.
+### paramRows fan-out — candidate batches (deferred)
+
+Once Phase 3b is dialled in, these are the candidate modules in priority order:
+
+**Tier 1 — clean 2-3 knob groups, direct Nord parallel:**
+- `Envelope` — `["attack", "decay"]` (matches Nord "AD-Env1")
+- `Filter` / `FilterC` / `FilterE` — `["frequency", "resonance"]` (leave Type/slope as dropdowns)
+- `Delay` / `ShortDelay` — `["time", "feedback", "mix"]` or equivalent
+- `Chorus` — rate / depth / mix
+- `Shaper` — drive / shape / mix
+
+**Tier 2 — multiple sub-groups on one module (tests multi-`paramRows`):**
+- `DrumSynth` — natural splits: `[mstPitch, mstDec, mstLvl]`, `[slvRatio, slvDec, slvLvl]`, `[fltFreq, fltRes, fltSweep, fltDec]`, `[bendAmt, bendDcy]`
+- `OscA` / `OscB` / `OscC` — pitch trio (freq + coarse + fine), then PW pair, then FM/level pair
+- `MasterOsc` — coarse/fine/pitch row (the most Nord-iconic layout)
+
+**Tier 3 — needs strip variant or splitting:**
+- `Mixer8` — 8 channel knobs is too many at 220px wide; either two `paramRows` of 4, or a wider strip variant
+- `OscSineBank` — partial-tune knob bank; might want its own `customUIHeight` widget like the sequencers
+
+### Known gotchas for the next agent to address before fanning out
+
+- The shared multi-LCD is **display-only** — no double-click-to-edit. If a strip-knob's only readout is the shared LCD, the user can't type a number directly. Solve before going wide. Possible: per-segment hit areas on the LCD, each opening an inline edit.
+- Strip knobs at 8+ count get cramped at the current `MODULE_WIDTH = 220`. Either widen, or auto-stack into a second row.
+- No param `unit` field (`Hz`, `ms`, `%`); LCDs show bare numbers. Trivial to add but a separate concern.
+
+### Phases still pending
+
+- **Phase 5** — inline ports next to controls. Restructures port layout system-wide; bigger risk on cables.
+- **Phase 6** — per-module mute (M) button. Needs engine wiring (a mute gain node intercepting connect/disconnect).
+- **Phase 7** — port colours by signal type (S1). Per-port `signalType` tag in `MODULE_DEFS`; renderer recolours by type. Visual-only at the rendering layer.
+- **Phase 8** — sub-section frames within a module (Nord's nested `OCTAVE` rows etc.). Extends `MODULE_DEFS` schema.
+
+### Open design questions still relevant
+
+From the original Open Design Questions list, settled and outstanding:
+
+| Q | Status |
+|---|---|
+| Q1 — module width policy | **Settled:** uniform fixed-width, 4 modules across canvas |
+| Q2 — variable-port-count modules under horizontal layout | **Open** — Mixer8, OscSineBank still TBD |
+| Q3 — sub-section frame styling | **Open** — Phase 8 |
+| Q4 — sidebar drop-zone position | **Open** — current impl is random-near-origin |
+| Q5 — cable attachment under new layout | **Settled by Phase 3a** — bottom port strip works |
+| Q6 — bitmap font choice | **Settled:** Pixel Operator |
+| Q7 — mute button position | **Open** — Phase 6 |
+| Light-grey vs dark module body | **Settled:** grey body with category colour as accent stroke |
