@@ -192,6 +192,7 @@ const MODULE_DEFS = {
     outputs: ["Out"],
     modInputs: ["Gate", "Retrig"],
     description: "Enhanced ADSR with curve control",
+    paramRows: [{ knobs: ["attack", "decay", "sustain", "release"] }],
   },
   LFO: {
     label: "LFO",
