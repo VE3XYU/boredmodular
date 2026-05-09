@@ -219,6 +219,34 @@ function SvgKnob({ x, y, width, min, max, value, onChange, color }) {
   );
 }
 
+function LcdDisplay({ x, y, width, height, text, onDoubleClick }) {
+  return (
+    <g style={{ cursor: onDoubleClick ? "text" : "default" }} onDoubleClick={onDoubleClick}>
+      <rect
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        rx={1}
+        fill="#1a3a6a"
+        stroke="#0a1f3a"
+        strokeWidth={0.5}
+      />
+      <text
+        x={x + width - 3}
+        y={y + height - 4}
+        textAnchor="end"
+        fill="#7ec8e3"
+        fontSize={12}
+        fontFamily="'Pixel Operator', 'DM Mono', monospace"
+        pointerEvents="none"
+      >
+        {text}
+      </text>
+    </g>
+  );
+}
+
 function Port({ x, y, name, isOutput, isMod, onMouseDown, onMouseUp, isConnected }) {
   const color = isOutput ? "#f44" : isMod ? "#fc0" : "#4cf";
   return (
@@ -420,21 +448,17 @@ function ModuleNode({
                 />
               </foreignObject>
             ) : (
-              <text
-                x={214}
-                y={py + 12}
-                fill="#000"
-                fontSize={13}
-                fontFamily="'Pixel Operator', 'DM Mono', monospace"
-                textAnchor="end"
-                style={{ cursor: "text" }}
+              <LcdDisplay
+                x={156}
+                y={py + 2}
+                width={58}
+                height={18}
+                text={p.value < 10 ? p.value.toFixed(2) : p.value < 100 ? p.value.toFixed(1) : Math.round(p.value)}
                 onDoubleClick={(e) => {
                   e.stopPropagation();
                   setEditingParam(key);
                 }}
-              >
-                {p.value < 10 ? p.value.toFixed(2) : p.value < 100 ? p.value.toFixed(1) : Math.round(p.value)}
-              </text>
+              />
             )}
           </g>
         );
