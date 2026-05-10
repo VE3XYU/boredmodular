@@ -97,6 +97,74 @@ const PIANO_KEYS = [
 
 // ─── Components ─────────────────────────────────────────────────────────────
 
+const SAFARI_ADVISORY_KEY = "bm-safari-latency-advisory-dismissed";
+
+function detectSafari() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  return /Safari/.test(ua) && !/Chrome|Chromium|Edg|OPR|Brave/.test(ua);
+}
+
+function SafariAdvisoryBanner() {
+  const [dismissed, setDismissed] = useState(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      if (window.localStorage.getItem(SAFARI_ADVISORY_KEY) === "1") return true;
+    } catch (_) {}
+    return !detectSafari();
+  });
+
+  if (dismissed) return null;
+
+  const dismiss = () => {
+    try { window.localStorage.setItem(SAFARI_ADVISORY_KEY, "1"); } catch (_) {}
+    setDismissed(true);
+  };
+
+  return (
+    <div
+      role="status"
+      style={{
+        position: "fixed",
+        top: 8,
+        left: "50%",
+        transform: "translateX(-50%)",
+        background: "#241c12",
+        border: "1px solid #5a3d1f",
+        color: "#e0c890",
+        padding: "8px 38px 8px 14px",
+        borderRadius: 4,
+        fontSize: 13,
+        lineHeight: 1.45,
+        maxWidth: 560,
+        zIndex: 1000,
+        boxShadow: "0 2px 10px rgba(0,0,0,0.5)",
+      }}
+    >
+      Safari uses a larger Web Audio output buffer than Chromium browsers, which adds noticeable latency to keypress-to-sound. For tighter monitoring, try Chrome, Edge, or Brave.
+      <button
+        type="button"
+        onClick={dismiss}
+        aria-label="Dismiss advisory"
+        style={{
+          position: "absolute",
+          top: 4,
+          right: 6,
+          background: "transparent",
+          border: "none",
+          color: "#a08560",
+          cursor: "pointer",
+          fontSize: 18,
+          lineHeight: 1,
+          padding: "2px 8px",
+        }}
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
 function Scope({ engine }) {
   const canvasRef = useRef(null);
   const animRef = useRef(null);
@@ -1321,6 +1389,8 @@ export default function BoredModularEmulator() {
       }}
     >
       <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+      <SafariAdvisoryBanner />
 
       {/* Sidebar */}
       <div
