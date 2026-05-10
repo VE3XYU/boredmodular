@@ -1371,6 +1371,28 @@ export default function BoredModularEmulator() {
         engineRef.current.triggerEnvelopes();
         return;
       }
+      // Octave shift: Z down, X up. Ignore when modifiers are held so
+      // Cmd/Ctrl+Z still reaches the browser. Shifts every Keyboard module
+      // on the canvas in lock-step so the musical keyboard stays consistent.
+      const k = e.key.toLowerCase();
+      if ((k === "z" || k === "x") && !e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const delta = k === "z" ? -1 : 1;
+        let shifted = false;
+        engineRef.current.modules.forEach((mod, id) => {
+          if (mod.type !== "Keyboard") return;
+          const p = mod.params && mod.params.octave;
+          if (!p) return;
+          const min = p.min ?? -2;
+          const max = p.max ?? 4;
+          const next = Math.max(min, Math.min(max, (p.value ?? 0) + delta));
+          if (next !== p.value) {
+            handleParamChange(id, "octave", next);
+            shifted = true;
+          }
+        });
+        if (shifted) e.preventDefault();
+        return;
+      }
       // Musical keyboard: route to all Keyboard modules
       const note = KEY_NOTE_MAP[e.key.toLowerCase()];
       if (note !== undefined && !e.repeat && !heldNotes.has(note)) {
@@ -1403,7 +1425,7 @@ export default function BoredModularEmulator() {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, [keyHeld, initAudio]);
+  }, [keyHeld, initAudio, handleParamChange]);
 
   // Sequencer step animation: poll at ~15fps to update step LEDs
   const [seqFrame, setSeqFrame] = useState(0);
@@ -1645,6 +1667,8 @@ export default function BoredModularEmulator() {
             Double-click value to type exact number.
             <br />
             Shift+drag canvas to pan.
+            <br />
+            Z / X to shift Keyboard octave.
           </div>
         </div>
       </div>
