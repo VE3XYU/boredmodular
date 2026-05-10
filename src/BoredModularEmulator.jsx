@@ -78,7 +78,7 @@ function getModuleHeight(type, params) {
 // module snaps top-to-bottom adjacent to that neighbour. Far drops keep
 // their exact cursor position. Roughly the height of a single knob row, so
 // the user has to mean it.
-const SNAP_MARGIN = 20;
+const SNAP_MARGIN = 22;
 
 function rectsOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
   return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
