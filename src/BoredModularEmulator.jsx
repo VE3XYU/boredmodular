@@ -73,6 +73,69 @@ function getModuleHeight(type, params) {
   return HEADER_H + paramsH + customH + portsH;
 }
 
+// Magnetic distance for drop-snap. If a dropped module's bbox (inflated by
+// this margin on all sides) overlaps another module's bbox, the dropped
+// module snaps top-to-bottom adjacent to that neighbour. Far drops keep
+// their exact cursor position. Roughly the height of a single knob row, so
+// the user has to mean it.
+const SNAP_MARGIN = 22;
+
+function rectsOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
+  return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+}
+
+// Pick the best snap neighbour for a dropped module: the module whose bbox
+// is within SNAP_MARGIN of (or overlapping) the dropped bbox, tied by
+// smallest centre-to-centre distance. Returns null when nothing is in range.
+function findSnapNeighbour(dragged, others) {
+  const dcx = dragged.x + dragged.w / 2;
+  const dcy = dragged.y + dragged.h / 2;
+  let best = null;
+  let bestDist = Infinity;
+  for (const o of others) {
+    const ow = MODULE_WIDTH;
+    const oh = getModuleHeight(o.type, o.params);
+    const inflated = rectsOverlap(
+      dragged.x - SNAP_MARGIN, dragged.y - SNAP_MARGIN,
+      dragged.w + 2 * SNAP_MARGIN, dragged.h + 2 * SNAP_MARGIN,
+      o.x, o.y, ow, oh,
+    );
+    if (!inflated) continue;
+    const ocx = o.x + ow / 2;
+    const ocy = o.y + oh / 2;
+    const dist = Math.hypot(dcx - ocx, dcy - ocy);
+    if (dist < bestDist) {
+      best = { mod: o, w: ow, h: oh };
+      bestDist = dist;
+    }
+  }
+  return best;
+}
+
+// Snap the dropped module so its left edge aligns with the neighbour's, and
+// it sits directly above or below the neighbour (whichever side the drop
+// gravitated to).
+function snapTopToBottom(dragged, neighbour) {
+  const dcy = dragged.y + dragged.h / 2;
+  const ncy = neighbour.mod.y + neighbour.h / 2;
+  const goBelow = dcy >= ncy;
+  return {
+    x: neighbour.mod.x,
+    y: goBelow ? neighbour.mod.y + neighbour.h : neighbour.mod.y - dragged.h,
+  };
+}
+
+// Resolve a dropped module's final position. Returns the snapped (x, y) if a
+// neighbour is in magnetic range, otherwise null (caller keeps the raw drop
+// coordinates).
+function resolveDropSnap({ x, y, type, params, ignoreId, modules }) {
+  const h = getModuleHeight(type, params);
+  const others = modules.filter((m) => m.id !== ignoreId);
+  const neighbour = findSnapNeighbour({ x, y, w: MODULE_WIDTH, h }, others);
+  if (!neighbour) return null;
+  return snapTopToBottom({ x, y, w: MODULE_WIDTH, h }, neighbour);
+}
+
 // Keyboard note mapping: computer keys -> MIDI notes (relative to C4=60)
 const KEY_NOTE_MAP = {
   a: 60, w: 61, s: 62, e: 63, d: 64, f: 65, t: 66, g: 67, y: 68, h: 69, u: 70, j: 71, k: 72,
@@ -1051,7 +1114,11 @@ export default function BoredModularEmulator() {
         params[k] = { ...v };
       });
 
-      setModules((prev) => [...prev, { id, type, x, y, params }]);
+      setModules((prev) => {
+        const snapped = resolveDropSnap({ x, y, type, params, ignoreId: id, modules: prev });
+        const pos = snapped || { x, y };
+        return [...prev, { id, type, x: pos.x, y: pos.y, params }];
+      });
     },
     [initAudio]
   );
@@ -1342,10 +1409,27 @@ export default function BoredModularEmulator() {
   );
 
   const handleMouseUp = useCallback(() => {
+    if (dragging) {
+      const draggedId = dragging.id;
+      setModules((prev) => {
+        const drag = prev.find((m) => m.id === draggedId);
+        if (!drag) return prev;
+        const snapped = resolveDropSnap({
+          x: drag.x,
+          y: drag.y,
+          type: drag.type,
+          params: drag.params,
+          ignoreId: draggedId,
+          modules: prev,
+        });
+        if (!snapped) return prev;
+        return prev.map((m) => (m.id === draggedId ? { ...m, x: snapped.x, y: snapped.y } : m));
+      });
+    }
     setDragging(null);
     setCableDrag(null);
     setIsPanning(false);
-  }, []);
+  }, [dragging]);
 
   const handleSvgMouseDown = useCallback(
     (e) => {
