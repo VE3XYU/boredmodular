@@ -38,7 +38,20 @@ class AudioEngine {
 
   init() {
     if (this.ctx) return;
-    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const Ctor = window.AudioContext || window.webkitAudioContext;
+    this.ctx = new Ctor({ latencyHint: "interactive" });
+    if (this.ctx.state === "suspended") {
+      this.ctx.resume().catch(() => {});
+    }
+    if (typeof console !== "undefined" && console.info) {
+      console.info(
+        "[AudioEngine] state=%s sampleRate=%d baseLatency=%s outputLatency=%s",
+        this.ctx.state,
+        this.ctx.sampleRate,
+        this.ctx.baseLatency,
+        this.ctx.outputLatency,
+      );
+    }
     this.masterGain = this.ctx.createGain();
     this.masterGain.gain.value = 0.3;
     this.analyser = this.ctx.createAnalyser();
