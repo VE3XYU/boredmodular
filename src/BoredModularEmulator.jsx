@@ -170,7 +170,17 @@ function Scope({ engine }) {
   const animRef = useRef(null);
 
   useEffect(() => {
-    const draw = () => {
+    // ~30fps cap: shadowBlur on the waveform stroke is expensive, and 30fps
+    // is plenty for an oscilloscope readout. Halves per-frame canvas work.
+    const FRAME_MS = 33;
+    let lastPaint = 0;
+
+    const draw = (now) => {
+      animRef.current = requestAnimationFrame(draw);
+      if (document.hidden) return;
+      if (now - lastPaint < FRAME_MS) return;
+      lastPaint = now;
+
       const canvas = canvasRef.current;
       if (!canvas || !engine.current) return;
       const ctx = canvas.getContext("2d");
@@ -214,11 +224,15 @@ function Scope({ engine }) {
       }
       ctx.stroke();
       ctx.shadowBlur = 0;
-
-      animRef.current = requestAnimationFrame(draw);
     };
-    draw();
-    return () => cancelAnimationFrame(animRef.current);
+
+    const onVisible = () => { lastPaint = 0; };
+    document.addEventListener("visibilitychange", onVisible);
+    animRef.current = requestAnimationFrame(draw);
+    return () => {
+      cancelAnimationFrame(animRef.current);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [engine]);
 
   return <canvas ref={canvasRef} width={280} height={90} style={{ borderRadius: 4, border: "1px solid #1a2a1a" }} />;
