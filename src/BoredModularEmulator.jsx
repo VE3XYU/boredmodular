@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import AudioEngine from "./AudioEngine";
 import { MODULE_DEFS, CATEGORIES } from "./moduleDefs";
+import { EXAMPLE_PATCHES } from "./examplePatches";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -1556,6 +1557,40 @@ export default function BoredModularEmulator() {
               })}
             </div>
           ))}
+        </div>
+
+        {/* Examples */}
+        <div style={{ padding: "8px 10px", borderTop: "1px solid #222" }}>
+          <div style={{ fontSize: 16, color: "#555", textTransform: "uppercase", letterSpacing: 2, marginBottom: 6 }}>
+            Examples
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+            {EXAMPLE_PATCHES.map((ex) => (
+              <div
+                key={ex.key}
+                onClick={() => {
+                  loadPatchData(ex.patch);
+                  setPatchMsg(`Loaded ${ex.label}`);
+                  setTimeout(() => setPatchMsg(null), 1500);
+                }}
+                title={ex.description}
+                style={{
+                  padding: "5px 0",
+                  textAlign: "center",
+                  background: "#222",
+                  borderRadius: 3,
+                  cursor: "pointer",
+                  fontSize: 14,
+                  color: "#999",
+                  border: "1px solid #333",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "#2a2a2e"; e.currentTarget.style.color = "#ddd"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "#222"; e.currentTarget.style.color = "#999"; }}
+              >
+                {ex.label}
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Patches */}
