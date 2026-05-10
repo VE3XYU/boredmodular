@@ -73,6 +73,47 @@ function getModuleHeight(type, params) {
   return HEADER_H + paramsH + customH + portsH;
 }
 
+// Grid step for module placement. Matches the background grid pattern in the
+// canvas SVG so a snapped module sits aligned with the visible dots.
+const GRID = 40;
+const snapToGrid = (v) => Math.round(v / GRID) * GRID;
+
+function rectsOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
+  return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+}
+
+// Returns a snapped (x, y) near the target that doesn't overlap any other
+// module. Spirals outward in grid steps from the snapped target. Each module's
+// bounding box is its full width (MODULE_WIDTH) and height (getModuleHeight).
+function findFreeSnappedPosition({ targetX, targetY, width, height, ignoreId, modules }) {
+  const sx = snapToGrid(targetX);
+  const sy = snapToGrid(targetY);
+  const collides = (x, y) =>
+    modules.some((m) => {
+      if (m.id === ignoreId) return false;
+      const mw = MODULE_WIDTH;
+      const mh = getModuleHeight(m.type, m.params);
+      return rectsOverlap(x, y, width, height, m.x, m.y, mw, mh);
+    });
+  if (!collides(sx, sy)) return { x: sx, y: sy };
+  // Spiral search: each ring r tests only the boundary cells at Chebyshev
+  // distance r * GRID from the target. 20 rings covers ~800px in each axis.
+  for (let r = 1; r <= 20; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+        const cx = sx + dx * GRID;
+        const cy = sy + dy * GRID;
+        if (cx < 0 || cy < 0) continue;
+        if (!collides(cx, cy)) return { x: cx, y: cy };
+      }
+    }
+  }
+  // Last resort: stack at the snapped target. Should not be reachable in
+  // practice on a canvas this size.
+  return { x: sx, y: sy };
+}
+
 // Keyboard note mapping: computer keys -> MIDI notes (relative to C4=60)
 const KEY_NOTE_MAP = {
   a: 60, w: 61, s: 62, e: 63, d: 64, f: 65, t: 66, g: 67, y: 68, h: 69, u: 70, j: 71, k: 72,
@@ -1051,7 +1092,18 @@ export default function BoredModularEmulator() {
         params[k] = { ...v };
       });
 
-      setModules((prev) => [...prev, { id, type, x, y, params }]);
+      const height = getModuleHeight(type, params);
+      setModules((prev) => {
+        const pos = findFreeSnappedPosition({
+          targetX: x,
+          targetY: y,
+          width: MODULE_WIDTH,
+          height,
+          ignoreId: id,
+          modules: prev,
+        });
+        return [...prev, { id, type, x: pos.x, y: pos.y, params }];
+      });
     },
     [initAudio]
   );
@@ -1071,19 +1123,16 @@ export default function BoredModularEmulator() {
 
       const candidateX = 80 + Math.random() * 200 - panOffset.x;
       const candidateY = 80 + Math.random() * 150 - panOffset.y;
+      const height = getModuleHeight(type, params);
       setModules((prev) => {
-        const pos = { x: candidateX, y: candidateY };
-        let attempts = 0;
-        while (
-          attempts < 20 &&
-          prev.some(
-            (m) => Math.abs(m.x - pos.x) < MODULE_WIDTH + 20 && Math.abs(m.y - pos.y) < 120
-          )
-        ) {
-          pos.x += 25;
-          pos.y += 25;
-          attempts++;
-        }
+        const pos = findFreeSnappedPosition({
+          targetX: candidateX,
+          targetY: candidateY,
+          width: MODULE_WIDTH,
+          height,
+          ignoreId: id,
+          modules: prev,
+        });
         return [...prev, { id, type, x: pos.x, y: pos.y, params }];
       });
     },
@@ -1323,11 +1372,18 @@ export default function BoredModularEmulator() {
         setModules((prev) =>
           prev.map((m) => {
             if (m.id !== dragging.id) return m;
-            return {
-              ...m,
-              x: mx / 1 - panOffset.x - dragging.offsetX,
-              y: my / 1 - panOffset.y - dragging.offsetY,
-            };
+            const targetX = snapToGrid(mx - panOffset.x - dragging.offsetX);
+            const targetY = snapToGrid(my - panOffset.y - dragging.offsetY);
+            if (targetX === m.x && targetY === m.y) return m;
+            const height = getModuleHeight(m.type, m.params);
+            const collides = prev.some((other) => {
+              if (other.id === m.id) return false;
+              const ow = MODULE_WIDTH;
+              const oh = getModuleHeight(other.type, other.params);
+              return rectsOverlap(targetX, targetY, MODULE_WIDTH, height, other.x, other.y, ow, oh);
+            });
+            if (collides) return m;
+            return { ...m, x: targetX, y: targetY };
           })
         );
       }
