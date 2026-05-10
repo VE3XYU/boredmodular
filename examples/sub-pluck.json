@@ -1,0 +1,61 @@
+{
+  "modules": [
+    {
+      "id": "mod_1",
+      "type": "Keyboard",
+      "x": 60,
+      "y": 320,
+      "params": {}
+    },
+    {
+      "id": "mod_2",
+      "type": "OscA",
+      "x": 320,
+      "y": 60,
+      "params": {
+        "frequency": 220,
+        "waveform": "sawtooth",
+        "level": 0.7
+      }
+    },
+    {
+      "id": "mod_3",
+      "type": "Filter",
+      "x": 600,
+      "y": 100,
+      "params": {
+        "frequency": 1500,
+        "resonance": 3,
+        "filterType": "lowpass"
+      }
+    },
+    {
+      "id": "mod_4",
+      "type": "ADSREnv",
+      "x": 880,
+      "y": 100,
+      "params": {
+        "attack": 0.005,
+        "decay": 0.3,
+        "sustain": 0,
+        "release": 0.3
+      }
+    },
+    {
+      "id": "mod_5",
+      "type": "Output",
+      "x": 1140,
+      "y": 200,
+      "params": {
+        "level": 0.6
+      }
+    }
+  ],
+  "connections": [
+    { "fromId": "mod_1", "fromPort": "Note", "toId": "mod_2", "toPort": "PitchMod1", "color": "hsl(60, 70%, 55%)" },
+    { "fromId": "mod_2", "fromPort": "Out",  "toId": "mod_3", "toPort": "In",        "color": "hsl(180, 70%, 55%)" },
+    { "fromId": "mod_3", "fromPort": "Out",  "toId": "mod_4", "toPort": "In",        "color": "hsl(180, 70%, 55%)" },
+    { "fromId": "mod_1", "fromPort": "Gate", "toId": "mod_4", "toPort": "Gate",      "color": "hsl(40, 70%, 55%)" },
+    { "fromId": "mod_4", "fromPort": "Out",  "toId": "mod_5", "toPort": "InL",       "color": "hsl(330, 70%, 55%)" }
+  ]
+}

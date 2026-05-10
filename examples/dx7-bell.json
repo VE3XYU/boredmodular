@@ -1,0 +1,64 @@
+{
+  "modules": [
+    {
+      "id": "mod_1",
+      "type": "Keyboard",
+      "x": 60,
+      "y": 320,
+      "params": {}
+    },
+    {
+      "id": "mod_2",
+      "type": "OscB",
+      "x": 300,
+      "y": 60,
+      "params": {
+        "frequency": 440,
+        "coarse": 12,
+        "waveform": "sine",
+        "level": 1.0
+      }
+    },
+    {
+      "id": "mod_3",
+      "type": "OscSlvFM",
+      "x": 580,
+      "y": 200,
+      "params": {
+        "partials": 0.5,
+        "fine": 0,
+        "fmDepth": 500,
+        "level": 0.8
+      }
+    },
+    {
+      "id": "mod_4",
+      "type": "ADSREnv",
+      "x": 840,
+      "y": 200,
+      "params": {
+        "attack": 0.001,
+        "decay": 1.2,
+        "sustain": 0,
+        "release": 1.5
+      }
+    },
+    {
+      "id": "mod_5",
+      "type": "Output",
+      "x": 1100,
+      "y": 280,
+      "params": {
+        "level": 0.5
+      }
+    }
+  ],
+  "connections": [
+    { "fromId": "mod_1", "fromPort": "Note", "toId": "mod_2", "toPort": "PitchMod",  "color": "hsl(60, 70%, 55%)" },
+    { "fromId": "mod_2", "fromPort": "Slv",  "toId": "mod_3", "toPort": "Mst",       "color": "hsl(0, 70%, 55%)" },
+    { "fromId": "mod_2", "fromPort": "Out",  "toId": "mod_3", "toPort": "FMB",       "color": "hsl(280, 70%, 55%)" },
+    { "fromId": "mod_3", "fromPort": "Out",  "toId": "mod_4", "toPort": "In",        "color": "hsl(180, 70%, 55%)" },
+    { "fromId": "mod_1", "fromPort": "Gate", "toId": "mod_4", "toPort": "Gate",      "color": "hsl(40, 70%, 55%)" },
+    { "fromId": "mod_4", "fromPort": "Out",  "toId": "mod_5", "toPort": "InL",       "color": "hsl(330, 70%, 55%)" }
+  ]
+}
