@@ -854,34 +854,78 @@ function ModuleNode({
   );
 }
 
-function CableSVG({ x1, y1, x2, y2, color }) {
+function cablePathD(x1, y1, x2, y2) {
   const dx = x2 - x1;
   const dy = y2 - y1;
   const dist = Math.sqrt(dx * dx + dy * dy);
   const sag = Math.min(dist * 0.3, 80);
-  const midX = (x1 + x2) / 2;
-  const midY = (y1 + y2) / 2 + sag;
   const cp1x = x1 + dx * 0.25;
   const cp1y = y1 + dy * 0.25 + sag;
   const cp2x = x1 + dx * 0.75;
   const cp2y = y1 + dy * 0.75 + sag;
+  return `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;
+}
 
+function CableSVG({ x1, y1, x2, y2, color }) {
+  const d = cablePathD(x1, y1, x2, y2);
   return (
     <g>
       <path
-        d={`M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`}
+        d={d}
         stroke="rgba(0,0,0,0.5)"
         strokeWidth={5}
         fill="none"
         strokeLinecap="round"
       />
       <path
-        d={`M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`}
+        d={d}
         stroke={color || "#f55"}
         strokeWidth={3}
         fill="none"
         strokeLinecap="round"
         style={{ filter: `drop-shadow(0 0 3px ${color || "#f55"})` }}
+      />
+    </g>
+  );
+}
+
+// Drag-preview cable: refs onto the SVG paths and a RAF loop that reads the
+// shared mousePosRef directly. Skips React reconciliation per mousemove,
+// which would otherwise re-render the entire app while a cable is being dragged.
+function CableDragPreview({ cableDrag, mousePosRef, panOffset }) {
+  const backRef = useRef(null);
+  const frontRef = useRef(null);
+
+  useEffect(() => {
+    if (!cableDrag) return undefined;
+    let raf = 0;
+    const tick = () => {
+      const mp = mousePosRef.current;
+      const d = cablePathD(
+        cableDrag.startX,
+        cableDrag.startY,
+        mp.x - panOffset.x,
+        mp.y - panOffset.y,
+      );
+      if (backRef.current) backRef.current.setAttribute("d", d);
+      if (frontRef.current) frontRef.current.setAttribute("d", d);
+      raf = requestAnimationFrame(tick);
+    };
+    tick();
+    return () => cancelAnimationFrame(raf);
+  }, [cableDrag, mousePosRef, panOffset]);
+
+  if (!cableDrag) return null;
+  return (
+    <g pointerEvents="none">
+      <path ref={backRef} stroke="rgba(0,0,0,0.5)" strokeWidth={5} fill="none" strokeLinecap="round" />
+      <path
+        ref={frontRef}
+        stroke="#fff"
+        strokeWidth={3}
+        fill="none"
+        strokeLinecap="round"
+        style={{ filter: "drop-shadow(0 0 3px #fff)" }}
       />
     </g>
   );
@@ -896,7 +940,9 @@ export default function BoredModularEmulator() {
   const [connections, setConnections] = useState([]);
   const [dragging, setDragging] = useState(null);
   const [cableDrag, setCableDrag] = useState(null);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  // mousePos is read only by the cable drag preview, which now consumes it
+  // imperatively via RAF -- keep it as a ref so mousemove doesn't re-render.
+  const mousePosRef = useRef({ x: 0, y: 0 });
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const panStart = useRef({ x: 0, y: 0, ox: 0, oy: 0 });
@@ -1188,7 +1234,8 @@ export default function BoredModularEmulator() {
       const rect = svg.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
-      setMousePos({ x: mx, y: my });
+      mousePosRef.current.x = mx;
+      mousePosRef.current.y = my;
 
       if (dragging) {
         setModules((prev) =>
@@ -1559,11 +1606,8 @@ export default function BoredModularEmulator() {
           </g>
 
           {/* Dragging cable */}
-          {cableDrag && (
-            <g pointerEvents="none">
-              <CableSVG x1={cableDrag.startX} y1={cableDrag.startY} x2={mousePos.x - panOffset.x} y2={mousePos.y - panOffset.y} color="#fff" />
-            </g>
-          )}
+          <CableDragPreview cableDrag={cableDrag} mousePosRef={mousePosRef} panOffset={panOffset} />
+
 
           {/* Port hit overlay — rendered last so ports are always interactive on top of cables */}
           {modules.map((m) => {
