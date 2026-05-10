@@ -4,7 +4,7 @@
       "id": "mod_1",
       "type": "Keyboard",
       "x": 60,
-      "y": 360,
+      "y": 380,
       "params": {}
     },
     {
@@ -21,8 +21,8 @@
     {
       "id": "mod_3",
       "type": "OscSlvA",
-      "x": 300,
-      "y": 220,
+      "x": 580,
+      "y": 20,
       "params": {
         "partials": 1,
         "fine": -7,
@@ -32,8 +32,8 @@
     {
       "id": "mod_4",
       "type": "OscSlvA",
-      "x": 300,
-      "y": 420,
+      "x": 860,
+      "y": 20,
       "params": {
         "partials": 2,
         "fine": 5,
@@ -43,8 +43,8 @@
     {
       "id": "mod_5",
       "type": "Mixer8",
-      "x": 580,
-      "y": 200,
+      "x": 300,
+      "y": 360,
       "params": {
         "level1": 0.6,
         "level2": 0.6,
@@ -54,8 +54,8 @@
     {
       "id": "mod_6",
       "type": "FilterE",
-      "x": 820,
-      "y": 200,
+      "x": 580,
+      "y": 360,
       "params": {
         "frequency": 1400,
         "resonance": 6,
@@ -66,8 +66,8 @@
     {
       "id": "mod_7",
       "type": "ADSREnv",
-      "x": 1060,
-      "y": 200,
+      "x": 860,
+      "y": 360,
       "params": {
         "attack": 0.01,
         "decay": 0.4,
@@ -78,8 +78,8 @@
     {
       "id": "mod_8",
       "type": "Output",
-      "x": 1300,
-      "y": 280,
+      "x": 1140,
+      "y": 380,
       "params": {
         "level": 0.45
       }
