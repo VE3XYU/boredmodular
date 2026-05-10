@@ -76,8 +76,9 @@ function getModuleHeight(type, params) {
 // Magnetic distance for drop-snap. If a dropped module's bbox (inflated by
 // this margin on all sides) overlaps another module's bbox, the dropped
 // module snaps top-to-bottom adjacent to that neighbour. Far drops keep
-// their exact cursor position.
-const SNAP_MARGIN = 40;
+// their exact cursor position. Roughly the height of a single knob row, so
+// the user has to mean it.
+const SNAP_MARGIN = 20;
 
 function rectsOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
   return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
