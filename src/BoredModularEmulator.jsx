@@ -80,6 +80,11 @@ function getModuleHeight(type, params) {
 // the user has to mean it.
 const SNAP_MARGIN = 22;
 
+// Snap will never shove a module sideways by more than this. Roughly one
+// centimetre at 96 DPI, so a misaligned column to either side does not
+// yank the dropped module to a column it was clearly not aiming at.
+const MAX_SNAP_X_SHIFT = 40;
+
 function rectsOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
   return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
 }
@@ -129,6 +134,7 @@ function resolveDropSnap({ x, y, type, params, ignoreId, modules }) {
 
   if (above && below) {
     const snapX = above.mod.x;
+    if (Math.abs(snapX - x) > MAX_SNAP_X_SHIFT) return null;
     const snapY = above.mod.y + above.h;
     const cBottom = snapY + h;
     const delta = Math.max(0, cBottom - below.mod.y);
@@ -146,9 +152,11 @@ function resolveDropSnap({ x, y, type, params, ignoreId, modules }) {
   }
 
   if (above) {
+    if (Math.abs(above.mod.x - x) > MAX_SNAP_X_SHIFT) return null;
     return { x: above.mod.x, y: above.mod.y + above.h, pushDown: null };
   }
   // below only
+  if (Math.abs(below.mod.x - x) > MAX_SNAP_X_SHIFT) return null;
   return { x: below.mod.x, y: below.mod.y - h, pushDown: null };
 }
 
