@@ -80,60 +80,97 @@ function getModuleHeight(type, params) {
 // the user has to mean it.
 const SNAP_MARGIN = 22;
 
+// Snap will never shove a module sideways by more than this. Roughly one
+// centimetre at 96 DPI, so a misaligned column to either side does not
+// yank the dropped module to a column it was clearly not aiming at.
+const MAX_SNAP_X_SHIFT = 40;
+
 function rectsOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
   return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
 }
 
-// Pick the best snap neighbour for a dropped module: the module whose bbox
-// is within SNAP_MARGIN of (or overlapping) the dropped bbox, tied by
-// smallest centre-to-centre distance. Returns null when nothing is in range.
-function findSnapNeighbour(dragged, others) {
-  const dcx = dragged.x + dragged.w / 2;
+// Find the nearest above-neighbour and nearest below-neighbour for a dropped
+// module: column-aligned modules (their bbox sits within SNAP_MARGIN of the
+// dropped bbox after inflation) split by whether their centre.y is above or
+// below the dropped centre.y. Either side may be null.
+function findColumnNeighbours(dragged, others) {
+  const ix = dragged.x - SNAP_MARGIN;
+  const iy = dragged.y - SNAP_MARGIN;
+  const iw = dragged.w + 2 * SNAP_MARGIN;
+  const ih = dragged.h + 2 * SNAP_MARGIN;
   const dcy = dragged.y + dragged.h / 2;
-  let best = null;
-  let bestDist = Infinity;
+  let above = null;
+  let below = null;
+  let aboveDist = Infinity;
+  let belowDist = Infinity;
   for (const o of others) {
     const ow = MODULE_WIDTH;
     const oh = getModuleHeight(o.type, o.params);
-    const inflated = rectsOverlap(
-      dragged.x - SNAP_MARGIN, dragged.y - SNAP_MARGIN,
-      dragged.w + 2 * SNAP_MARGIN, dragged.h + 2 * SNAP_MARGIN,
-      o.x, o.y, ow, oh,
-    );
-    if (!inflated) continue;
-    const ocx = o.x + ow / 2;
+    if (!rectsOverlap(ix, iy, iw, ih, o.x, o.y, ow, oh)) continue;
     const ocy = o.y + oh / 2;
-    const dist = Math.hypot(dcx - ocx, dcy - ocy);
-    if (dist < bestDist) {
-      best = { mod: o, w: ow, h: oh };
-      bestDist = dist;
+    if (ocy < dcy) {
+      const d = dcy - ocy;
+      if (d < aboveDist) { above = { mod: o, h: oh }; aboveDist = d; }
+    } else {
+      const d = ocy - dcy;
+      if (d < belowDist) { below = { mod: o, h: oh }; belowDist = d; }
     }
   }
-  return best;
-}
-
-// Snap the dropped module so its left edge aligns with the neighbour's, and
-// it sits directly above or below the neighbour (whichever side the drop
-// gravitated to).
-function snapTopToBottom(dragged, neighbour) {
-  const dcy = dragged.y + dragged.h / 2;
-  const ncy = neighbour.mod.y + neighbour.h / 2;
-  const goBelow = dcy >= ncy;
-  return {
-    x: neighbour.mod.x,
-    y: goBelow ? neighbour.mod.y + neighbour.h : neighbour.mod.y - dragged.h,
-  };
+  return { above, below };
 }
 
 // Resolve a dropped module's final position. Returns the snapped (x, y) if a
 // neighbour is in magnetic range, otherwise null (caller keeps the raw drop
-// coordinates).
+// coordinates). When both above and below neighbours exist (the sandwich
+// case), the dropped module's top aligns with the above's bottom, and any
+// modules in the same column at or below the below-neighbour are pushed
+// downward by whatever is needed so the sandwich is exact -- their ids and
+// the shared delta are returned in `pushDown`.
 function resolveDropSnap({ x, y, type, params, ignoreId, modules }) {
   const h = getModuleHeight(type, params);
   const others = modules.filter((m) => m.id !== ignoreId);
-  const neighbour = findSnapNeighbour({ x, y, w: MODULE_WIDTH, h }, others);
-  if (!neighbour) return null;
-  return snapTopToBottom({ x, y, w: MODULE_WIDTH, h }, neighbour);
+  const { above, below } = findColumnNeighbours({ x, y, w: MODULE_WIDTH, h }, others);
+  if (!above && !below) return null;
+
+  if (above && below) {
+    const snapX = above.mod.x;
+    if (Math.abs(snapX - x) > MAX_SNAP_X_SHIFT) return null;
+    const snapY = above.mod.y + above.h;
+    const cBottom = snapY + h;
+    const delta = Math.max(0, cBottom - below.mod.y);
+    let pushDown = null;
+    if (delta > 0) {
+      const ix = x - SNAP_MARGIN;
+      const iw = MODULE_WIDTH + 2 * SNAP_MARGIN;
+      const inColumn = (o) => ix < o.x + MODULE_WIDTH && ix + iw > o.x;
+      const ids = others
+        .filter((o) => inColumn(o) && o.y >= below.mod.y)
+        .map((o) => o.id);
+      if (ids.length) pushDown = { ids, deltaY: delta };
+    }
+    return { x: snapX, y: snapY, pushDown };
+  }
+
+  if (above) {
+    if (Math.abs(above.mod.x - x) > MAX_SNAP_X_SHIFT) return null;
+    return { x: above.mod.x, y: above.mod.y + above.h, pushDown: null };
+  }
+  // below only
+  if (Math.abs(below.mod.x - x) > MAX_SNAP_X_SHIFT) return null;
+  return { x: below.mod.x, y: below.mod.y - h, pushDown: null };
+}
+
+// Apply a resolved drop-snap to the module list: move the dragged module to
+// the snapped position and, if a pushDown was returned, shift every pushed
+// module down by the shared delta.
+function applyDropSnap(modules, draggedId, snapped) {
+  const pushIds = snapped.pushDown ? new Set(snapped.pushDown.ids) : null;
+  const delta = snapped.pushDown ? snapped.pushDown.deltaY : 0;
+  return modules.map((m) => {
+    if (m.id === draggedId) return { ...m, x: snapped.x, y: snapped.y };
+    if (pushIds && pushIds.has(m.id)) return { ...m, y: m.y + delta };
+    return m;
+  });
 }
 
 // Keyboard note mapping: computer keys -> MIDI notes (relative to C4=60)
@@ -1117,7 +1154,13 @@ export default function BoredModularEmulator() {
       setModules((prev) => {
         const snapped = resolveDropSnap({ x, y, type, params, ignoreId: id, modules: prev });
         const pos = snapped || { x, y };
-        return [...prev, { id, type, x: pos.x, y: pos.y, params }];
+        let next = prev;
+        if (snapped && snapped.pushDown) {
+          const pushIds = new Set(snapped.pushDown.ids);
+          const delta = snapped.pushDown.deltaY;
+          next = prev.map((m) => (pushIds.has(m.id) ? { ...m, y: m.y + delta } : m));
+        }
+        return [...next, { id, type, x: pos.x, y: pos.y, params }];
       });
     },
     [initAudio]
@@ -1423,7 +1466,7 @@ export default function BoredModularEmulator() {
           modules: prev,
         });
         if (!snapped) return prev;
-        return prev.map((m) => (m.id === draggedId ? { ...m, x: snapped.x, y: snapped.y } : m));
+        return applyDropSnap(prev, draggedId, snapped);
       });
     }
     setDragging(null);
