@@ -2189,6 +2189,70 @@ class AudioEngine {
     }
   }
 
+  // Returns a serialisable snapshot of a module's user-mutated runtime state
+  // (the state that lives on the engine object, not in React params). Returns
+  // null when the module has no such state. Arrays are shallow-cloned so the
+  // caller can't mutate the live module.
+  extractInternalState(mod) {
+    if (!mod) return null;
+    switch (mod.type) {
+      case "EventSeq":
+        return { triggers1: [...mod._triggers1], triggers2: [...mod._triggers2] };
+      case "CtrlSeq":
+        return { values: [...mod._values] };
+      case "NoteSeqA":
+      case "NoteSeqB":
+        return { pitchValues: [...mod._pitchValues], gatePattern: [...mod._gatePattern] };
+      default:
+        return null;
+    }
+  }
+
+  // Applies a saved internal-state snapshot to a live module. In-place writes
+  // preserve the live array length so future step-count changes load cleanly
+  // in either direction. Defensive against null / malformed input.
+  restoreInternalState(mod, state) {
+    if (!mod || !state || typeof state !== "object") return;
+    const writeBoolArray = (target, source) => {
+      if (!Array.isArray(target) || !Array.isArray(source)) return;
+      const n = Math.min(target.length, source.length);
+      for (let i = 0; i < n; i++) target[i] = Boolean(source[i]);
+    };
+    const writeMidiArray = (target, source) => {
+      if (!Array.isArray(target) || !Array.isArray(source)) return;
+      const n = Math.min(target.length, source.length);
+      for (let i = 0; i < n; i++) {
+        const raw = Number(source[i]);
+        const v = Number.isFinite(raw) ? Math.round(raw) : 60;
+        target[i] = Math.max(0, Math.min(127, v));
+      }
+    };
+    const writeNumberArray = (target, source) => {
+      if (!Array.isArray(target) || !Array.isArray(source)) return;
+      const n = Math.min(target.length, source.length);
+      for (let i = 0; i < n; i++) {
+        const raw = Number(source[i]);
+        target[i] = Number.isFinite(raw) ? raw : 0;
+      }
+    };
+    switch (mod.type) {
+      case "EventSeq":
+        writeBoolArray(mod._triggers1, state.triggers1);
+        writeBoolArray(mod._triggers2, state.triggers2);
+        break;
+      case "CtrlSeq":
+        writeNumberArray(mod._values, state.values);
+        break;
+      case "NoteSeqA":
+      case "NoteSeqB":
+        writeMidiArray(mod._pitchValues, state.pitchValues);
+        writeBoolArray(mod._gatePattern, state.gatePattern);
+        break;
+      default:
+        break;
+    }
+  }
+
   triggerEnvelopes() {
     this.modules.forEach((mod) => {
       if (mod.trigger) mod.trigger();
