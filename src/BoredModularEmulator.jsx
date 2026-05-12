@@ -1265,18 +1265,39 @@ export default function BoredModularEmulator() {
       patch.connections.forEach((c) => {
         engineRef.current.connect(c.fromId, c.fromPort, c.toId, c.toPort);
       });
+      // Restore per-module internal state (sequencer steps, etc.) after
+      // connections are in place. resetSeq() neutralises any ClkGen tick that
+      // may have advanced _currentStep during the awaited createModule loop.
+      for (const m of patch.modules) {
+        if (!m.internalState) continue;
+        const audioMod = engineRef.current.modules.get(m.id);
+        engineRef.current.restoreInternalState(audioMod, m.internalState);
+        if (audioMod && typeof audioMod.resetSeq === "function") audioMod.resetSeq();
+      }
       setModules(rebuilt);
       setConnections(patch.connections);
     },
     [modules, initAudio]
   );
 
+  const buildPatch = useCallback(() => {
+    const engine = engineRef.current;
+    return {
+      modules: modules.map((m) => {
+        const audioMod = engine ? engine.modules.get(m.id) : null;
+        const internalState = engine ? engine.extractInternalState(audioMod) : null;
+        return internalState ? { ...m, internalState } : { ...m };
+      }),
+      connections,
+    };
+  }, [modules, connections]);
+
   const savePatch = useCallback(() => {
-    const patch = JSON.stringify({ modules, connections });
+    const patch = JSON.stringify(buildPatch());
     localStorage.setItem("bored-patch-1", patch);
     setPatchMsg("Saved!");
     setTimeout(() => setPatchMsg(null), 1500);
-  }, [modules, connections]);
+  }, [buildPatch]);
 
   const loadPatch = useCallback(() => {
     const raw = localStorage.getItem("bored-patch-1");
@@ -1295,14 +1316,14 @@ export default function BoredModularEmulator() {
   }, [loadPatchData]);
 
   const exportPatch = useCallback(() => {
-    const blob = new Blob([JSON.stringify({ modules, connections }, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(buildPatch(), null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = "bored-patch.json";
     a.click();
     URL.revokeObjectURL(url);
-  }, [modules, connections]);
+  }, [buildPatch]);
 
   const importPatch = useCallback(
     (e) => {
