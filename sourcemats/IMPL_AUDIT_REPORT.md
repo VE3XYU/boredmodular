@@ -175,7 +175,7 @@ The spec's `Amplifier` (§6.13) is a fixed-gain attenuation module with no modul
 - **Impl total:** 39 modules across 6 categories (`src/moduleDefs.js`).
 - **Audited so far:** 3 (`Amplifier`, `ClkGen`, `RandomGen`).
 - **Spec-only modules (coverage gaps, ~70):** every spec module without an impl counterpart. Includes the entire Logic group (§9), most of Audio Modifier (§7) and Control Modifier (§8), the LFO/random slave-class modules (`LFOSlvA-E`, `RndStepGen`, `ClkRndGen`, `RndPulsGen`, `PatternGen`), and many partial group entries. Coverage closure is deferred to a separate plan.
-- **Impl-only modules:** notable impl-only entries surface as audit batches reach them. Currently identified: `Mixer2` (impl 2-input mixer; spec has §6.1 3-input and §6.2 8-input — Mixer2 is impl-only relative to §6.1).
+- **Impl-only modules:** notable impl-only entries surface as audit batches reach them. None currently identified — the former `Mixer2` (impl-only 2-input mixer) was reshaped to match spec §6.1 and now ships as `Mixer3`; legacy `"type": "Mixer2"` payloads still load via an alias in `AudioEngine.createModule`.
 
 Names and shapes diverging between impl and spec where audited:
 - impl `Amplifier` is a hybrid: name from spec §6.13 Amplifier, function from spec §6.3 GainControl. See per-module audit above.

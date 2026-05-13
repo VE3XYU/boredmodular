@@ -72,7 +72,7 @@ For module fidelity work — auditing existing modules against the spec corpus, 
 - **Oscillators** (14): `OscA`, `OscB`, `OscC`, `MasterOsc`, `OscSlvA`–`OscSlvE`, `OscSlvFM`, `OscSineBank`, `Noise`, `DrumSynth`, `FormantOsc`
 - **Filters** (3): `Filter`, `FilterC` (3-output LP/BP/HP), `FilterE` (12/24 dB slope)
 - **Modulators** (11): `Envelope`, `ADSREnv`, `LFO`, `LFOA`, `ClkGen`, `RandomGen`, `PortamentoA`, `EventSeq`, `CtrlSeq`, `NoteSeqA`, `NoteSeqB`
-- **Level** (5): `Amplifier`, `Mixer2`, `Mixer8`, `XFade`, `Panner`
+- **Level** (5): `Amplifier`, `Mixer3`, `Mixer8`, `XFade`, `Panner`
 - **Effects** (4): `Delay`, `ShortDelay` (flanger), `Chorus`, `Shaper`
 - **I/O** (2): `Keyboard` (playable), `Output`
 
