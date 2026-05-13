@@ -42,7 +42,7 @@
     },
     {
       "id": "mod_5",
-      "type": "Mixer8",
+      "type": "Mixer3",
       "x": 300,
       "y": 360,
       "params": {
