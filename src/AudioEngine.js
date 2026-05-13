@@ -87,7 +87,8 @@ class AudioEngine {
       case "RandomGen": mod = this._createRandomGen(id); break;
       case "PortamentoA": mod = this._createPortamentoA(id); break;
       case "Amplifier": mod = this._createAmplifier(id); break;
-      case "Mixer2": mod = this._createMixer2(id); break;
+      case "Mixer2": // legacy alias — load patches saved before Mixer3 rename
+      case "Mixer3": mod = this._createMixer3(id); break;
       case "Mixer8": mod = this._createMixer8(id); break;
       case "XFade": mod = this._createXFade(id); break;
       case "Noise": mod = this._createNoise(id); break;
@@ -1472,22 +1473,26 @@ class AudioEngine {
     };
   }
 
-  _createMixer2(id) {
+  _createMixer3(id) {
     const gain1 = this.ctx.createGain();
     const gain2 = this.ctx.createGain();
+    const gain3 = this.ctx.createGain();
     const merger = this.ctx.createGain();
     gain1.gain.value = 0.5;
     gain2.gain.value = 0.5;
+    gain3.gain.value = 0.5;
     gain1.connect(merger);
     gain2.connect(merger);
+    gain3.connect(merger);
     return {
-      id, type: "Mixer2", node: merger, outputNode: merger,
+      id, type: "Mixer3", node: merger, outputNode: merger,
       outputs: { Out: merger },
-      inputs: { In1: gain1, In2: gain2 },
-      _nodes: [gain1, gain2, merger],
+      inputs: { In1: gain1, In2: gain2, In3: gain3 },
+      _nodes: [gain1, gain2, gain3, merger],
       params: {
         level1: { value: 0.5, min: 0, max: 1, audioParam: gain1.gain, label: "Lvl 1" },
         level2: { value: 0.5, min: 0, max: 1, audioParam: gain2.gain, label: "Lvl 2" },
+        level3: { value: 0.5, min: 0, max: 1, audioParam: gain3.gain, label: "Lvl 3" },
       },
     };
   }

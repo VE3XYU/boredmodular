@@ -289,14 +289,14 @@ const MODULE_DEFS = {
     modInputs: ["GainMod"],
     description: "Voltage controlled amplifier",
   },
-  Mixer2: {
-    label: "Mix2",
+  Mixer3: {
+    label: "Mix3",
     category: "level",
     color: "#669",
-    inputs: ["In1", "In2"],
+    inputs: ["In1", "In2", "In3"],
     outputs: ["Out"],
     modInputs: [],
-    description: "2-channel mixer",
+    description: "3-channel mixer",
   },
   Mixer8: {
     label: "Mix8",
@@ -388,7 +388,7 @@ const CATEGORIES = [
   { key: "oscillator", label: "Oscillators", modules: ["MasterOsc", "OscA", "OscB", "OscC", "SpectralOsc", "FormantOsc", "OscSlvA", "OscSlvB", "OscSlvC", "OscSlvD", "OscSlvE", "OscSineBank", "OscSlvFM", "Noise", "PercOsc", "DrumSynth"] },
   { key: "filter", label: "Filters", modules: ["Filter", "FilterC", "FilterE"] },
   { key: "modulator", label: "Modulators", modules: ["Envelope", "ADSREnv", "LFO", "LFOA", "ClkGen", "RandomGen", "PortamentoA", "EventSeq", "CtrlSeq", "NoteSeqA", "NoteSeqB"] },
-  { key: "level", label: "Level", modules: ["Amplifier", "Mixer2", "Mixer8", "XFade", "Panner"] },
+  { key: "level", label: "Level", modules: ["Amplifier", "Mixer3", "Mixer8", "XFade", "Panner"] },
   { key: "effect", label: "Effects", modules: ["Delay", "ShortDelay", "Chorus", "Shaper"] },
   { key: "io", label: "I/O", modules: ["Keyboard", "Output"] },
 ];

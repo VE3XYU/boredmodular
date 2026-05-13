@@ -1244,7 +1244,10 @@ export default function BoredModularEmulator() {
       // ({freq: 220}) or as full objects ({freq: {value: 220, ...}}); both work.
       const rebuilt = [];
       for (const m of patch.modules) {
-        const audioMod = await engineRef.current.createModule(m.id, m.type);
+        // Legacy alias: pre-rename patches store "Mixer2" — canonicalise to "Mixer3"
+        // so both the engine and the renderer (which keys MODULE_DEFS by type) agree.
+        const type = m.type === "Mixer2" ? "Mixer3" : m.type;
+        const audioMod = await engineRef.current.createModule(m.id, type);
         const params = {};
         if (audioMod) {
           Object.entries(audioMod.params).forEach(([k, v]) => {
@@ -1256,7 +1259,7 @@ export default function BoredModularEmulator() {
           if (params[k]) params[k].value = value;
           engineRef.current.setParam(m.id, k, value);
         });
-        rebuilt.push({ id: m.id, type: m.type, x: m.x, y: m.y, params });
+        rebuilt.push({ id: m.id, type, x: m.x, y: m.y, params });
       }
       // Update _idCounter
       const maxId = Math.max(...patch.modules.map((m) => parseInt(m.id.split("_")[1]) || 0), 0);
