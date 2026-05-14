@@ -67,12 +67,12 @@ Each module is defined in **both** `moduleDefs.js` (UI metadata: label, color, c
 
 For module fidelity work — auditing existing modules against the spec corpus, classifying divergences, applying fixes, recording dispositions — see `sourcemats/MODULE_PLAYBOOK.md`. It carries the audit methodology, the divergence rationale rule (when `keep-as-divergence` is justified vs. when the divergence is a defect to fix or defer), batch sizing guidance, patch-load safety rules, and the per-batch retrospective log. The playbook references CLAUDE.md back for the module-system mechanics this section covers.
 
-### Modules (39 total, by category)
+### Modules (40 total, by category)
 
 - **Oscillators** (14): `OscA`, `OscB`, `OscC`, `MasterOsc`, `OscSlvA`–`OscSlvE`, `OscSlvFM`, `OscSineBank`, `Noise`, `DrumSynth`, `FormantOsc`
 - **Filters** (3): `Filter`, `FilterC` (3-output LP/BP/HP), `FilterE` (12/24 dB slope)
 - **Modulators** (11): `Envelope`, `ADSREnv`, `LFO`, `LFOA`, `ClkGen`, `RandomGen`, `PortamentoA`, `EventSeq`, `CtrlSeq`, `NoteSeqA`, `NoteSeqB`
-- **Level** (5): `Amplifier`, `Mixer3`, `Mixer8`, `XFade`, `Panner`
+- **Level** (6): `Amplifier` (fixed-gain), `GainControl` (VCA), `Mixer3`, `Mixer8`, `XFade`, `Panner`
 - **Effects** (4): `Delay`, `ShortDelay` (flanger), `Chorus`, `Shaper`
 - **I/O** (2): `Keyboard` (playable), `Output`
 

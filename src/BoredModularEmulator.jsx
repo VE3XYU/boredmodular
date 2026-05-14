@@ -1239,6 +1239,21 @@ export default function BoredModularEmulator() {
       // Clear existing
       modules.forEach((m) => engineRef.current.removeModule(m.id));
       initAudio();
+
+      // Legacy Amplifier migration: the pre-split impl was a VCA with a GainMod
+      // mod input. If a saved Amplifier still has a GainMod connection, retype
+      // it to the new GainControl (carrying the saved level value forward).
+      // Without any GainMod connection, it stays as the new fixed-gain Amplifier
+      // and its saved level is clamped into the new [0.25, 4.0] range.
+      const amplifierRetypes = new Map();
+      patch.modules.forEach((m) => {
+        if (m.type !== "Amplifier") return;
+        const hasGainMod = (patch.connections || []).some(
+          (c) => c.toId === m.id && c.toPort === "GainMod"
+        );
+        if (hasGainMod) amplifierRetypes.set(m.id, "GainControl");
+      });
+
       // Rebuild modules — start from the engine's param shape (with min/max/etc),
       // overlay the patch's values. Patches may store params as raw values
       // ({freq: 220}) or as full objects ({freq: {value: 220, ...}}); both work.
@@ -1246,7 +1261,8 @@ export default function BoredModularEmulator() {
       for (const m of patch.modules) {
         // Legacy alias: pre-rename patches store "Mixer2" — canonicalise to "Mixer3"
         // so both the engine and the renderer (which keys MODULE_DEFS by type) agree.
-        const type = m.type === "Mixer2" ? "Mixer3" : m.type;
+        let type = m.type === "Mixer2" ? "Mixer3" : m.type;
+        if (amplifierRetypes.has(m.id)) type = amplifierRetypes.get(m.id);
         const audioMod = await engineRef.current.createModule(m.id, type);
         const params = {};
         if (audioMod) {
@@ -1255,7 +1271,11 @@ export default function BoredModularEmulator() {
           });
         }
         Object.entries(m.params || {}).forEach(([k, v]) => {
-          const value = v && typeof v === "object" && "value" in v ? v.value : v;
+          let value = v && typeof v === "object" && "value" in v ? v.value : v;
+          // Amplifier kept as fixed-gain: clamp pre-split level values into [0.25, 4.0].
+          if (m.type === "Amplifier" && type === "Amplifier" && k === "level") {
+            value = Math.max(0.25, value);
+          }
           if (params[k]) params[k].value = value;
           engineRef.current.setParam(m.id, k, value);
         });
@@ -1264,8 +1284,15 @@ export default function BoredModularEmulator() {
       // Update _idCounter
       const maxId = Math.max(...patch.modules.map((m) => parseInt(m.id.split("_")[1]) || 0), 0);
       if (maxId >= _idCounter) _idCounter = maxId;
-      // Reconnect
-      patch.connections.forEach((c) => {
+      // Reconnect — for Amplifier→GainControl retypes, rename GainMod port to Ctrl
+      // so both engine connections and rendered cables target the new module shape.
+      const migratedConnections = (patch.connections || []).map((c) => {
+        if (amplifierRetypes.has(c.toId) && c.toPort === "GainMod") {
+          return { ...c, toPort: "Ctrl" };
+        }
+        return c;
+      });
+      migratedConnections.forEach((c) => {
         engineRef.current.connect(c.fromId, c.fromPort, c.toId, c.toPort);
       });
       // Restore per-module internal state (sequencer steps, etc.) after
@@ -1278,7 +1305,7 @@ export default function BoredModularEmulator() {
         if (audioMod && typeof audioMod.resetSeq === "function") audioMod.resetSeq();
       }
       setModules(rebuilt);
-      setConnections(patch.connections);
+      setConnections(migratedConnections);
     },
     [modules, initAudio]
   );
