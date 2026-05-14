@@ -87,6 +87,7 @@ class AudioEngine {
       case "RandomGen": mod = this._createRandomGen(id); break;
       case "PortamentoA": mod = this._createPortamentoA(id); break;
       case "Amplifier": mod = this._createAmplifier(id); break;
+      case "GainControl": mod = this._createGainControl(id); break;
       case "Mixer2": // legacy alias — load patches saved before Mixer3 rename
       case "Mixer3": mod = this._createMixer3(id); break;
       case "Mixer8": mod = this._createMixer8(id); break;
@@ -1465,10 +1466,58 @@ class AudioEngine {
     return {
       id, type: "Amplifier", node: gain, outputNode: gain,
       outputs: { Out: gain },
-      inputs: { In: gain, GainMod: gain.gain },
+      inputs: { In: gain },
       _nodes: [gain],
       params: {
-        level: { value: 0.8, min: 0, max: 4, audioParam: gain.gain, label: "Level" },
+        level: { value: 0.8, min: 0.25, max: 4, audioParam: gain.gain, label: "Amplification" },
+      },
+    };
+  }
+
+  _createGainControl(id) {
+    // Spec §6.3 GainControl (VCA). Ctrl modulates gainNode.gain around a baseline level.
+    // Unipolar toggle switches between ring-mod (bipolar Ctrl) and AM (unipolar Ctrl).
+    const gainNode = this.ctx.createGain();
+    gainNode.gain.value = 0.8;
+
+    const ctrlIn = this.ctx.createGain();
+    ctrlIn.gain.value = 1;
+
+    // Bipolar path: ctrlIn → bipolarGate → gainNode.gain
+    const bipolarGate = this.ctx.createGain();
+    bipolarGate.gain.value = 1;
+    ctrlIn.connect(bipolarGate);
+    bipolarGate.connect(gainNode.gain);
+
+    // Unipolar half path: ctrlIn → unipolarHalf (×0.5) → uniGate → gainNode.gain
+    const unipolarHalf = this.ctx.createGain();
+    unipolarHalf.gain.value = 0.5;
+    const uniGate = this.ctx.createGain();
+    uniGate.gain.value = 0;
+    ctrlIn.connect(unipolarHalf);
+    unipolarHalf.connect(uniGate);
+    uniGate.connect(gainNode.gain);
+
+    // Unipolar +0.5 bias: constant source through biasGate to gainNode.gain
+    const biasSrc = this.ctx.createConstantSource();
+    biasSrc.offset.value = 0.5;
+    const biasGate = this.ctx.createGain();
+    biasGate.gain.value = 0;
+    biasSrc.connect(biasGate);
+    biasGate.connect(gainNode.gain);
+    biasSrc.start();
+
+    return {
+      id, type: "GainControl", node: gainNode, outputNode: gainNode,
+      outputs: { Out: gainNode },
+      inputs: { In: gainNode, Ctrl: ctrlIn },
+      _nodes: [gainNode, ctrlIn, bipolarGate, unipolarHalf, uniGate, biasSrc, biasGate],
+      _bipolarGate: bipolarGate,
+      _uniGate: uniGate,
+      _biasGate: biasGate,
+      params: {
+        level: { value: 0.8, min: 0, max: 4, audioParam: gainNode.gain, label: "Level" },
+        unipolar: { value: "off", options: ["off", "on"], label: "Uni" },
       },
     };
   }
@@ -2017,6 +2066,21 @@ class AudioEngine {
     if (mod.type === "XFade" && paramName === "fade") {
       mod._gainA.gain.setValueAtTime(1 - value, this.ctx.currentTime);
       mod._gainB.gain.setValueAtTime(value, this.ctx.currentTime);
+    }
+    // GainControl: unipolar toggle flips bipolar/unipolar routing gates.
+    // Bias source is a ConstantSource(0.5); biasGate passes it through unchanged
+    // when on (gain=1) for the spec "+32 bias" (normalized to +0.5).
+    if (mod.type === "GainControl" && paramName === "unipolar") {
+      const now = this.ctx.currentTime;
+      if (value === "on") {
+        mod._bipolarGate.gain.setValueAtTime(0, now);
+        mod._uniGate.gain.setValueAtTime(1, now);
+        mod._biasGate.gain.setValueAtTime(1, now);
+      } else {
+        mod._bipolarGate.gain.setValueAtTime(1, now);
+        mod._uniGate.gain.setValueAtTime(0, now);
+        mod._biasGate.gain.setValueAtTime(0, now);
+      }
     }
     // Shaper: regenerate curve
     if (mod.type === "Shaper" && (paramName === "shape" || paramName === "drive")) {

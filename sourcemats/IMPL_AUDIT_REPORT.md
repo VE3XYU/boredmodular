@@ -2,7 +2,7 @@
 
 A growing record of how the implementation in `src/` compares to the spec corpus, audited per batch. Each batch appends its scoped audit; the report is allowed to be incomplete.
 
-**Status: 2026-05-06.** Two batches landed; 3 modules audited (`Amplifier`, `ClkGen`, `RandomGen`). Systemic findings: S1-S4 (port-colour, attenuator-type, layout, non-oscillator master/slave architecture). On 2026-05-06 the disposition framework was reframed to make spec the source of truth (see Disposition section); Amplifier findings F1/F2a/F3 were re-dispositioned. Most modules remain unaudited — by design; lazy/incremental.
+**Status: 2026-05-13.** Three batches landed; 4 modules audited (`Amplifier`, `ClkGen`, `RandomGen`, `GainControl`). Systemic findings: S1-S4 (port-colour, attenuator-type, layout, non-oscillator master/slave architecture). On 2026-05-06 the disposition framework was reframed to make spec the source of truth (see Disposition section); Amplifier findings F1/F2a/F3 were re-dispositioned. On 2026-05-13 the Amplifier hybrid was split into spec §6.13 `Amplifier` (fixed-gain) and a new spec §6.3 `GainControl` (VCA); F1/F2a/F3/F4/F7 now resolved. Most modules remain unaudited — by design; lazy/incremental.
 
 ## Sources
 
@@ -144,41 +144,59 @@ The spec defines `RandomGen` as a slave-class module: master-relative rate (0.02
 
 ## 6. Mixer Group
 
-### 6.13 Amplifier (impl: `Amplifier`) — audited 2026-05-04, batch 1
+### 6.3 GainControl (impl: `GainControl`) — audited 2026-05-13, batch 3
+
+- **Spec:** `BORED_MODULAR_DESIGN.md:629-635` (GainControl (VCA) — voltage-controlled amplifier; can function as ring/amplitude modulator).
+- **Impl:** `src/AudioEngine.js` (`_createGainControl`), `src/moduleDefs.js` (`MODULE_DEFS.GainControl`).
+
+The spec's `GainControl` is a VCA: a carrier `Input`, a `Control` mod input, an `Output`, and a `Unipolar` button that switches between ring-mod (bipolar control) and AM (unipolar control). Added in batch 3 alongside the Amplifier split (see Amplifier subsection below for the rationale). Internally a `ctrlIn` GainNode feeds two parallel paths into `gainNode.gain`: a bipolar gate (passes raw control) and a unipolar half-and-bias gate (×0.5 plus a +0.5 ConstantSource). Flipping the `unipolar` param swaps the active gates via `setParam`.
+
+- **Finding G1 — Impl-only `level` knob.** Impl has a `level` slider (0–4, default 0.8) that sets `gainNode.gain.value` as a baseline; the spec §6.3 GainControl has no level control — gain is defined entirely by the Control signal. **Severity:** Minor. **Disposition:** `keep-as-divergence`. Rationale: extension the spec doesn't preclude (category 2 of playbook §2.3). The level knob carries the saved value forward from migrated pre-split Amplifier patches and lets users set a baseline without needing an external `ConstantSource` for "fixed gain with Ctrl summed in." Doesn't replace any spec feature, doesn't change spec-required Ctrl behaviour.
+- **Finding G2 — `Ctrl` port colour (folds to S1).** Spec colours `Control` as Red (audio bus); impl renders it as a yellow mod-input per the direction-based convention. Folds to S1 systemic; no per-module action.
+- **Finding G3 — Default values.** Impl defaults: `level=0.8`, `unipolar="off"`. Spec is silent on defaults. **Severity:** Out-of-scope.
+- **Finding G4 — `Unipolar` button shape.** Spec defines a button with two states ("Unipolar off" = ring mod, "Unipolar on" = AM). Impl renders this as a select dropdown with `options: ["off", "on"]` — same pattern as `ClkGen.active` (folds to C1 / S3 layout encoding). **Severity:** Minor. **Disposition:** `fix-toward-spec (blocked: MODULE_DEFS schema does not currently distinguish button-style binary widgets from selector-style options — same blocker as ClkGen C1)`.
+
+**Cluster summary (GainControl):**
+- Findings: 3 in-scope + 1 out-of-scope = 4 total.
+- Dispositions: 1 `keep-as-divergence` (G1 — extension, category 2), 1 `fix-toward-spec (blocked)` (G4 — same blocker as C1), 1 folds-to-S1 (G2), 1 out-of-scope (G3).
+- Code change applied: new `_createGainControl` in `src/AudioEngine.js`, new `GainControl` entry in `src/moduleDefs.js`, conditional patch-load migration in `src/BoredModularEmulator.jsx`.
+- Patch-load impact: legacy Amplifier patches with a `GainMod` connection retype to GainControl (level value preserved, port renamed `GainMod → Ctrl`); legacy Amplifier patches without a `GainMod` connection stay as the new fixed-gain Amplifier (level clamped into [0.25, 4.0]).
+
+### 6.13 Amplifier (impl: `Amplifier`) — audited 2026-05-04, batch 1; updated 2026-05-13, batch 3
 
 - **Spec:** `BORED_MODULAR_DESIGN.md:698-702` (Amplifier — fixed gain/attenuation), `MODULE_LAYOUTS.md:391-393`.
-- **Impl:** `src/AudioEngine.js:1112-1124` (`_createAmplifier`), `src/moduleDefs.js:264-272` (`MODULE_DEFS.Amplifier`).
+- **Impl:** `src/AudioEngine.js` (`_createAmplifier`), `src/moduleDefs.js` (`MODULE_DEFS.Amplifier`).
 
-The spec's `Amplifier` (§6.13) is a fixed-gain attenuation module with no modulation input. The impl is named `Amplifier` but functionally implements `GainControl` (VCA, spec §6.3): it has a `GainMod` mod input and the moduleDefs description reads "Voltage controlled amplifier". This is the first concrete exercise of the tri-state framework — most findings below trace back to this name-vs-function divergence.
+The spec's `Amplifier` (§6.13) is a fixed-gain attenuation module with no modulation input. Pre-batch-3 the impl was named `Amplifier` but functionally implemented `GainControl` (VCA, spec §6.3): it had a `GainMod` mod input and the moduleDefs description read "Voltage controlled amplifier." Batch 3 resolved the hybrid by splitting: the impl `Amplifier` was narrowed to the spec §6.13 shape (no mod input, range 0.25–4.0×, label "Amplification"), and a new `GainControl` module was added to cover the spec §6.3 VCA role (see GainControl subsection above). Findings F1, F2a, F3, F4, F7 all resolved this batch.
 
-- **Finding F1 — Name-vs-function hybrid.** Impl module type "Amplifier" combines the name from spec §6.13 with the function (mod-controlled VCA) of spec §6.3 GainControl. **Severity:** Minor (impl works correctly as a VCA; the name doesn't match its function relative to spec). **Disposition:** `undecided`. Resolution requires a structural call: rename impl module type to `GainControl` (param-key change → patch-load risk per §5), or split into two modules (a fixed-gain `Amplifier` matching §6.13, plus a `GainControl` matching §6.3), or another path. Re-dispositioned 2026-05-06 from `keep-as-divergence`; the original "more intuitive" rationale was feature-level and does not survive the spec-as-source-of-truth frame.
-- **Finding F2a — Range minimum (0 vs 0.25).** Impl `level.min = 0`; spec `Amplification` range starts at `0.25x`. **Severity:** Minor. **Disposition:** `fix-toward-spec (blocked: range narrowing requires patch-load scan and handling per playbook §5; revisit when narrowing is safe to apply)`. Re-dispositioned 2026-05-06 from `keep-as-divergence`; the original "full-mute is useful in modular synthesis" rationale was feature-level (not DSP-level approximation, not a spec-tolerated extension, not a durable design call) and did not survive the divergence rationale rule.
-- **Finding F2b — Range maximum (1.0 vs 4.0).** Impl `level.max = 1`; spec range goes to `4.0x`. **Severity:** Critical (impl can't boost — limits useful patches that need to amplify weak signals). **Disposition:** `fix-toward-spec` (applied this batch). Range *widening* is patch-load-safe — any saved 0-1 value remains valid in the new 0-4 range. Resolution: changed `level.max` from `1` to `4` in `src/AudioEngine.js:1121`.
-- **Finding F3 — `GainMod` input presence.** Impl has `GainMod` mod input; spec §6.13 has no mod input. **Severity:** Minor (consequence of F1). **Disposition:** `undecided`. Depends on F1 resolution: if F1 splits Amplifier into two modules, F3 disappears (the §6.13 module loses `GainMod`; the §6.3 module retains it as spec-required); if F1 renames to `GainControl`, F3 becomes spec-correct. Re-dispositioned 2026-05-06 from `keep-as-divergence`.
-- **Finding F4 — `Unipolar` button absent.** Spec §6.3 GainControl has a `Unipolar` button ("Converts bipolar control to unipolar (divides by 2, adds +32 bias)"). Impl has no such button. **Severity:** Minor (real feature, but not strictly required for VCA behaviour). **Disposition:** `undecided`. Adding it requires inserting a half-and-offset stage on the `GainMod` input plus a UI toggle. Worth a follow-up consideration in a later batch — not high-priority.
+- **Finding F1 — Name-vs-function hybrid.** Impl module type "Amplifier" combined the name from spec §6.13 with the function (mod-controlled VCA) of spec §6.3 GainControl. **Severity:** Minor. **Disposition:** `fix-toward-spec` (applied 2026-05-13 in batch 3 — split into two modules: fixed-gain `Amplifier` per §6.13, new `GainControl` per §6.3). Re-dispositioned 2026-05-06 from `keep-as-divergence` to `undecided`; now resolved.
+- **Finding F2a — Range minimum (0 vs 0.25).** Impl had `level.min = 0`; spec `Amplification` range starts at `0.25x`. **Severity:** Minor. **Disposition:** `fix-toward-spec` (applied 2026-05-13 in batch 3 — `level.min: 0 → 0.25`). Patch-load safety handled by a conditional migration in `loadPatchData`: saved Amplifier patches with no `GainMod` connection stay as Amplifier and have their `level` clamped into the new range; patches with a `GainMod` connection retype to GainControl (whose `level.min` stays at 0). Re-dispositioned 2026-05-06 from `keep-as-divergence`; now resolved.
+- **Finding F2b — Range maximum (1.0 vs 4.0).** Impl `level.max` was 1; spec range goes to `4.0x`. **Severity:** Critical. **Disposition:** `fix-toward-spec` (applied 2026-05-04 in batch 1 — `level.max: 1 → 4`).
+- **Finding F3 — `GainMod` input presence.** Impl had a `GainMod` mod input; spec §6.13 has no mod input. **Severity:** Minor (consequence of F1). **Disposition:** `fix-toward-spec` (applied 2026-05-13 in batch 3 — `GainMod` removed from `Amplifier`, moved to the new `GainControl` as port `Ctrl` per spec §6.3). Re-dispositioned 2026-05-06 from `keep-as-divergence`; now resolved.
+- **Finding F4 — `Unipolar` button absent.** Spec §6.3 GainControl has a `Unipolar` button ("Converts bipolar control to unipolar (divides by 2, adds +32 bias)"). **Severity:** Minor. **Disposition:** `fix-toward-spec` (applied 2026-05-13 in batch 3 — Unipolar toggle added to the new `GainControl` module; widget renders as a select dropdown per the existing on/off param pattern, see GainControl finding G4 for the button-vs-selector follow-up).
 - **Finding F5 — Amplification value display absent.** Spec §6.13 layout includes an `[Amplification Display]` showing the numeric gain value. Impl renders only a slider with the value-as-position; no readout. **Severity:** Minor. **Disposition:** `undecided`. Visual-layout fidelity is deferred to a separate audit batch (see S3 systemic finding). When that batch runs, this finding folds in.
 - **Finding F6 — Default value (0.8).** Impl `level.value = 0.8`; spec doesn't state a default for `Amplification`. **Severity:** Out-of-scope (spec is silent).
-- **Finding F7 — Param key `level` vs spec knob "Amplification".** Spec calls the knob `Amplification`; impl uses key `level` and label `"Level"`. **Severity:** Minor (cosmetic naming). **Disposition:** `undecided`. Renaming the param key would silently drop the saved value from any pre-existing patch (param renames trigger the no-op branch in `setParam`, see `src/AudioEngine.js:1603`). The label-only change ("Level" → "Amplification") is safe but cosmetic; deferred until a UI/labelling batch makes that call.
+- **Finding F7 — Param key `level` vs spec knob "Amplification".** Spec calls the knob `Amplification`; impl uses key `level`. **Severity:** Minor (cosmetic naming). **Disposition:** `fix-toward-spec` (applied 2026-05-13 in batch 3 — label changed `"Level" → "Amplification"`; the param key `level` stays unchanged to keep saved patches loading).
 
-**Cluster summary:**
+**Cluster summary (Amplifier — batch 3 update):**
 - Findings: 7 in-scope + 1 out-of-scope = 8 total.
-- Dispositions: 1 `fix-toward-spec` applied (F2b), 1 `fix-toward-spec` blocked (F2a — patch-load), 0 `keep-as-divergence`, 5 `undecided` (F1, F3, F4, F5, F7), 1 out-of-scope (F6).
-- Code change applied: `src/AudioEngine.js:1121` — `level.max: 1 → 4`.
-- Patch-load impact: none (range widened, not narrowed).
-- Re-dispositioned 2026-05-06 under the corrected spec-as-source-of-truth frame: F1 → undecided, F2a → fix-toward-spec (blocked), F3 → undecided.
+- Dispositions: 6 `fix-toward-spec` applied (F1, F2a, F2b, F3, F4, F7), 1 `undecided` (F5 — folds to S3), 1 out-of-scope (F6). Zero `keep-as-divergence` on this module after the split (the impl-only level knob moved with the VCA behaviour to GainControl and is recorded there as G1).
+- Code change applied: `src/AudioEngine.js` `_createAmplifier` updated (`level.min: 0 → 0.25`, `GainMod` removed, label "Amplification"); new `_createGainControl` added; new switch case in `createModule`; new `unipolar` cross-param branch in `setParam`. `src/moduleDefs.js` updated for both modules. `src/BoredModularEmulator.jsx` `loadPatchData` adds the conditional Amplifier→GainControl retype + GainMod→Ctrl port rename + level clamp.
+- Patch-load impact: conditional migration. Pre-split Amplifier patches with a `GainMod` connection retype to GainControl (`level` carries forward unchanged). Pre-split Amplifier patches without a `GainMod` connection stay as the new fixed-gain Amplifier (`level` clamped to `[0.25, 4.0]` on load — a saved value of 0 lands at 0.25). User-exported patch JSON outside the repo: best-effort per playbook §5.
 
 ---
 
 ## Module Count Summary
 
 - **Spec total:** 109 modules across 10 groups (`BORED_MODULAR_DESIGN.md:1059-1080`).
-- **Impl total:** 39 modules across 6 categories (`src/moduleDefs.js`).
-- **Audited so far:** 3 (`Amplifier`, `ClkGen`, `RandomGen`).
+- **Impl total:** 40 modules across 6 categories (`src/moduleDefs.js`).
+- **Audited so far:** 4 (`Amplifier`, `ClkGen`, `RandomGen`, `GainControl`).
 - **Spec-only modules (coverage gaps, ~70):** every spec module without an impl counterpart. Includes the entire Logic group (§9), most of Audio Modifier (§7) and Control Modifier (§8), the LFO/random slave-class modules (`LFOSlvA-E`, `RndStepGen`, `ClkRndGen`, `RndPulsGen`, `PatternGen`), and many partial group entries. Coverage closure is deferred to a separate plan.
 - **Impl-only modules:** notable impl-only entries surface as audit batches reach them. None currently identified — the former `Mixer2` (impl-only 2-input mixer) was reshaped to match spec §6.1 and now ships as `Mixer3`; legacy `"type": "Mixer2"` payloads still load via an alias in `AudioEngine.createModule`.
 
 Names and shapes diverging between impl and spec where audited:
-- impl `Amplifier` is a hybrid: name from spec §6.13 Amplifier, function from spec §6.3 GainControl. See per-module audit above.
+- impl `Amplifier` matches spec §6.13 cleanly after the 2026-05-13 split (fixed-gain, range 0.25–4.0×, no mod input).
+- impl `GainControl` matches spec §6.3 in name and core shape; carries an impl-only `level` knob (extension, recorded as finding G1 keep-as-divergence). See per-module audit above.
 - impl `ClkGen` matches spec §3.9 in name; output port keys diverge (`Clk24`/`Clk4` vs spec `24 Pulses/B`/`4 Pulses/B`); missing `Reset` input and `Slv` output. See finding C5 and S4.
 - impl `RandomGen` matches spec §3.12 in name but is standalone (absolute rate) where spec is slave-class (master-relative rate via `Mst` input). See finding R1 and S4.
 
