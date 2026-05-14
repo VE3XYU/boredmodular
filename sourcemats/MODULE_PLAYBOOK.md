@@ -183,6 +183,17 @@ Running log of executed batches. Each entry: date, cluster, finding count by dis
   - **Codifications added in Unit 4** (this revision): `fix-toward-spec (blocked: <reason>)` named-blocker shape; severity for impl-only spec-silent params; consequence-finding notation; systemic-promotion threshold (≥2 per-module findings sharing root cause); "Display" substring as S3 indicator.
   - **CLAUDE.md → playbook link** added in this revision (the playbook is now promoted; Units 1-3 deliberately left it unlinked while it proved itself).
 
+### Batch 3 — Full-sweep audit (2026-05-12)
+
+- **Cluster:** all 38 previously unaudited implemented modules — §1 In/Out (Keyboard, Output), §2 Oscillator (MasterOsc, OscA/B/C, SpectralOsc, FormantOsc, OscSlvA-E, OscSineBank, OscSlvFM, Noise, PercOsc, DrumSynth), §3 LFO (LFO, LFOA), §4 Envelope (Envelope, ADSREnv), §5 Filter (Filter, FilterC, FilterE), §6 Mixer (Mixer3, Mixer8, XFade, Panner), §7 Audio Modifier (Delay, ShortDelay, Chorus, Shaper), §8 Control Modifier (PortamentoA), §10 Sequencer (EventSeq, CtrlSeq, NoteSeqA, NoteSeqB).
+- **Findings:** ~95 in-scope + ~20 out-of-scope ≈ 115 total. Roughly half of in-scope findings fold to S1-S6 (recorded once, not enumerated per module).
+- **Dispositions:** 0 `fix-toward-spec` applied (audit-only by plan), ~50 `fix-toward-spec (blocked)` (mostly blocked on S2/S3/S4/S5/S6 or playbook §5 patch-load safety), ~25 `keep-as-divergence` (mostly category 1 DSP approximations and category 2 extensions), ~20 out-of-scope (mostly spec-silent defaults).
+- **Effort class:** 38 modules × range/param-add audit-only ≈ 38 effort points — deliberately deviates from the playbook §4 "≤5 modules per cluster" rule, justified by audit-only scope (no `src/` changes), single-file diff into `IMPL_AUDIT_REPORT.md`, and explicit user direction in the plan that approved this packaging.
+- **Playbook delta:**
+  - **Two new systemic findings promoted:** S5 (mute affordance absent — folded ≥20 modules' missing M buttons) and S6 (KBT parameter cosmetic-only — folded 5 modules with kbt params that are stored but never read by `setParam` or the keyboard-pitch path).
+  - **Coverage milestone:** every implemented module now has at least one pass of audit-recorded findings. Future fix-batches reference back to existing per-module subsections; new modules added to `src/` should be audited as part of their introductory plan.
+  - **Workflow re-adoption note:** this batch explicitly re-adopted the playbook workflow that was retired after Unit 4 in 2026-05-06. The workflow is again static reference unless deliberately re-adopted for a future sweep or fix batch.
+
 ---
 
 *Companion files: `IMPL_AUDIT_REPORT.md` (the canonical audit log this playbook describes), `SPEC_AUDIT_REPORT.md` (model for prose style and severity grades), `BORED_MODULAR_DESIGN.md` and `MODULE_LAYOUTS.md` (the spec corpus). Project conventions and the imperative AudioEngine vs declarative React state split are in `CLAUDE.md`.*
