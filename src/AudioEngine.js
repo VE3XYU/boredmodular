@@ -154,7 +154,7 @@ class AudioEngine {
       _frequency: 220,
       params: {
         frequency: { value: 220, min: 20, max: 8000, audioParam: freqParam, label: "Freq" },
-        coarse: { value: 0, min: -60, max: 60, label: "Coarse" },
+        coarse: { value: 0, min: -64, max: 64, label: "Coarse" },
         fine: { value: 0, min: -100, max: 100, label: "Fine" },
         waveform: { value: "sawtooth", options: ["sine", "sawtooth", "square", "triangle"], label: "Wave" },
         pulseWidth: { value: 0.5, min: 0.01, max: 0.99, audioParam: pwParam, label: "PW" },
@@ -225,7 +225,7 @@ class AudioEngine {
       _frequency: 220,
       params: {
         frequency: { value: 220, min: 20, max: 8000, audioParam: osc.frequency, label: "Freq" },
-        coarse: { value: 0, min: -60, max: 60, label: "Coarse" },
+        coarse: { value: 0, min: -64, max: 64, label: "Coarse" },
         fine: { value: 0, min: -50, max: 50, label: "Fine" },
         kbt: { value: 1, min: 0, max: 2, label: "KBT" },
         fmDepth: { value: 0, min: 0, max: 1000, audioParam: fmGain.gain, label: "FM Dep" },
@@ -361,7 +361,7 @@ class AudioEngine {
       inputs: { Trig: trigIn, Amp: output.gain, PitchMod: osc.frequency },
       _nodes: [osc, bodyGain, noiseSrc, clickFilter, clickGain, output, trigIn],
       params: {
-        frequency: { value: 110, min: 20, max: 8000, audioParam: osc.frequency, label: "Pitch" },
+        frequency: { value: 110, min: 8, max: 12544, audioParam: osc.frequency, label: "Pitch" },
         fine: { value: 0, min: -50, max: 50, label: "Fine" },
         decay: { value: 0.3, min: 0.005, max: 4, label: "Dec" },
         click: { value: 0.3, min: 0, max: 1, label: "Click" },
@@ -606,7 +606,7 @@ class AudioEngine {
       _formantTable: FORMANT_TABLE,
       params: {
         frequency: { value: 150, min: 20, max: 8000, audioParam: osc.frequency, label: "Freq" },
-        coarse: { value: 0, min: -60, max: 60, label: "Coarse" },
+        coarse: { value: 0, min: -64, max: 64, label: "Coarse" },
         fine: { value: 0, min: -50, max: 50, label: "Fine" },
         kbt: { value: 1, min: 0, max: 2, label: "KBT" },
         vowel: { value: "A", options: ["A", "E", "I", "O", "U"], label: "Vowel" },
@@ -633,7 +633,7 @@ class AudioEngine {
       _frequency: 220,
       params: {
         frequency: { value: 220, min: 20, max: 8000, label: "Freq" },
-        coarse: { value: 0, min: -60, max: 60, label: "Coarse" },
+        coarse: { value: 0, min: -64, max: 64, label: "Coarse" },
         fine: { value: 0, min: -50, max: 50, label: "Fine" },
         kbt: { value: "on", options: ["on", "off"], label: "KBT" },
       },
@@ -925,7 +925,7 @@ class AudioEngine {
       inputs: { In: filter, FreqMod: filter.frequency, ResMod: filter.Q },
       _nodes: [filter],
       params: {
-        frequency: { value: 1200, min: 20, max: 15000, audioParam: filter.frequency, label: "Freq" },
+        frequency: { value: 1200, min: 10, max: 15800, audioParam: filter.frequency, label: "Freq" },
         resonance: { value: 4, min: 0.1, max: 30, audioParam: filter.Q, label: "Res" },
         filterType: { value: "lowpass", options: ["lowpass", "highpass", "bandpass", "notch"], label: "Type" },
       },
@@ -948,7 +948,7 @@ class AudioEngine {
       _nodes: [input, lp, bp, hp],
       _filters: [lp, bp, hp],
       params: {
-        frequency: { value: 1200, min: 20, max: 15000, audioParam: lp.frequency, label: "Freq" },
+        frequency: { value: 1200, min: 10, max: 15800, audioParam: lp.frequency, label: "Freq" },
         resonance: { value: 4, min: 0.1, max: 30, audioParam: lp.Q, label: "Res" },
         gainComp: { value: "off", options: ["off", "on"], label: "GComp" },
       },
@@ -975,7 +975,7 @@ class AudioEngine {
       _filter1: filter1, _filter2: filter2, _output: output,
       _slope: "12dB",
       params: {
-        frequency: { value: 1200, min: 20, max: 15000, audioParam: filter1.frequency, label: "Freq" },
+        frequency: { value: 1200, min: 10, max: 15800, audioParam: filter1.frequency, label: "Freq" },
         resonance: { value: 4, min: 0.1, max: 30, audioParam: filter1.Q, label: "Res" },
         filterType: { value: "lowpass", options: ["lowpass", "highpass", "bandpass", "notch"], label: "Type" },
         slope: { value: "12dB", options: ["12dB", "24dB"], label: "Slope" },

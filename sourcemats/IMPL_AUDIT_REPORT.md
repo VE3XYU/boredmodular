@@ -2,7 +2,7 @@
 
 A growing record of how the implementation in `src/` compares to the spec corpus, audited per batch. Each batch appends its scoped audit; the report is allowed to be incomplete.
 
-**Status: 2026-05-13.** Four batches landed; all 42 currently-implemented modules audited. Batch 3 (2026-05-12) was a single audit-only sweep covering the 38 modules previously unaudited; Batch 4 (2026-05-13) split the impl `Amplifier` hybrid into a spec §6.13 fixed-gain `Amplifier` plus a new spec §6.3 `GainControl` (VCA with `Unipolar` toggle), resolving Amplifier findings F1/F2a/F3/F4/F7 in one batch. Batches 1 and 2 covered Amplifier (initial range fixes), ClkGen, and RandomGen. Systemic findings: S1-S6 (port-colour, attenuator-type, layout, non-oscillator master/slave architecture, mute-affordance absence, KBT cosmetic-only). On 2026-05-06 the disposition framework was reframed to make spec the source of truth (see Disposition section). Batches 1-3 left every `fix-toward-spec` finding blocked on a systemic dependency, a design call, or a patch-load safety check; Batch 4 is the first batch since then to apply `fix-toward-spec` changes in `src/`.
+**Status: 2026-05-14.** Five batches landed; all 42 currently-implemented modules audited. Batch 3 (2026-05-12) was a single audit-only sweep covering the 38 modules previously unaudited; Batch 4 (2026-05-13) split the impl `Amplifier` hybrid into a spec §6.13 fixed-gain `Amplifier` plus a new spec §6.3 `GainControl` (VCA with `Unipolar` toggle), resolving Amplifier findings F1/F2a/F3/F4/F7 in one batch; Batch 5 (2026-05-14) applied eight patch-load-safe range widenings drawn from Batch 3's quick-win recommendations (MstOsc-F2, OscA-F3, OscC-F6, FormantOsc-F3, PercOsc-F1, Filter-F7, FilterC-F2, FilterE-F10). Batches 1 and 2 covered Amplifier (initial range fixes), ClkGen, and RandomGen. Systemic findings: S1-S6 (port-colour, attenuator-type, layout, non-oscillator master/slave architecture, mute-affordance absence, KBT cosmetic-only). On 2026-05-06 the disposition framework was reframed to make spec the source of truth (see Disposition section). Batches 1-3 left every `fix-toward-spec` finding blocked on a systemic dependency, a design call, or a patch-load safety check; Batches 4 and 5 are the first since then to apply `fix-toward-spec` changes in `src/`.
 
 ## Sources
 
@@ -162,7 +162,7 @@ Single stereo audio sink. Both `InL` and `InR` route to the same `gain` node (`A
 Pitch-only controller. No audio output; `Slv` carries frequency in Hz via `ConstantSourceNode.offset`. Coarse/fine recompute frequency in `setParam` `MasterOsc` branch (`AudioEngine.js:2131-2140`) and `_propagateToSlaves`.
 
 - **MstOsc-F1 — Impl-only `frequency` param (20-8000 Hz, default 220).** Spec defines pitch only via Coarse + Fine + Pitch Mod inputs + KBT (no direct frequency knob). Severity: Minor. Disposition: `keep-as-divergence`. Rationale (cat 2 — extension): direct-Hz seed lets users tune without going through semitone arithmetic; coarse/fine still apply as offsets on top of `frequency` per the `setParam` branch.
-- **MstOsc-F2 — Coarse range ±60 vs spec C-1..G9 (~±64 semitones from middle).** Severity: Minor. Disposition: `fix-toward-spec (blocked: range widening from ±60 → ±64 is patch-load-safe; defer to a routine cluster pass)`.
+- **MstOsc-F2 — Coarse range ±60 vs spec C-1..G9 (~±64 semitones from middle).** Severity: Minor. Disposition: `fix-toward-spec` (applied 2026-05-14 in batch 5 — `coarse.min/max: ±60 → ±64`).
 - **MstOsc-F3 — Fine range ±50 (cents) vs spec ±half-semitone with 128 discrete steps.** Magnitude matches (±0.5 semitone); the discretization is missing. Severity: Minor. Disposition: `keep-as-divergence`. Rationale (cat 1 — DSP approximation): continuous fine-tune is the Web Audio idiom; 128-step quantization is a hardware UI affordance, not a behavioural requirement.
 - **MstOsc-F4 — KBT (Button) matches spec form.** Match — no finding.
 - **MstOsc-F5 — KBT param cosmetic.** Folds to S6.
@@ -171,9 +171,9 @@ Pitch-only controller. No audio output; `Slv` carries frequency in Hz via `Const
 
 **Cluster summary (MasterOsc):**
 - Findings: 3 in-scope + 0 OOS = 3 total (F4 match; F5/F6/F7 fold to S6/S3/S1).
-- Dispositions: 2 `keep-as-divergence` (F1 cat 2, F3 cat 1), 1 `fix-toward-spec (blocked)` (F2 — widening, defer).
-- Code change applied: none.
-- Patch-load impact: F2 would-be widening (safe).
+- Dispositions: 2 `keep-as-divergence` (F1 cat 2, F3 cat 1), 1 `fix-toward-spec` applied (F2 — coarse widening in batch 5).
+- Code change applied: `src/AudioEngine.js:636` — `coarse.min/max: -60..60 → -64..64` (batch 5, 2026-05-14).
+- Patch-load impact: widening (safe).
 
 ### 2.2 OscA (impl: `OscA`) — audited 2026-05-12, batch 3
 
@@ -184,7 +184,7 @@ Full-featured master with Sync, FMA, PWM, and Slv output. Pitch / fine / wavefor
 
 - **OscA-F1 — Missing `KBT (Knob): Off to 2.0` param.** Compare to OscB/OscC which have a `kbt` knob param. Severity: Minor. Disposition: `fix-toward-spec (blocked: adding the param without the behaviour would deepen S6 — wire it once S6 is resolved)`.
 - **OscA-F2 — Fine range ±100 (cents) vs spec ±50 (half semitone, 128 steps).** Impl's range is double spec. Severity: Minor. Disposition: `fix-toward-spec (blocked: range narrowing requires patch-load scan per playbook §5)`.
-- **OscA-F3 — Coarse range ±60 vs spec C-1..G9 (~±64).** Same widening issue as MstOsc-F2. Severity: Minor. Disposition: `fix-toward-spec (blocked: widening — defer to fix batch)`.
+- **OscA-F3 — Coarse range ±60 vs spec C-1..G9 (~±64).** Same widening issue as MstOsc-F2. Severity: Minor. Disposition: `fix-toward-spec` (applied 2026-05-14 in batch 5 — `coarse.min/max: ±60 → ±64`).
 - **OscA-F4 — Missing `M (Button) Mute`.** Folds to S5.
 - **OscA-F5 — `pwModDepth` impl-only mod attenuator (0..1).** Spec describes a `PWidth Mod (Input, Red)` [Type I] with no separate impl-only depth knob — depth is the attenuator. Severity: Minor. Disposition: `keep-as-divergence`. Rationale (cat 2 — extension): provides per-input scaling that spec assumes hardware attenuator hardware provides; folds into S2 once attenuator metadata is threaded.
 - **OscA-F6 — `fmDepth` impl-only mod attenuator (0..1000).** Same shape as F5; same disposition (`keep-as-divergence`, cat 2; folds to S2).
@@ -194,9 +194,9 @@ Full-featured master with Sync, FMA, PWM, and Slv output. Pitch / fine / wavefor
 
 **Cluster summary (OscA):**
 - Findings: 5 in-scope + 1 OOS = 6 total (F4/F7/F8 fold to S5/S1/S3).
-- Dispositions: 3 `fix-toward-spec (blocked)` (F1, F2, F3), 2 `keep-as-divergence` (F5 cat 2, F6 cat 2), 1 OOS (F9).
-- Code change applied: none.
-- Patch-load impact: F2 would-be narrowing, F3 would-be widening.
+- Dispositions: 2 `fix-toward-spec (blocked)` (F1, F2), 1 `fix-toward-spec` applied (F3 — coarse widening in batch 5), 2 `keep-as-divergence` (F5 cat 2, F6 cat 2), 1 OOS (F9).
+- Code change applied: `src/AudioEngine.js:157` — `coarse.min/max: -60..60 → -64..64` (batch 5, 2026-05-14).
+- Patch-load impact: F3 widening (safe). F2 would-be narrowing still blocked.
 
 ### 2.3 OscB (impl: `OscB`) — audited 2026-05-12, batch 3
 
@@ -232,15 +232,15 @@ Sine-only master with AM and FMA. Single Pitch Mod input matches spec.
 - **OscC-F3 — KBT widget form: impl knob (0..2), spec button.** Severity: Minor. Disposition: `fix-toward-spec (blocked: depends on S6 — once behaviour wires up, settle widget form to match spec)`.
 - **OscC-F4 — KBT param cosmetic.** Folds to S6 (separate finding from F3 for clarity).
 - **OscC-F5 — `fmDepth` impl-only attenuator.** `keep-as-divergence` cat 2; folds to S2.
-- **OscC-F6 — Coarse range ±60 vs ~±64.** Same widening pattern as MstOsc-F2.
+- **OscC-F6 — Coarse range ±60 vs ~±64.** Same widening pattern as MstOsc-F2. Disposition: `fix-toward-spec` (applied 2026-05-14 in batch 5 — `coarse.min/max: ±60 → ±64`).
 - **OscC-F7 — Port colours.** Folds to S1.
 - **OscC-F8 — Default level 0.6 (spec silent).** OOS.
 
 **Cluster summary (OscC):**
 - Findings: 3 in-scope + 1 OOS = 4 total.
-- Dispositions: 2 `fix-toward-spec (blocked)` (F3 — depends on S6, F6 — widening), 1 `keep-as-divergence` (F5 cat 2), 1 OOS (F8).
-- Code change applied: none.
-- Patch-load impact: F6 would-be widening.
+- Dispositions: 1 `fix-toward-spec (blocked)` (F3 — depends on S6), 1 `fix-toward-spec` applied (F6 — coarse widening in batch 5), 1 `keep-as-divergence` (F5 cat 2), 1 OOS (F8).
+- Code change applied: `src/AudioEngine.js:228` — `coarse.min/max: -60..60 → -64..64` (batch 5, 2026-05-14).
+- Patch-load impact: widening (safe).
 
 ### 2.5 SpectralOsc (impl: `SpectralOsc`) — audited 2026-05-12, batch 3
 
@@ -273,7 +273,7 @@ Sawtooth source through three bandpass formants; vowel selects formant frequency
 
 - **FmtOsc-F1 — Vowel selector A/E/I/O/U vs spec "1-127 variations plus Random".** Spec describes `Timbre (Knob + Display): 1-127 variations plus Random`. Impl: discrete vowel selector + continuous `timbre` 0..1 for interpolation. The discrete `vowel` param is impl-only; spec doesn't define a vowel selector — its `timbre` is a continuous 1-127 knob that includes all variations. Severity: Minor (different control shape; same musical effect family). Disposition: `keep-as-divergence`. Rationale (cat 3 — durable design rationale): vowel-letter selectors are more learnable for users without prior modular fluency *and* the impl's `vowel + timbre` decomposition models the same continuum more transparently (each vowel is a labelled point, timbre interpolates between them).
 - **FmtOsc-F2 — Missing `Timbre Mod (Input, Blue)` [Type I].** Spec §2.6 has a dedicated timbre modulation input. Impl has no `TimbreMod` modInput. Severity: Minor. Disposition: `fix-toward-spec (blocked: implementation requires routing a control signal to the vowel-interpolation logic in `setParam` FormantOsc `timbre` branch — viable, just hasn't been wired)`.
-- **FmtOsc-F3 — Coarse range ±60 vs spec ±64.** Widening. Same disposition as MstOsc-F2.
+- **FmtOsc-F3 — Coarse range ±60 vs spec ±64.** Widening. Same disposition as MstOsc-F2. `fix-toward-spec` (applied 2026-05-14 in batch 5 — `coarse.min/max: ±60 → ±64`).
 - **FmtOsc-F4 — Missing `M (Button) Mute`.** Folds to S5.
 - **FmtOsc-F5 — KBT impl-knob vs spec-button; cosmetic.** Folds to S6.
 - **FmtOsc-F6 — Pitch Mod port colours.** Folds to S1.
@@ -281,9 +281,9 @@ Sawtooth source through three bandpass formants; vowel selects formant frequency
 
 **Cluster summary (FormantOsc):**
 - Findings: 3 in-scope + 0 OOS = 3 total.
-- Dispositions: 1 `keep-as-divergence` (F1 cat 3), 2 `fix-toward-spec (blocked)` (F2, F3).
-- Code change applied: none.
-- Patch-load impact: F3 would-be widening.
+- Dispositions: 1 `keep-as-divergence` (F1 cat 3), 1 `fix-toward-spec (blocked)` (F2), 1 `fix-toward-spec` applied (F3 — coarse widening in batch 5).
+- Code change applied: `src/AudioEngine.js:609` — `coarse.min/max: -60..60 → -64..64` (batch 5, 2026-05-14).
+- Patch-load impact: widening (safe).
 
 ### 2.7 OscSlvA (impl: `OscSlvA`) — audited 2026-05-12, batch 3
 
@@ -453,7 +453,7 @@ White / Pink noise generator. Impl uses pre-rendered buffer; `color` toggle swap
 
 Percussive sine with click + punch. `trigger()` schedules amplitude decay + optional pitch sweep on punch. Connected via gate-target tracking.
 
-- **PercOsc-F1 — Pitch range 20..8000 Hz vs spec "C-1 to G9" (~8 Hz to 12.5 kHz).** Spec range is wider on both ends. Severity: Minor. Disposition: `fix-toward-spec (blocked: range widening — defer to fix batch)`.
+- **PercOsc-F1 — Pitch range 20..8000 Hz vs spec "C-1 to G9" (~8 Hz to 12.5 kHz).** Spec range is wider on both ends. Severity: Minor. Disposition: `fix-toward-spec` (applied 2026-05-14 in batch 5 — `frequency.min/max: 20..8000 → 8..12544` Hz, rounded from spec's 8.18..12543.85).
 - **PercOsc-F2 — Fine range ±50 cents matches spec.** No finding.
 - **PercOsc-F3 — Missing `M (Button) Mute`.** Folds to S5.
 - **PercOsc-F4 — Trig / Amp / Pitch Mod port colours.** Folds to S1.
@@ -463,9 +463,9 @@ Percussive sine with click + punch. `trigger()` schedules amplitude decay + opti
 
 **Cluster summary (PercOsc):**
 - Findings: 1 in-scope + 2 OOS = 3 total.
-- Dispositions: 1 `fix-toward-spec (blocked)` (F1 — widening), 2 OOS (F5, F7).
-- Code change applied: none.
-- Patch-load impact: F1 would-be widening.
+- Dispositions: 1 `fix-toward-spec` applied (F1 — pitch widening in batch 5), 2 OOS (F5, F7).
+- Code change applied: `src/AudioEngine.js:364` — `frequency.min/max: 20..8000 → 8..12544` Hz (batch 5, 2026-05-14).
+- Patch-load impact: widening (safe).
 
 ### 2.16 DrumSynth (impl: `DrumSynth`) — audited 2026-05-12, batch 3
 
@@ -647,7 +647,7 @@ Multi-mode filter with LP/HP/BP/notch options, resonance, FreqMod, ResMod. Nativ
 - **Filter-F4 — `FreqMod` Type III attenuator metadata absent.** Folds to S2.
 - **Filter-F5 — `ResMod` attenuator metadata absent.** Folds to S2.
 - **Filter-F6 — `Filter` impl name divergence vs spec `FilterD`.** Severity: Minor (generic name vs spec-specific name). Disposition: `fix-toward-spec (blocked: module-type rename triggers patch-load drop via setParam no-op branch — see playbook §5; needs key/label separation per C5 to be safe)`.
-- **Filter-F7 — Frequency range 20..15000 Hz vs spec "10 Hz to 15.8 kHz".** Spec is slightly wider on both ends. Severity: Minor. Disposition: `fix-toward-spec (blocked: widening — defer)`.
+- **Filter-F7 — Frequency range 20..15000 Hz vs spec "10 Hz to 15.8 kHz".** Spec is slightly wider on both ends. Severity: Minor. Disposition: `fix-toward-spec` (applied 2026-05-14 in batch 5 — `frequency.min/max: 20..15000 → 10..15800` Hz).
 - **Filter-F8 — Resonance range 0.1..30 (Q value) vs spec "0-127" (units).** Different units. Severity: Minor (cosmetic — Q vs hardware units; behavioural equivalence depends on exact mapping). Disposition: `keep-as-divergence`. Rationale (cat 1 — DSP approximation): the BiquadFilter `Q` parameter is the Web Audio idiom; spec's "0-127, self-oscillates at 127" maps to a Q value that produces self-oscillation — a calibration question, not behavioural.
 - **Filter-F9 — Missing `Graph` display.** Folds to S3.
 - **Filter-F10 — Port colours.** Folds to S1.
@@ -655,9 +655,9 @@ Multi-mode filter with LP/HP/BP/notch options, resonance, FreqMod, ResMod. Nativ
 
 **Cluster summary (Filter):**
 - Findings: 4 in-scope + 1 OOS = 5 total (F2/F4/F5/F9/F10 fold).
-- Dispositions: 2 `keep-as-divergence` (F1 cat 2, F8 cat 1), 3 `fix-toward-spec (blocked)` (F3, F6, F7), 1 OOS (F11).
-- Code change applied: none.
-- Patch-load impact: F6 would-be rename (silent drop risk).
+- Dispositions: 2 `keep-as-divergence` (F1 cat 2, F8 cat 1), 2 `fix-toward-spec (blocked)` (F3, F6), 1 `fix-toward-spec` applied (F7 — frequency widening in batch 5), 1 OOS (F11).
+- Code change applied: `src/AudioEngine.js:928` — `frequency.min/max: 20..15000 → 10..15800` Hz (batch 5, 2026-05-14).
+- Patch-load impact: F7 widening (safe). F6 would-be rename still blocked.
 
 ### 5.3 FilterC (impl: `FilterC`) — audited 2026-05-12, batch 3
 
@@ -667,7 +667,7 @@ Multi-mode filter with LP/HP/BP/notch options, resonance, FreqMod, ResMod. Nativ
 Static 3-output multimode filter: parallel LP, BP, HP outputs sharing input + freq + res. GC (gain compensation) selector.
 
 - **FilterC-F1 — Three outputs LP/BP/HP match spec.** Match.
-- **FilterC-F2 — Frequency range 20..15000 Hz vs spec "10 Hz to 15.8 kHz".** Same as Filter-F7. Severity: Minor. Disposition: `fix-toward-spec (blocked: widening — defer)`.
+- **FilterC-F2 — Frequency range 20..15000 Hz vs spec "10 Hz to 15.8 kHz".** Same as Filter-F7. Severity: Minor. Disposition: `fix-toward-spec` (applied 2026-05-14 in batch 5 — `frequency.min/max: 20..15000 → 10..15800` Hz).
 - **FilterC-F3 — Missing `M (Button) Mute`.** Folds to S5.
 - **FilterC-F4 — `GC` selector `off`/`on` matches spec button.** Match in shape; only widget form (selector vs button) diverges — folds to MODULE_DEFS key/label separation (C5).
 - **FilterC-F5 — GC behaviour not actually implemented.** Impl `setParam` has no branch that consumes `gainComp` (`AudioEngine.js:1984-1991` only syncs freq and resonance). The param is stored but doesn't reduce gain at high resonance. Severity: Critical (the labelled control does nothing). Disposition: `fix-toward-spec (blocked: requires a per-output gain stage scaled inversely by resonance; modest addition. Could land in a routine fix batch)`.
@@ -678,9 +678,9 @@ Static 3-output multimode filter: parallel LP, BP, HP outputs sharing input + fr
 
 **Cluster summary (FilterC):**
 - Findings: 3 in-scope + 1 OOS = 4 total.
-- Dispositions: 2 `fix-toward-spec (blocked)` (F2, F5), 1 `keep-as-divergence` (F6 cat 1), 1 `fix-toward-spec (blocked)` (F4 — depends on C5), 1 OOS (F9).
-- Code change applied: none.
-- Patch-load impact: F2 would-be widening.
+- Dispositions: 1 `fix-toward-spec (blocked)` (F5), 1 `fix-toward-spec` applied (F2 — frequency widening in batch 5), 1 `keep-as-divergence` (F6 cat 1), 1 `fix-toward-spec (blocked)` (F4 — depends on C5), 1 OOS (F9).
+- Code change applied: `src/AudioEngine.js:951` — `frequency.min/max: 20..15000 → 10..15800` Hz (batch 5, 2026-05-14).
+- Patch-load impact: widening (safe).
 
 ### 5.5 FilterE (impl: `FilterE`) — audited 2026-05-12, batch 3
 
@@ -698,16 +698,16 @@ Dynamic synthesizer filter with 12/24 dB slope, four modes (LP/HP/BP/notch), GC,
 - **FilterE-F7 — `FreqMod1`/`FreqMod2` match spec's two Freq Mod inputs.** Match.
 - **FilterE-F8 — Attenuator types (Type III for FreqMods, Type I for ResMod).** Folds to S2.
 - **FilterE-F9 — Resonance range 0.1..30 (Q) vs spec "0-127".** Same as Filter-F8. `keep-as-divergence` cat 1.
-- **FilterE-F10 — Frequency range 20..15000 Hz vs spec "10 Hz to 15.8 kHz".** Widening; same disposition as Filter-F7.
+- **FilterE-F10 — Frequency range 20..15000 Hz vs spec "10 Hz to 15.8 kHz".** Widening; same disposition as Filter-F7. `fix-toward-spec` (applied 2026-05-14 in batch 5 — `frequency.min/max: 20..15000 → 10..15800` Hz).
 - **FilterE-F11 — Display + Graph elements absent.** Folds to S3.
 - **FilterE-F12 — Port colours.** Folds to S1.
 - **FilterE-F13 — Default frequency 1200 Hz, resonance 4, type LP, slope 12dB, GC off (spec silent).** OOS.
 
 **Cluster summary (FilterE):**
 - Findings: 4 in-scope + 1 OOS = 5 total.
-- Dispositions: 3 `fix-toward-spec (blocked)` (F3, F5, F10), 1 `keep-as-divergence` (F9 cat 1), 1 OOS (F13).
-- Code change applied: none.
-- Patch-load impact: F10 would-be widening.
+- Dispositions: 2 `fix-toward-spec (blocked)` (F3, F5), 1 `fix-toward-spec` applied (F10 — frequency widening in batch 5), 1 `keep-as-divergence` (F9 cat 1), 1 OOS (F13).
+- Code change applied: `src/AudioEngine.js:978` — `frequency.min/max: 20..15000 → 10..15800` Hz (batch 5, 2026-05-14).
+- Patch-load impact: widening (safe).
 
 ---
 
@@ -1097,6 +1097,45 @@ Single-cluster batch resolving the Amplifier name-vs-function hybrid surfaced in
 - The pre-batch saved-patch scan (playbook §5) identified that no committed example patches use `Amplifier`, narrowing the risk surface to the maintainer's localStorage and user-exported JSON files — which the conditional migration now covers in-tree.
 - Re-using the `Mixer2 → Mixer3` alias pattern at the same `loadPatchData` call site kept the migration code mechanically equivalent to a precedent the maintainer has already reviewed once.
 - Folding G4 to S5 (per Batch 3's systemic) rather than re-stating the button-vs-selector argument per-module kept the GainControl findings tight.
+
+---
+
+## Batch 5 — Range widenings (2026-05-14)
+
+Eight patch-load-safe range widenings drawn from Batch 3's quick-win recommendation list (`:1067-1073`). Two thematic groups in a single PR: oscillator pitch widening (5 modules) and filter frequency widening (3 modules). No new modules; no `setParam` branches touched; no `loadPatchData` migration needed (widenings only).
+
+**Modules covered:** 8 — `MasterOsc`, `OscA`, `OscC`, `FormantOsc`, `PercOsc`, `Filter`, `FilterC`, `FilterE`.
+
+**Findings resolved:**
+- **Oscillator pitch widening (5):** MstOsc-F2 (`coarse: ±60 → ±64`), OscA-F3 (`coarse: ±60 → ±64`), OscC-F6 (`coarse: ±60 → ±64`), FormantOsc-F3 (`coarse: ±60 → ±64`), PercOsc-F1 (`pitch: 20..8000 → 8..12544` Hz).
+- **Filter frequency widening (3):** Filter-F7 (`frequency: 20..15000 → 10..15800` Hz), FilterC-F2 (same), FilterE-F10 (same).
+
+**Dispositions:**
+- 8 `fix-toward-spec` applied.
+- 0 `keep-as-divergence`, 0 `undecided`, 0 OOS surfaced this batch (all eight had existing dispositions of `fix-toward-spec (blocked: widening — defer to fix batch)`; this batch unblocks them).
+
+**Code change applied:**
+- `src/AudioEngine.js`: eight single-literal min/max edits across seven `_create*` methods.
+  - `_createOscA` (`:157`): `coarse.min/max: -60..60 → -64..64`.
+  - `_createOscC` (`:228`): `coarse.min/max: -60..60 → -64..64`.
+  - `_createPercOsc` (`:364`): `frequency.min/max: 20..8000 → 8..12544` Hz.
+  - `_createFormantOsc` (`:609`): `coarse.min/max: -60..60 → -64..64`.
+  - `_createMasterOsc` (`:636`): `coarse.min/max: -60..60 → -64..64`.
+  - `_createFilter` (`:928`): `frequency.min/max: 20..15000 → 10..15800` Hz.
+  - `_createFilterC` (`:951`): `frequency.min/max: 20..15000 → 10..15800` Hz.
+  - `_createFilterE` (`:978`): `frequency.min/max: 20..15000 → 10..15800` Hz.
+
+**Patch-load impact:** widening only across all eight changes. Every saved value remains valid in the wider range; no rename, no narrowing, no `setParam` keys changed. Pre-batch saved-patch scan (playbook §5) not required by rule — recorded explicitly for clarity.
+
+**Scope deviation from playbook §4:** the cluster covers 8 modules vs. the §4 cap of 5. Mirroring Batch 3's deviation justification: every fix is a single numeric literal change, no cross-module entanglement, two clean thematic groups within one diff surface. Per-module cluster summaries are preserved.
+
+**Audit gap observed, not in scope:**
+- **OscB.coarse** at `src/AudioEngine.js:192` is also `min: -60, max: 60`. Spec §2.3 says "Coarse/Fine/KBT: Same as OscA" (`BORED_MODULAR_DESIGN.md:145`), so the spec range is ±64 here as well. The Batch 3 audit's OscB cluster did not record a coarse-widening finding; this is an audit gap rather than a deliberate divergence. Deferred to a follow-up audit pass — not silently extended into this batch.
+- **SpectralOsc.coarse** at `src/AudioEngine.js:297` is `min: -24, max: 24`, narrower than spec's C-1..G9 (~±64); SpcOsc-F1 records this as `fix-toward-spec (blocked: widening — defer to fix batch)`. Not on Batch 3's quick-win list, so out of scope for Batch 5; flagged here so a future fix batch can pick it up alongside OscB.
+
+**Playbook leverage signals:**
+- The cluster deliberately *omits* LFOA-F1 (rate widening) and ADSREnv-F1 (envelope time widening) from Batch 3's quick-win list. LFOA-F1's sibling F2 needs to be re-derived once `rate` widens — applying F1 alone leaves Sub-range insufficient. ADSREnv-F1 lowers the floor (0.001 → 0.0005 s) which doubles snappiness at the same slider position — not a clean widening. Both deferred to brainstorms.
+- Eight one-literal edits with no cross-module entanglement made `replace_all` tempting but unsafe: a literal `replace_all` on `coarse: { value: 0, min: -60, max: 60, label: "Coarse" }` would have silently caught OscB (line 192), which is *not* in this batch's scope per the audit-gap observation above. Hand-edited instead with disambiguating multi-line context per target.
 
 ---
 

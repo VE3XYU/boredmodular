@@ -194,6 +194,28 @@ Running log of executed batches. Each entry: date, cluster, finding count by dis
   - **Coverage milestone:** every implemented module now has at least one pass of audit-recorded findings. Future fix-batches reference back to existing per-module subsections; new modules added to `src/` should be audited as part of their introductory plan.
   - **Workflow re-adoption note:** this batch explicitly re-adopted the playbook workflow that was retired after Unit 4 in 2026-05-06. The workflow is again static reference unless deliberately re-adopted for a future sweep or fix batch.
 
+### Batch 4 — Amplifier split (2026-05-13)
+
+- **Cluster:** `Amplifier` narrowed to spec §6.13 (fixed-gain) + new `GainControl` module per spec §6.3 (VCA with `Unipolar` toggle). 2 modules.
+- **Findings:** 7 in-scope + 1 OOS = 8 total (Amplifier F1/F2a/F2b/F3/F4/F5/F6/F7 + new GainControl G1-G4).
+- **Dispositions:** 6 `fix-toward-spec` applied (Amplifier F1/F2a/F3/F4/F7 in this batch; F2b had landed in Batch 1), 1 `keep-as-divergence` (GainControl G1 cat 2 extension), 1 `undecided` (Amplifier F5, folds to S3), 2 OOS, 2 fold-to-systemic.
+- **Effort class:** 1 module-narrow + 1 new module + patch-load migration ≈ 4 effort points (single-PR cluster within playbook §4).
+- **Playbook delta:**
+  - **Conditional patch-load migration pattern** demonstrated in `loadPatchData`: pre-existing `Amplifier` patches with an inbound `GainMod` connection retype to `GainControl` (rename port to `Ctrl`, level value preserved); patches without one stay as the narrowed Amplifier with `level` clamped into `[0.25, 4.0]`. Mechanically chained onto the existing `Mixer2 → Mixer3` alias precedent.
+  - **No new systemic findings.**
+  - Retrospected here on 2026-05-14 alongside the Batch 5 entry below — Batch 4's PR did not include a §6 update at the time.
+
+### Batch 5 — Range widenings (2026-05-14)
+
+- **Cluster:** 8 modules across two thematic groups — Oscillator pitch (`MasterOsc`, `OscA`, `OscC`, `FormantOsc`, `PercOsc`) and Filter frequency (`Filter`, `FilterC`, `FilterE`).
+- **Findings:** 8 in-scope + 0 OOS = 8 total (MstOsc-F2, OscA-F3, OscC-F6, FormantOsc-F3, PercOsc-F1, Filter-F7, FilterC-F2, FilterE-F10). All eight were previously `fix-toward-spec (blocked: widening — defer to fix batch)` and listed on Batch 3's quick-win recommendation.
+- **Dispositions:** 8 `fix-toward-spec` applied; 0 blocked / div / undecided / OOS surfaced this batch.
+- **Effort class:** 8 × range fix = 8 effort points; deliberately deviates from playbook §4 "≤5 modules per cluster", justified by every fix being a single numeric literal change with no cross-module entanglement and one diff surface in `IMPL_AUDIT_REPORT.md`.
+- **Playbook delta:**
+  - **No new systemic findings.** Audit gap *observed* (OscB.coarse and SpectralOsc.coarse should also widen to ±64) but explicitly *not extended into this batch* per user feedback `feedback_match_literal_scope.md`. Recorded in the Batch 5 cluster summary as a deferred audit-pass item, not folded into Batch 5's scope.
+  - **`replace_all` near-miss documented** in the Batch 5 cluster summary: literal `replace_all` on `coarse: { value: 0, min: -60, max: 60, label: "Coarse" }` would have silently caught OscB (not in scope). Hand-edited with disambiguating multi-line context per target. Surfaces here as a small but reusable safety note: `replace_all` is unsafe whenever the matched pattern is *legitimately repeated* across modules that aren't all in the batch's scope. Use per-target multi-line context instead.
+  - **Excluded from this batch by design:** LFOA-F1 (rate widening — sibling LFOA-F2 multiplier values need re-derivation first) and ADSREnv-F1 (lowers attack/decay/release floor 0.001 → 0.0005 s, doubles snappiness at same slider position — not a clean widening). Both deferred to brainstorms.
+
 ---
 
 *Companion files: `IMPL_AUDIT_REPORT.md` (the canonical audit log this playbook describes), `SPEC_AUDIT_REPORT.md` (model for prose style and severity grades), `BORED_MODULAR_DESIGN.md` and `MODULE_LAYOUTS.md` (the spec corpus). Project conventions and the imperative AudioEngine vs declarative React state split are in `CLAUDE.md`.*
