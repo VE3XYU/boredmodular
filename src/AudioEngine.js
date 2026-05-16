@@ -155,7 +155,7 @@ class AudioEngine {
       params: {
         frequency: { value: 220, min: 20, max: 8000, audioParam: freqParam, label: "Freq" },
         coarse: { value: 0, min: -64, max: 64, label: "Coarse" },
-        fine: { value: 0, min: -100, max: 100, label: "Fine" },
+        fine: { value: 0, min: -50, max: 50, label: "Fine" },
         waveform: { value: "sawtooth", options: ["sine", "sawtooth", "square", "triangle"], label: "Wave" },
         pulseWidth: { value: 0.5, min: 0.01, max: 0.99, audioParam: pwParam, label: "PW" },
         pwModDepth: { value: 0, min: 0, max: 1, audioParam: pwModGain.gain, label: "PW Mod" },
@@ -1264,7 +1264,7 @@ class AudioEngine {
       inputs: { In: input },
       _nodes: [input, filter, output],
       params: {
-        time: { value: 0.1, min: 0.001, max: 2, label: "Time" },
+        time: { value: 0.1, min: 0.0053, max: 1.355, label: "Time" },
         level: { value: 1, min: 0, max: 1, audioParam: output.gain, label: "Level" },
       },
     };
