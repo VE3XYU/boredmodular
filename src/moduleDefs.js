@@ -155,6 +155,7 @@ const MODULE_DEFS = {
     outputs: ["Out"],
     modInputs: ["FreqMod", "ResMod"],
     description: "Multi-mode filter with resonance",
+    paramRows: [{ knobs: ["frequency", "resonance"] }],
   },
   FilterC: {
     label: "FiltC",
@@ -164,6 +165,7 @@ const MODULE_DEFS = {
     outputs: ["LP", "BP", "HP"],
     modInputs: ["FreqMod", "ResMod"],
     description: "Static 3-output multimode filter",
+    paramRows: [{ knobs: ["frequency", "resonance"] }],
   },
   FilterE: {
     label: "FiltE",
@@ -173,6 +175,7 @@ const MODULE_DEFS = {
     outputs: ["Out"],
     modInputs: ["FreqMod1", "FreqMod2", "ResMod"],
     description: "Dynamic filter with slope select",
+    paramRows: [{ knobs: ["frequency", "resonance"] }],
   },
   // ── Modulators ──
   Envelope: {
@@ -183,6 +186,7 @@ const MODULE_DEFS = {
     outputs: ["Out"],
     modInputs: [],
     description: "ADSR Envelope generator",
+    paramRows: [{ knobs: ["attack", "decay", "sustain", "release"] }],
   },
   ADSREnv: {
     label: "ADSR",
@@ -343,6 +347,7 @@ const MODULE_DEFS = {
     outputs: ["Out"],
     modInputs: [],
     description: "Delay effect with feedback",
+    paramRows: [{ knobs: ["time", "feedback", "mix"] }],
   },
   ShortDelay: {
     label: "ShDly",
@@ -352,6 +357,7 @@ const MODULE_DEFS = {
     outputs: ["Out"],
     modInputs: ["TimeMod"],
     description: "Short delay for flanging (0-2.65ms)",
+    paramRows: [{ knobs: ["time", "feedback", "mix"] }],
   },
   Chorus: {
     label: "Chorus",
@@ -361,6 +367,7 @@ const MODULE_DEFS = {
     outputs: ["Out"],
     modInputs: [],
     description: "Stereo chorus effect",
+    paramRows: [{ knobs: ["rate", "depth", "mix"] }],
   },
   Shaper: {
     label: "Shaper",
@@ -370,6 +377,7 @@ const MODULE_DEFS = {
     outputs: ["Out"],
     modInputs: [],
     description: "Waveshaper with drive control",
+    paramRows: [{ knobs: ["drive", "level"] }],
   },
   // ── I/O ──
   Keyboard: {
