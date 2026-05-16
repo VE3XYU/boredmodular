@@ -2,7 +2,7 @@
 
 A growing record of how the implementation in `src/` compares to the spec corpus, audited per batch. Each batch appends its scoped audit; the report is allowed to be incomplete.
 
-**Status: 2026-05-14.** Five batches landed; all 42 currently-implemented modules audited. Batch 3 (2026-05-12) was a single audit-only sweep covering the 38 modules previously unaudited; Batch 4 (2026-05-13) split the impl `Amplifier` hybrid into a spec §6.13 fixed-gain `Amplifier` plus a new spec §6.3 `GainControl` (VCA with `Unipolar` toggle), resolving Amplifier findings F1/F2a/F3/F4/F7 in one batch; Batch 5 (2026-05-14) applied eight patch-load-safe range widenings drawn from Batch 3's quick-win recommendations (MstOsc-F2, OscA-F3, OscC-F6, FormantOsc-F3, PercOsc-F1, Filter-F7, FilterC-F2, FilterE-F10). Batches 1 and 2 covered Amplifier (initial range fixes), ClkGen, and RandomGen. Systemic findings: S1-S6 (port-colour, attenuator-type, layout, non-oscillator master/slave architecture, mute-affordance absence, KBT cosmetic-only). On 2026-05-06 the disposition framework was reframed to make spec the source of truth (see Disposition section). Batches 1-3 left every `fix-toward-spec` finding blocked on a systemic dependency, a design call, or a patch-load safety check; Batches 4 and 5 are the first since then to apply `fix-toward-spec` changes in `src/`.
+**Status: 2026-05-15.** Six batches landed; all 42 currently-implemented modules audited. Batch 3 (2026-05-12) was a single audit-only sweep covering the 38 modules previously unaudited; Batch 4 (2026-05-13) split the impl `Amplifier` hybrid into a spec §6.13 fixed-gain `Amplifier` plus a new spec §6.3 `GainControl` (VCA with `Unipolar` toggle), resolving Amplifier findings F1/F2a/F3/F4/F7 in one batch; Batch 5 (2026-05-14) applied eight patch-load-safe range widenings drawn from Batch 3's quick-win recommendations (MstOsc-F2, OscA-F3, OscC-F6, FormantOsc-F3, PercOsc-F1, Filter-F7, FilterC-F2, FilterE-F10); Batch 6 (2026-05-15) applied two range narrowings (OscA-F2 Fine, Porta-F2 time) — the playbook §5 saved-patch scan was waived because the project is still in development mode and the maintainer confirmed no saved patches need preservation. Batches 1 and 2 covered Amplifier (initial range fixes), ClkGen, and RandomGen. Systemic findings: S1-S6 (port-colour, attenuator-type, layout, non-oscillator master/slave architecture, mute-affordance absence, KBT cosmetic-only). On 2026-05-06 the disposition framework was reframed to make spec the source of truth (see Disposition section). Batches 1-3 left every `fix-toward-spec` finding blocked on a systemic dependency, a design call, or a patch-load safety check; Batches 4, 5, and 6 are the first since then to apply `fix-toward-spec` changes in `src/`.
 
 ## Sources
 
@@ -183,7 +183,7 @@ Pitch-only controller. No audio output; `Slv` carries frequency in Hz via `Const
 Full-featured master with Sync, FMA, PWM, and Slv output. Pitch / fine / waveform / PW params present.
 
 - **OscA-F1 — Missing `KBT (Knob): Off to 2.0` param.** Compare to OscB/OscC which have a `kbt` knob param. Severity: Minor. Disposition: `fix-toward-spec (blocked: adding the param without the behaviour would deepen S6 — wire it once S6 is resolved)`.
-- **OscA-F2 — Fine range ±100 (cents) vs spec ±50 (half semitone, 128 steps).** Impl's range is double spec. Severity: Minor. Disposition: `fix-toward-spec (blocked: range narrowing requires patch-load scan per playbook §5)`.
+- **OscA-F2 — Fine range ±100 (cents) vs spec ±50 (half semitone, 128 steps).** Impl's range is double spec. Severity: Minor. Disposition: `fix-toward-spec` (applied 2026-05-15 in batch 6 — `fine.min/max: ±100 → ±50`). Saved-patch scan waived: project is still in development mode; maintainer confirmed no saved patches need preservation.
 - **OscA-F3 — Coarse range ±60 vs spec C-1..G9 (~±64).** Same widening issue as MstOsc-F2. Severity: Minor. Disposition: `fix-toward-spec` (applied 2026-05-14 in batch 5 — `coarse.min/max: ±60 → ±64`).
 - **OscA-F4 — Missing `M (Button) Mute`.** Folds to S5.
 - **OscA-F5 — `pwModDepth` impl-only mod attenuator (0..1).** Spec describes a `PWidth Mod (Input, Red)` [Type I] with no separate impl-only depth knob — depth is the attenuator. Severity: Minor. Disposition: `keep-as-divergence`. Rationale (cat 2 — extension): provides per-input scaling that spec assumes hardware attenuator hardware provides; folds into S2 once attenuator metadata is threaded.
@@ -194,9 +194,9 @@ Full-featured master with Sync, FMA, PWM, and Slv output. Pitch / fine / wavefor
 
 **Cluster summary (OscA):**
 - Findings: 5 in-scope + 1 OOS = 6 total (F4/F7/F8 fold to S5/S1/S3).
-- Dispositions: 2 `fix-toward-spec (blocked)` (F1, F2), 1 `fix-toward-spec` applied (F3 — coarse widening in batch 5), 2 `keep-as-divergence` (F5 cat 2, F6 cat 2), 1 OOS (F9).
-- Code change applied: `src/AudioEngine.js:157` — `coarse.min/max: -60..60 → -64..64` (batch 5, 2026-05-14).
-- Patch-load impact: F3 widening (safe). F2 would-be narrowing still blocked.
+- Dispositions: 1 `fix-toward-spec (blocked)` (F1 — depends on S6), 2 `fix-toward-spec` applied (F3 — coarse widening in batch 5; F2 — fine narrowing in batch 6), 2 `keep-as-divergence` (F5 cat 2, F6 cat 2), 1 OOS (F9).
+- Code change applied: `src/AudioEngine.js:157` — `coarse.min/max: -60..60 → -64..64` (batch 5, 2026-05-14); `src/AudioEngine.js:158` — `fine.min/max: -100..100 → -50..50` (batch 6, 2026-05-15).
+- Patch-load impact: F3 widening (safe). F2 narrowing — saved-patch scan waived per dev-mode statement in batch 6.
 
 ### 2.3 OscB (impl: `OscB`) — audited 2026-05-12, batch 3
 
@@ -922,7 +922,7 @@ Long echo delay (0.01-2 s) with feedback (0-0.95) and dry/wet mix. Impl-only mod
 Slew limiter using a BiquadFilter lowpass: input → filter → output. The `time` param maps to cutoff (higher time = lower cutoff = slower glide).
 
 - **Porta-F1 — Missing `On (Input, Yellow)` enable input.** Spec: "On (Input, Yellow): Enables glide when high. If unpatched, portamento is always active." Impl has no On input — portamento is always active. Severity: Minor (impl matches spec's "unpatched" default state but loses the ability to gate the glide). Disposition: `fix-toward-spec (blocked: requires adding an `On` input that conditionally bypasses the filter when low; modest addition, depends on a small architectural decision about how to implement the bypass — switch via AudioWorklet vs branching gain)`.
-- **Porta-F2 — `time` range 0.001..2 s vs spec "5.3 to 1355 ms" (0.0053..1.355 s).** Different range. Impl is wider at the lower end and narrower at the upper. Severity: Minor. Disposition: `fix-toward-spec (blocked: range narrowing on the upper end requires patch-load scan per §5)`.
+- **Porta-F2 — `time` range 0.001..2 s vs spec "5.3 to 1355 ms" (0.0053..1.355 s).** Different range. Impl is wider at the lower end and narrower at the upper. Severity: Minor. Disposition: `fix-toward-spec` (applied 2026-05-15 in batch 6 — `time.min/max: 0.001..2 → 0.0053..1.355` s). Saved-patch scan waived: project is still in development mode; maintainer confirmed no saved patches need preservation. User-visible effect: fastest glide gets slightly slower (1 ms → 5.3 ms minimum) and slowest glide narrows from 2 s to 1.355 s; the `setParam` mapping (`cutoff = max(0.5, 1 / (time * 2))`) is range-agnostic.
 - **Porta-F3 — Impl-only `level` param (0..1).** Spec has no output level knob (Portamento is just a slew limiter). Severity: Minor. Disposition: `keep-as-divergence`. Rationale (cat 2 — extension): output gain is a small affordance; doesn't replace any spec feature.
 - **Porta-F4 — In / Output port colours (spec Blue for both, impl In is blue but Out is red).** Folds to S1.
 - **Porta-F5 — Display element absent.** Folds to S3.
@@ -930,9 +930,9 @@ Slew limiter using a BiquadFilter lowpass: input → filter → output. The `tim
 
 **Cluster summary (PortamentoA):**
 - Findings: 2 in-scope + 1 OOS = 3 total.
-- Dispositions: 2 `keep-as-divergence` (F3 cat 2, F6 cat 1), 2 `fix-toward-spec (blocked)` (F1, F2).
-- Code change applied: none.
-- Patch-load impact: F2 would-be narrowing.
+- Dispositions: 2 `keep-as-divergence` (F3 cat 2, F6 cat 1), 1 `fix-toward-spec (blocked)` (F1), 1 `fix-toward-spec` applied (F2 — time narrowing in batch 6).
+- Code change applied: `src/AudioEngine.js:1267` — `time.min/max: 0.001..2 → 0.0053..1.355` s (batch 6, 2026-05-15).
+- Patch-load impact: F2 narrowing — saved-patch scan waived per dev-mode statement in batch 6.
 
 ---
 
@@ -1136,6 +1136,36 @@ Eight patch-load-safe range widenings drawn from Batch 3's quick-win recommendat
 **Playbook leverage signals:**
 - The cluster deliberately *omits* LFOA-F1 (rate widening) and ADSREnv-F1 (envelope time widening) from Batch 3's quick-win list. LFOA-F1's sibling F2 needs to be re-derived once `rate` widens — applying F1 alone leaves Sub-range insufficient. ADSREnv-F1 lowers the floor (0.001 → 0.0005 s) which doubles snappiness at the same slider position — not a clean widening. Both deferred to brainstorms.
 - Eight one-literal edits with no cross-module entanglement made `replace_all` tempting but unsafe: a literal `replace_all` on `coarse: { value: 0, min: -60, max: 60, label: "Coarse" }` would have silently caught OscB (line 192), which is *not* in this batch's scope per the audit-gap observation above. Hand-edited instead with disambiguating multi-line context per target.
+
+---
+
+## Batch 6 — Range narrowings (2026-05-15)
+
+Two range narrowings drawn from Batch 3's quick-win list (`:1067-1073`), both previously blocked on the playbook §5 saved-patch scan. The scan was waived for this batch on direct maintainer direction: the project is still in development mode, no saved patches need preservation, so the silent-stale-value risk that motivates §5 doesn't apply here.
+
+**Modules covered:** 2 — `OscA` (fine range), `PortamentoA` (time range).
+
+**Findings resolved:**
+- **OscA-F2** — `fine.min/max: ±100 → ±50` cents, matching spec ±half-semitone (`BORED_MODULAR_DESIGN.md:132`).
+- **Porta-F2** — `time.min/max: 0.001..2 → 0.0053..1.355` s, matching spec "5.3 to 1355 ms" (`:867`).
+
+**Dispositions:**
+- 2 `fix-toward-spec` applied.
+- 0 other dispositions surfaced this batch.
+
+**Code change applied:**
+- `src/AudioEngine.js:158` (`_createOscA`): `fine.min/max: -100..100 → -50..50`.
+- `src/AudioEngine.js:1267` (`_createPortamentoA`): `time.min/max: 0.001..2 → 0.0053..1.355`.
+
+**Patch-load impact:** narrowings — would normally require the playbook §5 saved-patch scan to verify no in-flight saved values fall outside the new range. Scan waived on direct maintainer direction (dev-mode project, no saved patches need preservation). Recorded explicitly in the affected per-module dispositions and cluster summaries.
+
+**User-visible effects worth noting:**
+- `OscA.fine`: the cents knob now travels half as far per slider unit — fine-tune resolution is the same (continuous), but the range stops at ±50 cents instead of ±100. A user accustomed to ±100 will hit the ceiling sooner.
+- `PortamentoA.time`: fastest glide moves from 1 ms to 5.3 ms (slightly slower); slowest glide moves from 2 s to 1.355 s (slightly faster). The `setParam` mapping (`cutoff = max(0.5, 1 / (time * 2))`) is range-agnostic — only the slider extremes change.
+
+**Playbook leverage signals:**
+- Documenting the §5 scan waiver explicitly (rather than silently skipping it) keeps the audit honest about why this batch differs from the §5 default. If saved-patch preservation later becomes a requirement (post-launch, public release, etc.), the waiver can be revisited per-finding rather than re-litigated from scratch.
+- This is the first batch to apply a `fix-toward-spec (blocked: ... patch-load scan per §5)` finding by waiving rather than satisfying the scan. The waiver is dev-mode-specific; the §5 rule itself stays in place for future batches.
 
 ---
 

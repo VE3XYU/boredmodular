@@ -216,6 +216,18 @@ Running log of executed batches. Each entry: date, cluster, finding count by dis
   - **`replace_all` near-miss documented** in the Batch 5 cluster summary: literal `replace_all` on `coarse: { value: 0, min: -60, max: 60, label: "Coarse" }` would have silently caught OscB (not in scope). Hand-edited with disambiguating multi-line context per target. Surfaces here as a small but reusable safety note: `replace_all` is unsafe whenever the matched pattern is *legitimately repeated* across modules that aren't all in the batch's scope. Use per-target multi-line context instead.
   - **Excluded from this batch by design:** LFOA-F1 (rate widening — sibling LFOA-F2 multiplier values need re-derivation first) and ADSREnv-F1 (lowers attack/decay/release floor 0.001 → 0.0005 s, doubles snappiness at same slider position — not a clean widening). Both deferred to brainstorms.
 
+### Batch 6 — Range narrowings (2026-05-15)
+
+- **Cluster:** 2 modules — `OscA` (fine narrowing), `PortamentoA` (time narrowing). Both were on Batch 3's quick-win list but blocked on the playbook §5 saved-patch scan.
+- **Findings:** 2 in-scope + 0 OOS = 2 total (OscA-F2, Porta-F2).
+- **Dispositions:** 2 `fix-toward-spec` applied; 0 blocked / div / undecided / OOS surfaced this batch.
+- **Effort class:** 2 × range fix = 2 effort points. Within playbook §4's "≤5 modules per cluster".
+- **Playbook delta:**
+  - **§5 saved-patch scan waiver pattern.** This is the first batch to apply a `fix-toward-spec (blocked: ... patch-load scan per §5)` finding by *waiving* rather than satisfying the scan. The waiver is conditional on the project being in development mode with no saved patches needing preservation, and was issued by direct maintainer instruction in-session. The §5 rule itself stays in place for future batches — when saved-patch preservation later becomes a requirement (post-launch, public release, etc.), the waiver can be revisited per-finding rather than re-litigated from scratch.
+  - **No new systemic findings.**
+  - **No audit gaps observed** worth deferring this round. (Compare Batch 5's OscB / SpectralOsc audit gap deferrals.)
+  - **Carry-over for future batches:** the `fix-toward-spec (blocked: ... patch-load scan per §5)` disposition language is now ambiguous between "blocked indefinitely" and "blocked-pending-waiver". Future audits should distinguish by writing out the *reason* the scan is needed in the blocker — e.g., "blocked: range narrowing; preservation required because <reason>" — so the waiver path is clearer.
+
 ---
 
 *Companion files: `IMPL_AUDIT_REPORT.md` (the canonical audit log this playbook describes), `SPEC_AUDIT_REPORT.md` (model for prose style and severity grades), `BORED_MODULAR_DESIGN.md` and `MODULE_LAYOUTS.md` (the spec corpus). Project conventions and the imperative AudioEngine vs declarative React state split are in `CLAUDE.md`.*
