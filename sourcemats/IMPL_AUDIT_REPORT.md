@@ -213,12 +213,13 @@ Master oscillator with FMA, no Sync, no PWM (spec also has `PWidth Mod` but impl
 - **OscB-F6 — PitchMod / FMA port colours.** Folds to S1.
 - **OscB-F7 — Spec describes "clicking selected waveform button mutes output".** Impl has no per-waveform mute click affordance. Severity: Minor. Disposition: `fix-toward-spec (blocked: depends on per-module Mute affordance from S5 + per-waveform-button UI gesture)`.
 - **OscB-F8 — Default level 0.8 (spec silent).** Severity: OOS.
+- **OscB-F9 — Coarse range ±60 vs spec ±64.** Spec §2.3 says "Coarse/Fine/KBT: Same as OscA" (`BORED_MODULAR_DESIGN.md:145`), so the spec coarse range is C-1..G9 ≈ ±64 semitones from middle, matching OscA / MstOsc / OscC / FormantOsc. Impl is ±60. Severity: Minor. Disposition: `fix-toward-spec (blocked: widening — defer to fix batch; patch-load-safe per playbook §5)`. **Surfaced:** 2026-05-14 during Batch 5 (range-widening cluster); was missed in the original Batch 3 audit pass. Eligible for inclusion in any future widening cluster alongside MstOsc-F2 / OscA-F3 / OscC-F6 / FormantOsc-F3 (which were resolved in Batch 5).
 
 **Cluster summary (OscB):**
-- Findings: 4 in-scope + 1 OOS = 5 total (F3/F4/F6 fold; F5 folds via S2; F2 is a match).
-- Dispositions: 2 `fix-toward-spec (blocked)` (F1, F7), 1 `keep-as-divergence` (F5 cat 2), 1 OOS (F8).
+- Findings: 5 in-scope + 1 OOS = 6 total (F3/F4/F6 fold; F5 folds via S2; F2 is a match).
+- Dispositions: 3 `fix-toward-spec (blocked)` (F1, F7, F9 — backfilled audit gap), 1 `keep-as-divergence` (F5 cat 2), 1 OOS (F8).
 - Code change applied: none.
-- Patch-load impact: F1 would-be additive (safe).
+- Patch-load impact: F1 would-be additive (safe). F9 would-be widening (safe).
 
 ### 2.4 OscC (impl: `OscC`) — audited 2026-05-12, batch 3
 
@@ -257,12 +258,13 @@ Spec describes an additive oscillator with synced noise generating overtones; im
 - **SpcOsc-F6 — `fmDepth` impl-only attenuator.** `keep-as-divergence` cat 2; folds to S2.
 - **SpcOsc-F7 — Port colours.** Folds to S1.
 - **SpcOsc-F8 — Default level 0.5 (spec silent).** OOS.
+- **SpcOsc-F9 — Fine range ±100 (cents) vs spec ±half-semitone (±50).** Same shape as OscA-F2 (which was resolved in Batch 6). Impl's range is double spec. Severity: Minor. Disposition: `fix-toward-spec (blocked: narrowing — would normally require playbook §5 saved-patch scan; Batch 6 established a dev-mode waiver precedent. Eligible for inclusion in any future narrowing cluster while the dev-mode waiver still applies)`. **Surfaced:** 2026-05-15 during Batch 6 (range-narrowing cluster); was missed in the original Batch 3 audit pass.
 
 **Cluster summary (SpectralOsc):**
-- Findings: 3 in-scope + 2 OOS = 5 total.
-- Dispositions: 1 `keep-as-divergence` (F2 cat 1), 1 `fix-toward-spec (blocked)` (F1 — widening), 1 `fix-toward-spec (blocked)` (F3 — depends on C5 key/label separation), 1 `keep-as-divergence` (F6 cat 2), 2 OOS (F2 also borderline, F8).
+- Findings: 4 in-scope + 2 OOS = 6 total.
+- Dispositions: 1 `keep-as-divergence` (F2 cat 1), 3 `fix-toward-spec (blocked)` (F1 — widening, F3 — depends on C5 key/label separation, F9 — narrowing audit gap from Batch 6), 1 `keep-as-divergence` (F6 cat 2), 2 OOS (F2 also borderline, F8).
 - Code change applied: none.
-- Patch-load impact: F1 would-be widening.
+- Patch-load impact: F1 would-be widening (safe). F9 would-be narrowing (saved-patch scan / dev-mode waiver per Batch 6 precedent).
 
 ### 2.6 FormantOsc (impl: `FormantOsc`) — audited 2026-05-12, batch 3
 
@@ -1130,8 +1132,8 @@ Eight patch-load-safe range widenings drawn from Batch 3's quick-win recommendat
 **Scope deviation from playbook §4:** the cluster covers 8 modules vs. the §4 cap of 5. Mirroring Batch 3's deviation justification: every fix is a single numeric literal change, no cross-module entanglement, two clean thematic groups within one diff surface. Per-module cluster summaries are preserved.
 
 **Audit gap observed, not in scope:**
-- **OscB.coarse** at `src/AudioEngine.js:192` is also `min: -60, max: 60`. Spec §2.3 says "Coarse/Fine/KBT: Same as OscA" (`BORED_MODULAR_DESIGN.md:145`), so the spec range is ±64 here as well. The Batch 3 audit's OscB cluster did not record a coarse-widening finding; this is an audit gap rather than a deliberate divergence. Deferred to a follow-up audit pass — not silently extended into this batch.
-- **SpectralOsc.coarse** at `src/AudioEngine.js:297` is `min: -24, max: 24`, narrower than spec's C-1..G9 (~±64); SpcOsc-F1 records this as `fix-toward-spec (blocked: widening — defer to fix batch)`. Not on Batch 3's quick-win list, so out of scope for Batch 5; flagged here so a future fix batch can pick it up alongside OscB.
+- **OscB.coarse** at `src/AudioEngine.js:192` is also `min: -60, max: 60`. Spec §2.3 says "Coarse/Fine/KBT: Same as OscA" (`BORED_MODULAR_DESIGN.md:145`), so the spec range is ±64 here as well. The Batch 3 audit's OscB cluster did not record a coarse-widening finding; this is an audit gap rather than a deliberate divergence. Deferred to a follow-up audit pass — not silently extended into this batch. **Backfilled 2026-05-15 as OscB-F9** so future widening clusters discover it via the canonical per-module subsection.
+- **SpectralOsc.coarse** at `src/AudioEngine.js:297` is `min: -24, max: 24`, narrower than spec's C-1..G9 (~±64); SpcOsc-F1 records this as `fix-toward-spec (blocked: widening — defer to fix batch)`. Not on Batch 3's quick-win list, so out of scope for Batch 5; flagged here so a future fix batch can pick it up alongside OscB. (This one was already recorded in the per-module subsection; the cross-reference is preserved here for context.)
 
 **Playbook leverage signals:**
 - The cluster deliberately *omits* LFOA-F1 (rate widening) and ADSREnv-F1 (envelope time widening) from Batch 3's quick-win list. LFOA-F1's sibling F2 needs to be re-derived once `rate` widens — applying F1 alone leaves Sub-range insufficient. ADSREnv-F1 lowers the floor (0.001 → 0.0005 s) which doubles snappiness at the same slider position — not a clean widening. Both deferred to brainstorms.
@@ -1166,6 +1168,9 @@ Two range narrowings drawn from Batch 3's quick-win list (`:1067-1073`), both pr
 **Playbook leverage signals:**
 - Documenting the §5 scan waiver explicitly (rather than silently skipping it) keeps the audit honest about why this batch differs from the §5 default. If saved-patch preservation later becomes a requirement (post-launch, public release, etc.), the waiver can be revisited per-finding rather than re-litigated from scratch.
 - This is the first batch to apply a `fix-toward-spec (blocked: ... patch-load scan per §5)` finding by waiving rather than satisfying the scan. The waiver is dev-mode-specific; the §5 rule itself stays in place for future batches.
+
+**Audit gap observed, not in scope:**
+- **SpectralOsc.fine** at `src/AudioEngine.js:298` is also `min: -100, max: 100` — same shape as OscA's pre-fix state. The Batch 3 audit's SpectralOsc cluster did not record a fine-narrowing finding; this joins the `OscB.coarse` and `SpectralOsc.coarse` gaps surfaced in Batch 5. **Backfilled 2026-05-15 as SpcOsc-F9** so future narrowing clusters discover it via the canonical per-module subsection.
 
 ---
 
