@@ -153,6 +153,7 @@ Before Phase 3 (the big layout shift) we need calls on these. Phase 1 (knob) and
 - **2026-05-08 — Phase 3a (denser layout) shipped.** `MODULE_WIDTH` 170→220, `HEADER_H` 32→22, `PARAM_ROW_H` 32→24, knob radius 10→9, font sizes scaled down. Sync-sweep round-trip verified. PR #25.
 - **2026-05-08 — Phase 4 (LCD display) shipped.** `LcdDisplay` component (deep navy `#1a3a6a` + cyan `#7ec8e3` text) replaces the per-row plain-text value. PR #26.
 - **2026-05-09 — Phase 3b (multi-knob row) opened, parked.** Opt-in `paramRows: [{ knobs: [...] }]` field on a module def renders a strip with shared multi-segment LCD on top and small knobs below. Applied to ADSREnv only as a pattern proof. PR #27 — open, awaiting tweaks before merge per user.
+- **2026-05-20 — Phase 3b Tier 1 fan-out shipped.** `paramRows` applied to all three filters (`Filter`/`FilterC`/`FilterE` → `[frequency, resonance]`), `Envelope` (→ ADSR row matching ADSREnv), and all four effects (`Delay`/`ShortDelay` → `[time, feedback, mix]`, `Chorus` → `[rate, depth, mix]`, `Shaper` → `[drive, level]`). PR #47. Tier 2 (`DrumSynth`, `OscA`/`B`/`C`, `MasterOsc`) and Tier 3 (`Mixer8`, `OscSineBank`) still deferred.
 
 ## Reference observations (2026-05-08)
 
@@ -176,18 +177,16 @@ User shared three Nord Modular Editor reference screenshots in chat — used as 
 
 ## Status / Next Action
 
-Plan in `draft`. **Shipped:** Phase 1 (knob), Phase 2 (font), grey re-skin, Phase 3a (density), Phase 4 (LCD). **Parked:** Phase 3b (multi-knob row) — pattern works on ADSREnv (PR #27) but the user wants to live with it before fanning out and possibly tweaking the strip dimensions.
+Plan in `draft`. **Shipped:** Phase 1 (knob), Phase 2 (font), grey re-skin, Phase 3a (density), Phase 4 (LCD), Phase 3b Tier 1 fan-out (PR #47 — filters, Envelope, effects). **Pending Phase 3b work:** Tier 2 (DrumSynth, OscA/B/C, MasterOsc) and Tier 3 (Mixer8, OscSineBank) still deferred — Tier 2 will exercise multi-`paramRows` per module; Tier 3 needs strip-variant or splitting decisions first.
 
-### paramRows fan-out — candidate batches (deferred)
+### paramRows fan-out — candidate batches
 
-Once Phase 3b is dialled in, these are the candidate modules in priority order:
-
-**Tier 1 — clean 2-3 knob groups, direct Nord parallel:**
-- `Envelope` — `["attack", "decay"]` (matches Nord "AD-Env1")
-- `Filter` / `FilterC` / `FilterE` — `["frequency", "resonance"]` (leave Type/slope as dropdowns)
-- `Delay` / `ShortDelay` — `["time", "feedback", "mix"]` or equivalent
-- `Chorus` — rate / depth / mix
-- `Shaper` — drive / shape / mix
+**Tier 1 — shipped in PR #47 (2026-05-20):**
+- `Envelope` — `["attack", "decay", "sustain", "release"]` (full ADSR row; the original draft proposed AD-only to mirror Nord "AD-Env1", but Envelope's spec is ADSR so the row matches `ADSREnv`)
+- `Filter` / `FilterC` / `FilterE` — `["frequency", "resonance"]` (Type/slope/gainComp left as dropdowns below the strip)
+- `Delay` / `ShortDelay` — `["time", "feedback", "mix"]`
+- `Chorus` — `["rate", "depth", "mix"]`
+- `Shaper` — `["drive", "level"]` (Shape stays a dropdown above; the original draft suggested `drive / shape / mix` but Shaper has no `mix` param — `level` is the output gain)
 
 **Tier 2 — multiple sub-groups on one module (tests multi-`paramRows`):**
 - `DrumSynth` — natural splits: `[mstPitch, mstDec, mstLvl]`, `[slvRatio, slvDec, slvLvl]`, `[fltFreq, fltRes, fltSweep, fltDec]`, `[bendAmt, bendDcy]`
