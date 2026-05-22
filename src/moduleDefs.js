@@ -64,6 +64,7 @@ const MODULE_DEFS = {
     outputs: ["Slv"],
     modInputs: ["PitchMod1", "PitchMod2"],
     description: "Master oscillator - Pitch controller for slaves",
+    paramRows: [{ knobs: ["frequency", "coarse", "fine"] }],
   },
   OscSlvA: {
     label: "SlvA",
