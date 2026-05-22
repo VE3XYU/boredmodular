@@ -154,6 +154,7 @@ Before Phase 3 (the big layout shift) we need calls on these. Phase 1 (knob) and
 - **2026-05-08 — Phase 4 (LCD display) shipped.** `LcdDisplay` component (deep navy `#1a3a6a` + cyan `#7ec8e3` text) replaces the per-row plain-text value. PR #26.
 - **2026-05-09 — Phase 3b (multi-knob row) opened, parked.** Opt-in `paramRows: [{ knobs: [...] }]` field on a module def renders a strip with shared multi-segment LCD on top and small knobs below. Applied to ADSREnv only as a pattern proof. PR #27 — open, awaiting tweaks before merge per user.
 - **2026-05-20 — Phase 3b Tier 1 fan-out shipped.** `paramRows` applied to all three filters (`Filter`/`FilterC`/`FilterE` → `[frequency, resonance]`), `Envelope` (→ ADSR row matching ADSREnv), and all four effects (`Delay`/`ShortDelay` → `[time, feedback, mix]`, `Chorus` → `[rate, depth, mix]`, `Shaper` → `[drive, level]`). PR #47. Tier 2 (`DrumSynth`, `OscA`/`B`/`C`, `MasterOsc`) and Tier 3 (`Mixer8`, `OscSineBank`) still deferred.
+- **2026-05-22 — Phase 3b Tier 2 MasterOsc shipped.** `paramRows: [{ knobs: ["frequency", "coarse", "fine"] }]` on `MasterOsc`; `kbt` falls through to the existing single-row select renderer below the strip. Single-row shape, same as Tier 1 — doesn't exercise multi-`paramRows` yet. PR #49. Remaining Tier 2 (`DrumSynth`, `OscA`/`B`/`C`) is the multi-row exercise; still deferred.
 
 ## Reference observations (2026-05-08)
 
@@ -177,7 +178,7 @@ User shared three Nord Modular Editor reference screenshots in chat — used as 
 
 ## Status / Next Action
 
-Plan in `draft`. **Shipped:** Phase 1 (knob), Phase 2 (font), grey re-skin, Phase 3a (density), Phase 4 (LCD), Phase 3b Tier 1 fan-out (PR #47 — filters, Envelope, effects). **Pending Phase 3b work:** Tier 2 (DrumSynth, OscA/B/C, MasterOsc) and Tier 3 (Mixer8, OscSineBank) still deferred — Tier 2 will exercise multi-`paramRows` per module; Tier 3 needs strip-variant or splitting decisions first.
+Plan in `draft`. **Shipped:** Phase 1 (knob), Phase 2 (font), grey re-skin, Phase 3a (density), Phase 4 (LCD), Phase 3b Tier 1 fan-out (PR #47 — filters, Envelope, effects), Phase 3b Tier 2 MasterOsc (PR #49 — single-row freq/coarse/fine). **Pending Phase 3b work:** remaining Tier 2 (DrumSynth, OscA/B/C — the multi-`paramRows` exercise) and Tier 3 (Mixer8, OscSineBank) still deferred — Tier 3 needs strip-variant or splitting decisions first.
 
 ### paramRows fan-out — candidate batches
 
@@ -191,7 +192,7 @@ Plan in `draft`. **Shipped:** Phase 1 (knob), Phase 2 (font), grey re-skin, Phas
 **Tier 2 — multiple sub-groups on one module (tests multi-`paramRows`):**
 - `DrumSynth` — natural splits: `[mstPitch, mstDec, mstLvl]`, `[slvRatio, slvDec, slvLvl]`, `[fltFreq, fltRes, fltSweep, fltDec]`, `[bendAmt, bendDcy]`
 - `OscA` / `OscB` / `OscC` — pitch trio (freq + coarse + fine), then PW pair, then FM/level pair
-- `MasterOsc` — coarse/fine/pitch row (the most Nord-iconic layout)
+- ~~`MasterOsc` — coarse/fine/pitch row (the most Nord-iconic layout)~~ — **shipped in PR #49 (2026-05-22)**. Single-row only; still doesn't exercise multi-`paramRows`.
 
 **Tier 3 — needs strip variant or splitting:**
 - `Mixer8` — 8 channel knobs is too many at 220px wide; either two `paramRows` of 4, or a wider strip variant
