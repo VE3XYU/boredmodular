@@ -156,6 +156,7 @@ Before Phase 3 (the big layout shift) we need calls on these. Phase 1 (knob) and
 - **2026-05-20 — Phase 3b Tier 1 fan-out shipped.** `paramRows` applied to all three filters (`Filter`/`FilterC`/`FilterE` → `[frequency, resonance]`), `Envelope` (→ ADSR row matching ADSREnv), and all four effects (`Delay`/`ShortDelay` → `[time, feedback, mix]`, `Chorus` → `[rate, depth, mix]`, `Shaper` → `[drive, level]`). PR #47. Tier 2 (`DrumSynth`, `OscA`/`B`/`C`, `MasterOsc`) and Tier 3 (`Mixer8`, `OscSineBank`) still deferred.
 - **2026-05-22 — Phase 3b Tier 2 MasterOsc shipped.** `paramRows: [{ knobs: ["frequency", "coarse", "fine"] }]` on `MasterOsc`; `kbt` falls through to the existing single-row select renderer below the strip. Single-row shape, same as Tier 1 — doesn't exercise multi-`paramRows` yet. PR #49. Remaining Tier 2 (`DrumSynth`, `OscA`/`B`/`C`) is the multi-row exercise; still deferred.
 - **2026-05-22 — Phase 3b Tier 2 OscA/B/C shipped.** First exercise of multi-`paramRows` (multiple row entries per module) in the codebase. `OscA` → three rows: `[frequency, coarse, fine]`, `[pulseWidth, pwModDepth]`, `[fmDepth, level]` with `waveform` dropdown falling through as a single between rows 1 and 2. `OscB` → two rows: `[frequency, coarse, fine]`, `[fmDepth, level]` with `kbt` slider and `waveform` dropdown falling through. `OscC` → two rows: `[frequency, coarse, fine]`, `[fmDepth, level]` with `kbt` slider falling through. No engine or param changes; patches saved before this PR load identically after. PR #51. Remaining Tier 2: `DrumSynth` (the 4-row-group case: mst / slv / flt / bend).
+- **2026-05-22 — Phase 3b Tier 2 DrumSynth shipped.** Final Tier 2 module. Four `paramRows` matching the spec's natural groupings: `[masterPitch, masterDecay, masterLevel]`, `[slaveRatio, slaveDecay, slaveLevel]`, `[filterFreq, filterRes, filterSweep, filterDecay]` (densest case yet — 4 knobs in a 220 px strip), `[bendAmt, bendDecay]`. `filterMode` dropdown falls through as a single between the slave and filter rows; `click`, `noiseLevel`, `level` fall through after the bend row. No engine or param changes; the existing `buildParamLayout` + row renderer (proven in PRs #47/#49/#51) handles 4 rows as one more iteration. PR #53. **Tier 2 complete.** Pending Phase 3b: only Tier 3 (Mixer8 — needs strip-variant or 2×4-knob auto-stack decision; OscSineBank — likely needs `customUIHeight` widget).
 
 ## Reference observations (2026-05-08)
 
@@ -179,7 +180,7 @@ User shared three Nord Modular Editor reference screenshots in chat — used as 
 
 ## Status / Next Action
 
-Plan in `draft`. **Shipped:** Phase 1 (knob), Phase 2 (font), grey re-skin, Phase 3a (density), Phase 4 (LCD), Phase 3b Tier 1 fan-out (PR #47 — filters, Envelope, effects), Phase 3b Tier 2 MasterOsc (PR #49 — single-row freq/coarse/fine), Phase 3b Tier 2 OscA/B/C (PR #51 — first multi-`paramRows` exercise). **Pending Phase 3b work:** remaining Tier 2 is now just `DrumSynth` (the 4-row-group case: mst / slv / flt / bend). Tier 3 (Mixer8, OscSineBank) still deferred — Tier 3 needs strip-variant or splitting decisions first.
+Plan in `draft`. **Shipped:** Phase 1 (knob), Phase 2 (font), grey re-skin, Phase 3a (density), Phase 4 (LCD), Phase 3b Tier 1 fan-out (PR #47 — filters, Envelope, effects), Phase 3b Tier 2 MasterOsc (PR #49 — single-row freq/coarse/fine), Phase 3b Tier 2 OscA/B/C (PR #51 — first multi-`paramRows` exercise), Phase 3b Tier 2 DrumSynth (PR #53 — 4-row layout, densest case yet). **Phase 3b Tier 2 is complete.** Pending Phase 3b work: Tier 3 only (Mixer8 — needs strip-variant or 2×4-knob auto-stack decision; OscSineBank — likely needs `customUIHeight` widget like the sequencers).
 
 ### paramRows fan-out — candidate batches
 
@@ -190,8 +191,8 @@ Plan in `draft`. **Shipped:** Phase 1 (knob), Phase 2 (font), grey re-skin, Phas
 - `Chorus` — `["rate", "depth", "mix"]`
 - `Shaper` — `["drive", "level"]` (Shape stays a dropdown above; the original draft suggested `drive / shape / mix` but Shaper has no `mix` param — `level` is the output gain)
 
-**Tier 2 — multiple sub-groups on one module (tests multi-`paramRows`):**
-- `DrumSynth` — natural splits: `[mstPitch, mstDec, mstLvl]`, `[slvRatio, slvDec, slvLvl]`, `[fltFreq, fltRes, fltSweep, fltDec]`, `[bendAmt, bendDcy]`
+**Tier 2 — multiple sub-groups on one module (tests multi-`paramRows`):** **Complete.**
+- ~~`DrumSynth` — natural splits: `[mstPitch, mstDec, mstLvl]`, `[slvRatio, slvDec, slvLvl]`, `[fltFreq, fltRes, fltSweep, fltDec]`, `[bendAmt, bendDcy]`~~ — **shipped in PR #53 (2026-05-22).** 4-row layout; densest case yet (4 knobs in the filter strip).
 - ~~`OscA` / `OscB` / `OscC` — pitch trio (freq + coarse + fine), then PW pair, then FM/level pair~~ — **shipped in PR #51 (2026-05-22).** First multi-`paramRows` exercise; OscA at 3 rows + waveform single, OscB/C at 2 rows + KBT/waveform singles.
 - ~~`MasterOsc` — coarse/fine/pitch row (the most Nord-iconic layout)~~ — **shipped in PR #49 (2026-05-22)**. Single-row only; still doesn't exercise multi-`paramRows`.
 
