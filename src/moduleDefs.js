@@ -10,6 +10,11 @@ const MODULE_DEFS = {
     outputs: ["Out", "Slv"],
     modInputs: ["PitchMod1", "PitchMod2", "FmMod", "PWMod"],
     description: "Master oscillator - Full-featured with FM, PW, sync",
+    paramRows: [
+      { knobs: ["frequency", "coarse", "fine"] },
+      { knobs: ["pulseWidth", "pwModDepth"] },
+      { knobs: ["fmDepth", "level"] },
+    ],
   },
   OscB: {
     label: "OscB",
@@ -19,6 +24,10 @@ const MODULE_DEFS = {
     outputs: ["Out", "Slv"],
     modInputs: ["PitchMod1", "PitchMod2", "FmMod"],
     description: "Oscillator B - Classic analog waveforms with FM",
+    paramRows: [
+      { knobs: ["frequency", "coarse", "fine"] },
+      { knobs: ["fmDepth", "level"] },
+    ],
   },
   OscC: {
     label: "OscC",
@@ -28,6 +37,10 @@ const MODULE_DEFS = {
     outputs: ["Out", "Slv"],
     modInputs: ["PitchMod", "FMA", "AM"],
     description: "Oscillator C - Sine with AM and FMA",
+    paramRows: [
+      { knobs: ["frequency", "coarse", "fine"] },
+      { knobs: ["fmDepth", "level"] },
+    ],
   },
   Noise: {
     label: "Noise",
