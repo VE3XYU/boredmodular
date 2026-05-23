@@ -157,6 +157,8 @@ Before Phase 3 (the big layout shift) we need calls on these. Phase 1 (knob) and
 - **2026-05-22 — Phase 3b Tier 2 MasterOsc shipped.** `paramRows: [{ knobs: ["frequency", "coarse", "fine"] }]` on `MasterOsc`; `kbt` falls through to the existing single-row select renderer below the strip. Single-row shape, same as Tier 1 — doesn't exercise multi-`paramRows` yet. PR #49. Remaining Tier 2 (`DrumSynth`, `OscA`/`B`/`C`) is the multi-row exercise; still deferred.
 - **2026-05-22 — Phase 3b Tier 2 OscA/B/C shipped.** First exercise of multi-`paramRows` (multiple row entries per module) in the codebase. `OscA` → three rows: `[frequency, coarse, fine]`, `[pulseWidth, pwModDepth]`, `[fmDepth, level]` with `waveform` dropdown falling through as a single between rows 1 and 2. `OscB` → two rows: `[frequency, coarse, fine]`, `[fmDepth, level]` with `kbt` slider and `waveform` dropdown falling through. `OscC` → two rows: `[frequency, coarse, fine]`, `[fmDepth, level]` with `kbt` slider falling through. No engine or param changes; patches saved before this PR load identically after. PR #51. Remaining Tier 2: `DrumSynth` (the 4-row-group case: mst / slv / flt / bend).
 - **2026-05-22 — Phase 3b Tier 2 DrumSynth shipped.** Final Tier 2 module. Four `paramRows` matching the spec's natural groupings: `[masterPitch, masterDecay, masterLevel]`, `[slaveRatio, slaveDecay, slaveLevel]`, `[filterFreq, filterRes, filterSweep, filterDecay]` (densest case yet — 4 knobs in a 220 px strip), `[bendAmt, bendDecay]`. `filterMode` dropdown falls through as a single between the slave and filter rows; `click`, `noiseLevel`, `level` fall through after the bend row. No engine or param changes; the existing `buildParamLayout` + row renderer (proven in PRs #47/#49/#51) handles 4 rows as one more iteration. PR #53. **Tier 2 complete.** Pending Phase 3b: only Tier 3 (Mixer8 — needs strip-variant or 2×4-knob auto-stack decision; OscSineBank — likely needs `customUIHeight` widget).
+- **2026-05-23 — Phase 3b Tier 3 Mixer8 shipped.** Two `paramRows` of four knobs each: `[level1, level2, level3, level4]` and `[level5, level6, level7, level8]`. The 4-knob-per-row shape proven in PR #53 (DrumSynth filter row) absorbed Mixer8 without needing a wider strip variant. No engine or param changes. PR #56.
+- **2026-05-23 — Phase 3b Tier 3 OscSineBank shipped.** Six `paramRows` of three knobs each, one row per partial: `[tuneN, fineN, levelN]` for N=1..6. `masterLevel` falls through as a single below the strip. Per-partial grouping (each row = one partial) preferred over per-control grouping (all tunes / all fines / all levels) because 6 knobs at 220 px would overflow. The plan flagged a `customUIHeight` widget as a possibility — not needed; the existing renderer handles 6 rows as one more iteration. Module is ~422 px tall, comparable to DrumSynth's post-paramRows height. PR #57. **Phase 3b is complete.** All modules that benefit from `paramRows` have shipped.
 
 ## Reference observations (2026-05-08)
 
@@ -180,7 +182,9 @@ User shared three Nord Modular Editor reference screenshots in chat — used as 
 
 ## Status / Next Action
 
-Plan in `draft`. **Shipped:** Phase 1 (knob), Phase 2 (font), grey re-skin, Phase 3a (density), Phase 4 (LCD), Phase 3b Tier 1 fan-out (PR #47 — filters, Envelope, effects), Phase 3b Tier 2 MasterOsc (PR #49 — single-row freq/coarse/fine), Phase 3b Tier 2 OscA/B/C (PR #51 — first multi-`paramRows` exercise), Phase 3b Tier 2 DrumSynth (PR #53 — 4-row layout, densest case yet). **Phase 3b Tier 2 is complete.** Pending Phase 3b work: Tier 3 only (Mixer8 — needs strip-variant or 2×4-knob auto-stack decision; OscSineBank — likely needs `customUIHeight` widget like the sequencers).
+Plan in `draft`. **Shipped:** Phase 1 (knob), Phase 2 (font), grey re-skin, Phase 3a (density), Phase 4 (LCD), Phase 3b Tier 1 fan-out (PR #47), Phase 3b Tier 2 MasterOsc / OscA/B/C / DrumSynth (PRs #49 / #51 / #53), Phase 3b Tier 3 Mixer8 / OscSineBank (PRs #56 / #57). **Phase 3b is complete** — `paramRows` fan-out has landed across every module type that benefits from it.
+
+**Next concrete step for the next agent:** Phase 6 (per-module mute button + `MODULE_DEFS` schema extension). Per the broader roadmap at `~/.claude/plans/let-s-figure-out-what-shiny-parasol.md`, the schema extension also folds in S2 (attenuator-type metadata) — batch these together. After Phase 6 lands, Phase 7 (port colours by signal type / S1) and Phase 8 (sub-section frames / S3 long tail) finish the UI redesign. See *Phases still pending* below.
 
 ### paramRows fan-out — candidate batches
 
@@ -196,9 +200,9 @@ Plan in `draft`. **Shipped:** Phase 1 (knob), Phase 2 (font), grey re-skin, Phas
 - ~~`OscA` / `OscB` / `OscC` — pitch trio (freq + coarse + fine), then PW pair, then FM/level pair~~ — **shipped in PR #51 (2026-05-22).** First multi-`paramRows` exercise; OscA at 3 rows + waveform single, OscB/C at 2 rows + KBT/waveform singles.
 - ~~`MasterOsc` — coarse/fine/pitch row (the most Nord-iconic layout)~~ — **shipped in PR #49 (2026-05-22)**. Single-row only; still doesn't exercise multi-`paramRows`.
 
-**Tier 3 — needs strip variant or splitting:**
-- `Mixer8` — 8 channel knobs is too many at 220px wide; either two `paramRows` of 4, or a wider strip variant
-- `OscSineBank` — partial-tune knob bank; might want its own `customUIHeight` widget like the sequencers
+**Tier 3 — needs strip variant or splitting:** **Complete.**
+- ~~`Mixer8` — 8 channel knobs is too many at 220px wide; either two `paramRows` of 4, or a wider strip variant~~ — **shipped in PR #56 (2026-05-23).** Chose the 2×4 split; no strip variant needed.
+- ~~`OscSineBank` — partial-tune knob bank; might want its own `customUIHeight` widget like the sequencers~~ — **shipped in PR #57 (2026-05-23).** Chose 6 `paramRows` of 3 knobs (one per partial); no custom widget needed.
 
 ### Known gotchas for the next agent to address before fanning out
 
@@ -220,7 +224,7 @@ From the original Open Design Questions list, settled and outstanding:
 | Q | Status |
 |---|---|
 | Q1 — module width policy | **Settled:** uniform fixed-width, 4 modules across canvas |
-| Q2 — variable-port-count modules under horizontal layout | **Open** — Mixer8, OscSineBank still TBD |
+| Q2 — variable-port-count modules under horizontal layout | **Settled by PRs #56 / #57** — Mixer8 ships 2×4, OscSineBank ships 6×3 per-partial; both stay within `MODULE_WIDTH = 220` with no strip variant needed |
 | Q3 — sub-section frame styling | **Open** — Phase 8 |
 | Q4 — sidebar drop-zone position | **Open** — current impl is random-near-origin |
 | Q5 — cable attachment under new layout | **Settled by Phase 3a** — bottom port strip works |
