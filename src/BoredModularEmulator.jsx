@@ -8,6 +8,7 @@ let _idCounter = 0;
 const genId = () => `mod_${++_idCounter}`;
 
 const PORT_SIZE = 4;
+const PORT_HIT_SIZE = 8;
 const MODULE_WIDTH = 220;
 const HEADER_H = 22;
 const PARAM_ROW_H = 24;
@@ -234,7 +235,7 @@ function SafariAdvisoryBanner() {
         color: "#e0c890",
         padding: "8px 38px 8px 14px",
         borderRadius: 4,
-        fontSize: 13,
+        fontSize: 14,
         lineHeight: 1.45,
         maxWidth: 560,
         zIndex: 1000,
@@ -254,7 +255,7 @@ function SafariAdvisoryBanner() {
           border: "none",
           color: "#a08560",
           cursor: "pointer",
-          fontSize: 18,
+          fontSize: 19,
           lineHeight: 1,
           padding: "2px 8px",
         }}
@@ -443,7 +444,7 @@ function LcdDisplay({ x, y, width, height, text, onDoubleClick }) {
         y={y + height - 4}
         textAnchor="end"
         fill="#7ec8e3"
-        fontSize={12}
+        fontSize={13}
         fontFamily="'Pixel Operator', 'DM Mono', monospace"
         pointerEvents="none"
       >
@@ -479,7 +480,7 @@ function Port({ x, y, name, isOutput, isMod, onMouseDown, onMouseUp, isConnected
         y={y - 7}
         textAnchor="middle"
         fill="#222"
-        fontSize={10}
+        fontSize={11}
         fontFamily="'Pixel Operator', 'DM Mono', monospace"
         pointerEvents="none"
       >
@@ -544,7 +545,7 @@ function ModuleNode({
       {/* Header underline accents the category colour */}
       <rect x={0} y={headerH - 1} width={MODULE_WIDTH} height={1} fill={def.color} />
       {/* Label */}
-      <text x={8} y={15} fill="#111" fontSize={14} fontWeight={700} fontFamily="'Pixel Operator', 'DM Mono', monospace">
+      <text x={8} y={15} fill="#111" fontSize={15} fontWeight={700} fontFamily="'Pixel Operator', 'DM Mono', monospace">
         {def.label}
       </text>
       {/* Close */}
@@ -552,7 +553,7 @@ function ModuleNode({
         x={MODULE_WIDTH - 12}
         y={15}
         fill="#444"
-        fontSize={14}
+        fontSize={15}
         fontWeight={700}
         fontFamily="'Pixel Operator', 'DM Mono', monospace"
         style={{ cursor: "pointer" }}
@@ -600,7 +601,7 @@ function ModuleNode({
                       y={py + 50}
                       textAnchor="middle"
                       fill="#111"
-                      fontSize={11}
+                      fontSize={12}
                       fontFamily="'Pixel Operator', 'DM Mono', monospace"
                     >
                       {p.label || k}
@@ -615,7 +616,7 @@ function ModuleNode({
         if (p.options) {
           return (
             <g key={key}>
-              <text x={6} y={py + 12} fill="#111" fontSize={13} fontFamily="'Pixel Operator', 'DM Mono', monospace">
+              <text x={6} y={py + 12} fill="#111" fontSize={14} fontFamily="'Pixel Operator', 'DM Mono', monospace">
                 {p.label || key}
               </text>
               <foreignObject x={64} y={py + 1} width={152} height={20}>
@@ -627,7 +628,7 @@ function ModuleNode({
                     color: "#ddd",
                     border: `1px solid ${def.color}44`,
                     borderRadius: 2,
-                    fontSize: 12,
+                    fontSize: 13,
                     fontFamily: "'Pixel Operator', 'DM Mono', monospace",
                     padding: "0 3px",
                     outline: "none",
@@ -648,7 +649,7 @@ function ModuleNode({
         }
         return (
           <g key={key}>
-            <text x={6} y={py + 12} fill="#111" fontSize={13} fontFamily="'Pixel Operator', 'DM Mono', monospace">
+            <text x={6} y={py + 12} fill="#111" fontSize={14} fontFamily="'Pixel Operator', 'DM Mono', monospace">
               {p.label || key}
             </text>
             <SvgKnob
@@ -674,7 +675,7 @@ function ModuleNode({
                     color: "#fff",
                     border: `1px solid ${def.color}`,
                     borderRadius: 2,
-                    fontSize: 12,
+                    fontSize: 13,
                     fontFamily: "'Pixel Operator', 'DM Mono', monospace",
                     padding: "0 3px",
                     outline: "none",
@@ -1392,35 +1393,20 @@ export default function BoredModularEmulator() {
     [modules, panOffset]
   );
 
-  const handlePortDragStart = useCallback(
-    (e, moduleId, portName, isOutput) => {
-      initAudio();
-      const mod = modules.find((m) => m.id === moduleId);
-      if (!mod) return;
-      const pos = getPortPosition(mod, portName, isOutput);
-      e.preventDefault();
-      setCableDrag({
-        fromId: moduleId,
-        fromPort: portName,
-        isOutput,
-        startX: pos.x,
-        startY: pos.y,
-      });
-    },
-    [modules, initAudio, panOffset]
-  );
-
   const handlePortDragEnd = useCallback(
     (e, moduleId, portName, isOutput) => {
       if (!cableDrag) return;
+      // Releasing on the same port that started the cable — leave it pending
+      // so the user can click a target next (click-then-click mode).
+      if (cableDrag.fromId === moduleId && cableDrag.fromPort === portName) return;
       // Normalize: one side must be output, the other input
       let outId, outPort, inId, inPort;
       if (cableDrag.isOutput && !isOutput) {
-        // Dragged from output to input (normal)
+        // Output → input (normal)
         outId = cableDrag.fromId; outPort = cableDrag.fromPort;
         inId = moduleId; inPort = portName;
       } else if (!cableDrag.isOutput && isOutput) {
-        // Dragged from input to output (reverse)
+        // Input → output (reverse)
         outId = moduleId; outPort = portName;
         inId = cableDrag.fromId; inPort = cableDrag.fromPort;
       } else {
@@ -1444,6 +1430,29 @@ export default function BoredModularEmulator() {
       setCableDrag(null);
     },
     [cableDrag]
+  );
+
+  const handlePortDragStart = useCallback(
+    (e, moduleId, portName, isOutput) => {
+      e.preventDefault();
+      // If a cable is already pending, treat this click as the drop target.
+      if (cableDrag) {
+        handlePortDragEnd(e, moduleId, portName, isOutput);
+        return;
+      }
+      initAudio();
+      const mod = modules.find((m) => m.id === moduleId);
+      if (!mod) return;
+      const pos = getPortPosition(mod, portName, isOutput);
+      setCableDrag({
+        fromId: moduleId,
+        fromPort: portName,
+        isOutput,
+        startX: pos.x,
+        startY: pos.y,
+      });
+    },
+    [modules, initAudio, panOffset, cableDrag, handlePortDragEnd]
   );
 
   const removeCable = useCallback((idx) => {
@@ -1521,20 +1530,23 @@ export default function BoredModularEmulator() {
       });
     }
     setDragging(null);
-    setCableDrag(null);
     setIsPanning(false);
   }, [dragging]);
 
   const handleSvgMouseDown = useCallback(
     (e) => {
       if (e.target === svgRef.current || e.target.tagName === "rect") {
+        if (cableDrag) {
+          setCableDrag(null);
+          return;
+        }
         if (e.button === 0 && (e.shiftKey || e.altKey)) {
           setIsPanning(true);
           panStart.current = { x: e.clientX, y: e.clientY, ox: panOffset.x, oy: panOffset.y };
         }
       }
     },
-    [panOffset]
+    [panOffset, cableDrag]
   );
 
   // Keyboard trigger + musical keyboard
@@ -1542,6 +1554,11 @@ export default function BoredModularEmulator() {
     const heldNotes = new Set();
     const down = (e) => {
       if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+      if (e.key === "Escape" && cableDrag) {
+        e.preventDefault();
+        setCableDrag(null);
+        return;
+      }
       if (e.key === " " && !keyHeld) {
         e.preventDefault();
         setKeyHeld(true);
@@ -1603,7 +1620,7 @@ export default function BoredModularEmulator() {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, [keyHeld, initAudio, handleParamChange]);
+  }, [keyHeld, initAudio, handleParamChange, cableDrag]);
 
   // Sequencer step animation: poll at ~15fps to update step LEDs
   const [seqFrame, setSeqFrame] = useState(0);
@@ -1672,9 +1689,9 @@ export default function BoredModularEmulator() {
             borderBottom: "1px solid #222",
           }}
         >
-          <div style={{ fontSize: 16, letterSpacing: 3, color: "#666", textTransform: "uppercase" }}>bored</div>
-          <div style={{ fontSize: 24, fontWeight: 500, color: "#e33", letterSpacing: 1 }}>modular</div>
-          <div style={{ fontSize: 14, color: "#555", marginTop: 2 }}>v0.1</div>
+          <div style={{ fontSize: 17, letterSpacing: 3, color: "#666", textTransform: "uppercase" }}>bored</div>
+          <div style={{ fontSize: 25, fontWeight: 500, color: "#e33", letterSpacing: 1 }}>modular</div>
+          <div style={{ fontSize: 15, color: "#555", marginTop: 2 }}>v0.1</div>
         </div>
 
         {/* Module palette */}
@@ -1683,7 +1700,7 @@ export default function BoredModularEmulator() {
             <div key={cat.key} style={{ marginBottom: 4 }}>
               <div
                 style={{
-                  fontSize: 16,
+                  fontSize: 17,
                   color: "#555",
                   textTransform: "uppercase",
                   letterSpacing: 2,
@@ -1730,7 +1747,7 @@ export default function BoredModularEmulator() {
                         display: "flex",
                         alignItems: "center",
                         gap: 6,
-                        fontSize: 14,
+                        fontSize: 15,
                         color: "#ddd",
                         whiteSpace: "nowrap",
                       }}
@@ -1748,8 +1765,8 @@ export default function BoredModularEmulator() {
                       }}
                     />
                     <div>
-                      <div style={{ fontSize: 16, color: "#bbb" }}>{d.label}</div>
-                      <div style={{ fontSize: 12, color: "#888" }}>{d.description}</div>
+                      <div style={{ fontSize: 17, color: "#bbb" }}>{d.label}</div>
+                      <div style={{ fontSize: 13, color: "#888" }}>{d.description}</div>
                     </div>
                   </div>
                 );
@@ -1760,7 +1777,7 @@ export default function BoredModularEmulator() {
 
         {/* Patches */}
         <div style={{ padding: "8px 10px", borderTop: "1px solid #222" }}>
-          <div style={{ fontSize: 16, color: "#555", textTransform: "uppercase", letterSpacing: 2, marginBottom: 6 }}>
+          <div style={{ fontSize: 17, color: "#555", textTransform: "uppercase", letterSpacing: 2, marginBottom: 6 }}>
             Patches
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
@@ -1779,7 +1796,7 @@ export default function BoredModularEmulator() {
                   background: "#222",
                   borderRadius: 3,
                   cursor: "pointer",
-                  fontSize: 14,
+                  fontSize: 15,
                   color: "#999",
                   border: "1px solid #333",
                 }}
@@ -1792,13 +1809,13 @@ export default function BoredModularEmulator() {
           </div>
           <input ref={fileInputRef} type="file" accept=".json" style={{ display: "none" }} onChange={importPatch} />
           {patchMsg && (
-            <div style={{ fontSize: 14, color: "#6c6", textAlign: "center", marginTop: 4 }}>{patchMsg}</div>
+            <div style={{ fontSize: 15, color: "#6c6", textAlign: "center", marginTop: 4 }}>{patchMsg}</div>
           )}
         </div>
 
         {/* Scope & controls */}
         <div style={{ padding: "8px 10px 12px", borderTop: "1px solid #222" }}>
-          <div style={{ fontSize: 16, color: "#555", textTransform: "uppercase", letterSpacing: 2, marginBottom: 4 }}>
+          <div style={{ fontSize: 17, color: "#555", textTransform: "uppercase", letterSpacing: 2, marginBottom: 4 }}>
             Scope
           </div>
           <Scope engine={engineRef} />
@@ -1827,7 +1844,7 @@ export default function BoredModularEmulator() {
                 color: keyHeld ? "#fff" : "#888",
                 borderRadius: 4,
                 cursor: "pointer",
-                fontSize: 14,
+                fontSize: 15,
                 transition: "all 0.1s",
                 border: "1px solid #333",
               }}
@@ -1835,7 +1852,7 @@ export default function BoredModularEmulator() {
               {keyHeld ? "▶ GATE ON" : "GATE (Space / Click)"}
             </div>
           </div>
-          <div style={{ marginTop: 8, fontSize: 14, color: "#444", lineHeight: 1.5 }}>
+          <div style={{ marginTop: 8, fontSize: 15, color: "#444", lineHeight: 1.5 }}>
             Drag from output (red) to input (blue/yellow) to patch.
             <br />
             Double-click cable to remove.
@@ -1907,7 +1924,7 @@ export default function BoredModularEmulator() {
                   return (
                     <circle
                       key={`oh-${port}`}
-                      cx={pos.x} cy={pos.y} r={PORT_SIZE}
+                      cx={pos.x} cy={pos.y} r={PORT_HIT_SIZE}
                       fill="transparent"
                       style={{ cursor: "pointer" }}
                       onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); handlePortDragStart(e, m.id, port, true); }}
@@ -1920,7 +1937,7 @@ export default function BoredModularEmulator() {
                   return (
                     <circle
                       key={`ih-${port}`}
-                      cx={pos.x} cy={pos.y} r={PORT_SIZE}
+                      cx={pos.x} cy={pos.y} r={PORT_HIT_SIZE}
                       fill="transparent"
                       style={{ cursor: "pointer" }}
                       onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); handlePortDragStart(e, m.id, port, false); }}
@@ -1935,7 +1952,7 @@ export default function BoredModularEmulator() {
 
         {/* Empty state */}
         {modules.length === 0 && (
-          <text x="50%" y="50%" textAnchor="middle" fill="#333" fontSize={16} fontFamily="'Pixel Operator', 'DM Mono', monospace">
+          <text x="50%" y="50%" textAnchor="middle" fill="#333" fontSize={17} fontFamily="'Pixel Operator', 'DM Mono', monospace">
             Click a module in the sidebar to begin patching
           </text>
         )}
