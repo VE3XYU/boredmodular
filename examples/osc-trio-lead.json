@@ -1,0 +1,108 @@
+{
+  "modules": [
+    {
+      "id": "mod_1",
+      "type": "Keyboard",
+      "x": 60,
+      "y": 400,
+      "params": {}
+    },
+    {
+      "id": "mod_2",
+      "type": "OscA",
+      "x": 300,
+      "y": 20,
+      "params": {
+        "frequency": 220,
+        "waveform": "square",
+        "pulseWidth": 0.35,
+        "pwModDepth": 0.15,
+        "fmDepth": 0,
+        "level": 0.55
+      }
+    },
+    {
+      "id": "mod_3",
+      "type": "OscB",
+      "x": 540,
+      "y": 20,
+      "params": {
+        "frequency": 220,
+        "coarse": 0,
+        "fine": 7,
+        "waveform": "sawtooth",
+        "fmDepth": 0,
+        "level": 0.5
+      }
+    },
+    {
+      "id": "mod_4",
+      "type": "OscC",
+      "x": 780,
+      "y": 20,
+      "params": {
+        "frequency": 110,
+        "coarse": -12,
+        "fine": 0,
+        "fmDepth": 0,
+        "level": 0.45
+      }
+    },
+    {
+      "id": "mod_5",
+      "type": "Mixer3",
+      "x": 300,
+      "y": 400,
+      "params": {
+        "level1": 0.6,
+        "level2": 0.6,
+        "level3": 0.55
+      }
+    },
+    {
+      "id": "mod_6",
+      "type": "FilterE",
+      "x": 540,
+      "y": 400,
+      "params": {
+        "frequency": 2200,
+        "resonance": 5,
+        "filterType": "lowpass",
+        "slope": "24dB"
+      }
+    },
+    {
+      "id": "mod_7",
+      "type": "ADSREnv",
+      "x": 780,
+      "y": 400,
+      "params": {
+        "attack": 0.01,
+        "decay": 0.25,
+        "sustain": 0.7,
+        "release": 0.3
+      }
+    },
+    {
+      "id": "mod_8",
+      "type": "Output",
+      "x": 1020,
+      "y": 400,
+      "params": {
+        "level": 0.5
+      }
+    }
+  ],
+  "connections": [
+    { "fromId": "mod_1", "fromPort": "Note", "toId": "mod_2", "toPort": "PitchMod1", "color": "hsl(60, 70%, 55%)" },
+    { "fromId": "mod_1", "fromPort": "Note", "toId": "mod_3", "toPort": "PitchMod1", "color": "hsl(60, 70%, 55%)" },
+    { "fromId": "mod_1", "fromPort": "Note", "toId": "mod_4", "toPort": "PitchMod",  "color": "hsl(60, 70%, 55%)" },
+    { "fromId": "mod_2", "fromPort": "Out",  "toId": "mod_5", "toPort": "In1",       "color": "hsl(180, 70%, 55%)" },
+    { "fromId": "mod_3", "fromPort": "Out",  "toId": "mod_5", "toPort": "In2",       "color": "hsl(180, 70%, 55%)" },
+    { "fromId": "mod_4", "fromPort": "Out",  "toId": "mod_5", "toPort": "In3",       "color": "hsl(180, 70%, 55%)" },
+    { "fromId": "mod_5", "fromPort": "Out",  "toId": "mod_6", "toPort": "In",        "color": "hsl(180, 70%, 55%)" },
+    { "fromId": "mod_6", "fromPort": "Out",  "toId": "mod_7", "toPort": "In",        "color": "hsl(180, 70%, 55%)" },
+    { "fromId": "mod_1", "fromPort": "Gate", "toId": "mod_7", "toPort": "Gate",      "color": "hsl(40, 70%, 55%)" },
+    { "fromId": "mod_7", "fromPort": "Out",  "toId": "mod_8", "toPort": "InL",       "color": "hsl(330, 70%, 55%)" }
+  ]
+}

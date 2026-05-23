@@ -1,0 +1,101 @@
+{
+  "modules": [
+    {
+      "id": "mod_1",
+      "type": "Keyboard",
+      "x": 60,
+      "y": 400,
+      "params": {}
+    },
+    {
+      "id": "mod_2",
+      "type": "MasterOsc",
+      "x": 300,
+      "y": 80,
+      "params": {
+        "frequency": 220,
+        "coarse": 0,
+        "fine": 0,
+        "kbt": "on"
+      }
+    },
+    {
+      "id": "mod_3",
+      "type": "OscSlvA",
+      "x": 540,
+      "y": 20,
+      "params": {
+        "partials": 1,
+        "fine": -4,
+        "level": 0.6,
+        "waveform": "sawtooth"
+      }
+    },
+    {
+      "id": "mod_4",
+      "type": "OscSlvE",
+      "x": 780,
+      "y": 20,
+      "params": {
+        "partials": 0.5,
+        "fine": 3,
+        "level": 0.55
+      }
+    },
+    {
+      "id": "mod_5",
+      "type": "Mixer3",
+      "x": 300,
+      "y": 400,
+      "params": {
+        "level1": 0.55,
+        "level2": 0.55,
+        "level3": 0
+      }
+    },
+    {
+      "id": "mod_6",
+      "type": "FilterE",
+      "x": 540,
+      "y": 400,
+      "params": {
+        "frequency": 1100,
+        "resonance": 3,
+        "filterType": "lowpass",
+        "slope": "12dB"
+      }
+    },
+    {
+      "id": "mod_7",
+      "type": "ADSREnv",
+      "x": 780,
+      "y": 400,
+      "params": {
+        "attack": 0.45,
+        "decay": 0.6,
+        "sustain": 0.8,
+        "release": 0.9
+      }
+    },
+    {
+      "id": "mod_8",
+      "type": "Output",
+      "x": 1020,
+      "y": 400,
+      "params": {
+        "level": 0.5
+      }
+    }
+  ],
+  "connections": [
+    { "fromId": "mod_1", "fromPort": "Note", "toId": "mod_2", "toPort": "PitchMod1", "color": "hsl(60, 70%, 55%)" },
+    { "fromId": "mod_2", "fromPort": "Slv",  "toId": "mod_3", "toPort": "Mst",       "color": "hsl(0, 70%, 55%)" },
+    { "fromId": "mod_2", "fromPort": "Slv",  "toId": "mod_4", "toPort": "Mst",       "color": "hsl(0, 70%, 55%)" },
+    { "fromId": "mod_3", "fromPort": "Out",  "toId": "mod_5", "toPort": "In1",       "color": "hsl(180, 70%, 55%)" },
+    { "fromId": "mod_4", "fromPort": "Out",  "toId": "mod_5", "toPort": "In2",       "color": "hsl(180, 70%, 55%)" },
+    { "fromId": "mod_5", "fromPort": "Out",  "toId": "mod_6", "toPort": "In",        "color": "hsl(180, 70%, 55%)" },
+    { "fromId": "mod_6", "fromPort": "Out",  "toId": "mod_7", "toPort": "In",        "color": "hsl(180, 70%, 55%)" },
+    { "fromId": "mod_1", "fromPort": "Gate", "toId": "mod_7", "toPort": "Gate",      "color": "hsl(40, 70%, 55%)" },
+    { "fromId": "mod_7", "fromPort": "Out",  "toId": "mod_8", "toPort": "InL",       "color": "hsl(330, 70%, 55%)" }
+  ]
+}
