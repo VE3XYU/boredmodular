@@ -147,6 +147,14 @@ const MODULE_DEFS = {
     outputs: ["Out"],
     modInputs: ["AM1", "AM2", "AM3", "AM4", "AM5", "AM6"],
     description: "6-oscillator sine bank with sync and mix-in",
+    paramRows: [
+      { knobs: ["tune1", "fine1", "level1"] },
+      { knobs: ["tune2", "fine2", "level2"] },
+      { knobs: ["tune3", "fine3", "level3"] },
+      { knobs: ["tune4", "fine4", "level4"] },
+      { knobs: ["tune5", "fine5", "level5"] },
+      { knobs: ["tune6", "fine6", "level6"] },
+    ],
   },
   SpectralOsc: {
     label: "Spectral",
