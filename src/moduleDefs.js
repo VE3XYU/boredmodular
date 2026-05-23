@@ -347,6 +347,10 @@ const MODULE_DEFS = {
     outputs: ["Out"],
     modInputs: [],
     description: "8-channel mixer",
+    paramRows: [
+      { knobs: ["level1", "level2", "level3", "level4"] },
+      { knobs: ["level5", "level6", "level7", "level8"] },
+    ],
   },
   XFade: {
     label: "X-Fade",
