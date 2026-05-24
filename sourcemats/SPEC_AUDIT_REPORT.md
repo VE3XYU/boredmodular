@@ -2,13 +2,64 @@
 
 A discrepancy report comparing the project's spec documents against the canonical source PDF.
 
-**Status: 2026-05-04 — All 26 findings (6 critical, 20 minor) resolved.** `BORED_MODULAR_DESIGN.md` and `MODULE_LAYOUTS.md` have been updated to match the PDF where they diverged. The 5 out-of-scope items are unchanged (they describe material outside this PDF excerpt and could not be verified). The Resolution lines below are kept as a record of what was changed.
+**Status: 2026-05-04 — Pass 1 closed: All 26 findings (6 critical, 20 minor) resolved.** `BORED_MODULAR_DESIGN.md` and `MODULE_LAYOUTS.md` have been updated to match the PDF where they diverged. The 5 out-of-scope items are unchanged (they describe material outside the Pass 1 PDF excerpt and could not be verified). The Resolution lines below are kept as a record of what was changed.
+
+**Status: 2026-05-23 — Pass 2 addendum opened against full manual.** 7 new findings filed against the foundational chapters (Signals, Connectors, Cable conventions, Bandwidth, Modulation limits) that the Pass 1 excerpt did not cover. All 7 resolved as part of the same docs PR. See "Pass 2 — 2026-05-23 — Full manual addendum" below.
 
 ## Sources
 
-- **Canonical:** `sourcemats/Bored Modular English User Manual - module reference only.pdf` — 97 PDF pages, original manual pages 93-189 (Chapter 7 "Module reference"). PDF page numbers in this report are PDF-page numbers (1-97), not original-manual page numbers.
+- **Canonical (Pass 1):** `sourcemats/Bored Modular English User Manual - module reference only.pdf` — 97 PDF pages, original manual pages 93-189 (Chapter 7 "Module reference"). PDF page numbers in Pass 1 findings below are PDF-page numbers (1-97), not original-manual page numbers.
+- **Canonical (Pass 2):** `sourcemats/Bored Modular English User Manual v3.0 Edition 3.0.pdf` — full manual (~220 pages). Page numbers in Pass 2 findings are original-manual page numbers (matching the printed page footer).
 - **Spec doc 1:** `sourcemats/BORED_MODULAR_DESIGN.md` — technical specification.
 - **Spec doc 2:** `sourcemats/MODULE_LAYOUTS.md` — visual layout descriptions.
+
+---
+
+# Pass 2 — 2026-05-23 — Full manual addendum
+
+The Pass 1 source was a module-reference-only excerpt and could not verify foundational
+chapters (Signals, Modulation, Knobs, Voices, Synthesis basics). The full manual is now
+the canonical source. This pass files findings only for the items that landed in the
+docs PR `docs/spec-signals-and-cables`; remaining foundational material (voice areas,
+polyphony, morph groups, knob/MIDI assignment, per-module bandwidth tagging) is deferred
+to future passes and not enumerated here.
+
+## P2.1 Signal Types — sampling rates missing (`BORED_MODULAR_DESIGN.md:7-11` before edit)
+
+- **Critical** — the four signal types were named but their sampling rates were not. Per full manual p. 25 ("Connector types"): audio = 96 kHz, control = 24 kHz, logic = 24 kHz, slave = 24 kHz. Rates are load-bearing for any downstream bandwidth-class work and for documenting why audio-rate modulation inputs behave differently from control-rate ones.
+- **Resolution:** sampling rate added to each of the four entries in `BORED_MODULAR_DESIGN.md` "Signal Types".
+
+## P2.2 Connector Colors — sampling rates missing (`BORED_MODULAR_DESIGN.md:13-17` before edit)
+
+- **Minor** — colour mapping was correct but did not state sampling rate alongside each colour. Same source (p. 25).
+- **Resolution:** sampling rate appended to each colour entry in `BORED_MODULAR_DESIGN.md` "Connector Colors".
+
+## P2.3 Connector shape — divergence from canonical convention (`MODULE_LAYOUTS.md:8-12` before edit)
+
+- **Critical** — `MODULE_LAYOUTS.md` previously stated all four colours used "Circular socket". Per full manual p. 25 ("Inputs and outputs"): "These connectors come in two different shapes: circular inputs and square outputs." The current implementation in `src/BoredModularEmulator.jsx` also uses circles for both, which is an impl divergence from the canonical convention.
+- **Resolution:** `MODULE_LAYOUTS.md` updated to state inputs = circles, outputs = squares (canonical). `BORED_MODULAR_DESIGN.md` "Connector Colors" header note cross-references the divergence. Impl side is tracked separately (see `IMPL_AUDIT_REPORT.md`; planned as Stream B4 in the active doc plan).
+
+## P2.4 Cable Conventions — missing (`BORED_MODULAR_DESIGN.md` had no such section)
+
+- **Critical** — five cable-behaviour rules were not in the spec at all, despite being foundational to user workflow: cable colour = source colour; cross-type drops allowed; branch connections supported; serial input-to-input chains render white; click-hold highlights chain. All from full manual p. 25-26 ("Connecting cables in a patch").
+- **Resolution:** new "Cable Conventions" subsection added to `BORED_MODULAR_DESIGN.md` under General Conventions, capturing all five rules.
+
+## P2.5 Bandwidth Considerations — missing (`BORED_MODULAR_DESIGN.md` had no such section)
+
+- **Minor** — full manual p. 31 ("Bandwidth considerations") distinguishes audio-rate modulation inputs (96 kHz, e.g. `OscA.FMA`, `FilterF.FreqMod`) from control-rate modulation inputs (24 kHz). Per-module classification is needed to spec which mod inputs are which.
+- **Resolution:** new "Bandwidth Considerations" subsection added to `BORED_MODULAR_DESIGN.md` with the two-class definition. Per-module bandwidth tagging deferred to a future audit batch.
+
+## P2.6 Modulation attenuator descriptions — curve detail thin (`BORED_MODULAR_DESIGN.md:19-22` before edit)
+
+- **Minor** — Pass 1 spec named the three attenuator types but did not give their numeric curve shape. Full manual p. 32-33 ("Mod-amount knobs (attenuators)"): Type I linear (0/64/127 = off/half/full); Type II exponential (64 = less than half, finer at low values); Type III bipolar (0/64/127 = off/unaffected/2× with bidirectional polarity).
+- **Resolution:** curve detail added to each Type entry in `BORED_MODULAR_DESIGN.md` "Modulation Input Attenuator Types".
+
+## P2.7 Maximum modulation limits — missing (`BORED_MODULAR_DESIGN.md` had no such section)
+
+- **Critical** — full manual p. 36 ("Maximum modulation"): most parameters accept ±64 units total modulation (sum of all inputs); filter frequency parameters accept ±128. Without this, summed-modulation behaviour cannot be specified at the parameter level.
+- **Resolution:** new "Maximum modulation" sub-subsection added under "Modulation Input Attenuator Types" in `BORED_MODULAR_DESIGN.md`.
+
+---
 
 ## Scope
 

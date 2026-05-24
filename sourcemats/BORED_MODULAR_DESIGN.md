@@ -5,21 +5,44 @@ This document provides a detailed technical specification for all modules from t
 ## General Conventions
 
 ### Signal Types
-- **Bipolar:** Range -64 to +64 units (or -1.0 to 1.0 normalized). Used for audio and bipolar modulation.
-- **Control (Unipolar):** Range 0 to +64 units (or 0.0 to 1.0 normalized). Used for envelopes, velocity, and unipolar modulation.
-- **Logic:** High (+64 units / 1.0) or Low (0 units / 0.0). Used for gates, triggers, and clocks. Any signal crossing from <=0 to >0 triggers logic transitions.
-- **Slave (Gray):** Specialized high-resolution pitch/frequency control signals used between master and slave modules. Slave oscillators track 1:1 with master pitch; slave LFOs track 5 octaves below master pitch.
+Four signal classes, each tied 1:1 to a connector colour. See "Connector Colors" below.
+
+- **Bipolar (audio):** Range -64 to +64 units (or -1.0 to 1.0 normalized). Used for audio and bipolar modulation. Sampled at **96 kHz** when carried on an audio (red) connector.
+- **Control (Unipolar or Bipolar):** Range 0 to +64 units, or -64 to +64 units (or 0 to ±64 / 0.0 to 1.0 normalized). Used for envelopes, velocity, LFOs, and general modulation. Sampled at **24 kHz**.
+- **Logic:** High (+64 units / 1.0) or Low (0 units / 0.0). Used for gates, triggers, and clocks. Any signal crossing from <=0 to >0 triggers logic transitions. Sampled at **24 kHz**.
+- **Slave (Gray):** Specialized high-resolution pitch/frequency control signals used between master and slave modules. Slave oscillators track 1:1 with master pitch; slave LFOs track 5 octaves below master pitch. Sampled at **24 kHz**.
 
 ### Connector Colors
-- **Red:** Audio signals (Bipolar).
-- **Blue:** Control signals (Unipolar or Bipolar).
-- **Yellow:** Logic signals.
-- **Gray:** Slave control signals (master-slave pitch links).
+Inputs are rendered as circles and outputs as squares (canonical convention; the current implementation uses circles for both — see SPEC_AUDIT_REPORT.md). Colour identifies signal type; sampling rate listed alongside.
+
+- **Red:** Audio signals (Bipolar). **96 kHz** sampling.
+- **Blue:** Control signals (Unipolar or Bipolar). **24 kHz** sampling.
+- **Yellow:** Logic signals. **24 kHz** sampling.
+- **Gray:** Slave control signals (master-slave pitch links). **24 kHz** sampling.
+
+### Cable Conventions
+- **Cable colour = source (output) connector colour.** The output's colour determines the cable's appearance. A cable can be re-coloured manually after creation.
+- **Cross-type drops are allowed.** An audio (red) output may be patched into a control (blue) input or vice versa; the system applies the source signal at the destination without conversion damage. Drops that are not meaningful at all (e.g. into a non-routable target) refuse with no cable-with-dot cursor and produce no connection.
+- **Branch connections** (one output → many inputs) are supported.
+- **Serial input→input chains** are allowed provided the chain head connects to an output. The chain renders in **white** to indicate it carries no signal flow on its own (presentation only); when the head connects to an output, the chain inherits the source colour.
+- **Highlight:** click-hold a connector to highlight the full cable chain attached to it.
+
+### Bandwidth Considerations
+Modulation inputs come in two bandwidth classes:
+- **Audio-rate modulation inputs:** run at the full **96 kHz** audio bandwidth (e.g. `OscA.FMA`, `FilterF.FreqMod`).
+- **Control-rate modulation inputs:** run at **24 kHz** (most filters' frequency/resonance mod inputs, and most non-audio-FM mod inputs).
+
+Per-module bandwidth tagging is deferred to a future audit batch.
 
 ### Modulation Input Attenuator Types
-- **Type I:** Linear attenuator. Range 0-127. Good for general-purpose modulation.
-- **Type II:** Exponential attenuator. Provides finer control at low modulation amounts. Used for pitch and FM modulation.
-- **Type III:** Bipolar attenuator for filter frequency modulation. Allows positive and negative modulation amounts.
+- **Type I (Linear):** Range 0-127. 0 = off, 64 = half, 127 = full. Used for pulse-width and general-purpose modulation.
+- **Type II (Exponential):** Range 0-127. Provides finer control at low modulation amounts (64 = less than half). Used for pitch and FM modulation.
+- **Type III (Bipolar):** Range 0-127. 0 = off, 64 = unaffected, 127 = 2× amplification with bidirectional polarity. Used for filter frequency modulation.
+
+#### Maximum modulation
+- Most parameters accept **±64 units** of total modulation (sum of all modulation inputs on the same parameter).
+- **Filter frequency** parameters accept **±128 units**.
+- If summed modulation would exceed the limit, it is clamped at the limit.
 
 ### Module Limits
 - Max 254 modules per patch (127 poly, 127 common).

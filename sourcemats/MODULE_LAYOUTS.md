@@ -5,11 +5,13 @@ This document describes the visual layout and control arrangement for each modul
 ## General UI Patterns
 - **Header:** Contains Module Name and Instance Number (e.g., OscA1).
 - **Body:** Gray/Silver background with recessed "wells" for groups of controls.
-- **Inputs/Outputs:**
-    - **Red:** Audio (Circular socket)
-    - **Blue:** Control (Circular socket)
-    - **Yellow:** Logic (Circular socket)
-    - **Gray:** Slave (Circular socket)
+- **Inputs/Outputs:** Inputs are rendered as **circles**, outputs as **squares**. Colour identifies signal type:
+    - **Red:** Audio
+    - **Blue:** Control
+    - **Yellow:** Logic
+    - **Gray:** Slave
+
+    See `BORED_MODULAR_DESIGN.md` → "Cable Conventions" for cable colour, branching, and cross-type drop rules.
 - **Knobs:** Small circular knobs, often with a green triangle indicating the default/reset position.
 - **Buttons:** Small square buttons, often with an internal LED state indicator.
 - **Displays:** Blue-background text boxes showing numerical values or names.
