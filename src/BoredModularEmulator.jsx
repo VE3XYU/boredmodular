@@ -454,27 +454,36 @@ function LcdDisplay({ x, y, width, height, text, onDoubleClick }) {
   );
 }
 
-function Port({ x, y, name, signalType, onMouseDown, onMouseUp, isConnected }) {
+function Port({ x, y, name, isOutput, signalType, onMouseDown, onMouseUp, isConnected }) {
   const color = SIGNAL_TYPE_COLORS[signalType] || SIGNAL_TYPE_COLORS.audio;
+  const shapeProps = {
+    fill: isConnected ? color : "#111",
+    stroke: color,
+    strokeWidth: 1.5,
+    "data-port": "1",
+    style: { cursor: "pointer", filter: isConnected ? `drop-shadow(0 0 4px ${color})` : "none" },
+    onMouseDown: (e) => {
+      e.stopPropagation();
+      onMouseDown(e);
+    },
+    onMouseUp: (e) => {
+      e.stopPropagation();
+      onMouseUp(e);
+    },
+  };
   return (
     <g>
-      <circle
-        cx={x}
-        cy={y}
-        r={PORT_SIZE}
-        fill={isConnected ? color : "#111"}
-        stroke={color}
-        strokeWidth={1.5}
-        style={{ cursor: "pointer", filter: isConnected ? `drop-shadow(0 0 4px ${color})` : "none" }}
-        onMouseDown={(e) => {
-          e.stopPropagation();
-          onMouseDown(e);
-        }}
-        onMouseUp={(e) => {
-          e.stopPropagation();
-          onMouseUp(e);
-        }}
-      />
+      {isOutput ? (
+        <rect
+          x={x - PORT_SIZE}
+          y={y - PORT_SIZE}
+          width={PORT_SIZE * 2}
+          height={PORT_SIZE * 2}
+          {...shapeProps}
+        />
+      ) : (
+        <circle cx={x} cy={y} r={PORT_SIZE} {...shapeProps} />
+      )}
       <text
         x={x}
         y={y - 7}
@@ -560,7 +569,7 @@ function ModuleNode({
     <g
       transform={`translate(${moduleState.x}, ${moduleState.y})`}
       onMouseDown={(e) => {
-        if (e.target.tagName === "circle" || e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+        if (e.target.dataset?.port === "1" || e.target.tagName === "circle" || e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
         onDragStart(e, moduleState.id);
       }}
       style={{ cursor: "grab" }}
@@ -1030,6 +1039,7 @@ function ModuleNode({
             x={px}
             y={py}
             name={port}
+            isOutput={false}
             signalType={signalType}
             isConnected={connectedPorts.has(`in:${port}`)}
             onMouseDown={(e) => onPortDragStart(e, moduleState.id, port, false)}
@@ -1050,6 +1060,7 @@ function ModuleNode({
             x={px}
             y={py}
             name={port}
+            isOutput={true}
             signalType={signalType}
             isConnected={connectedPorts.has(`out:${port}`)}
             onMouseDown={(e) => onPortDragStart(e, moduleState.id, port, true)}
@@ -1947,10 +1958,12 @@ export default function BoredModularEmulator() {
                 {allOutputs.map((port) => {
                   const pos = getPortPosition(m, port, true);
                   return (
-                    <circle
+                    <rect
                       key={`oh-${port}`}
-                      cx={pos.x} cy={pos.y} r={PORT_HIT_SIZE}
+                      x={pos.x - PORT_HIT_SIZE} y={pos.y - PORT_HIT_SIZE}
+                      width={PORT_HIT_SIZE * 2} height={PORT_HIT_SIZE * 2}
                       fill="transparent"
+                      data-port="1"
                       style={{ cursor: "pointer" }}
                       onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); handlePortDragStart(e, m.id, port, true); }}
                       onMouseUp={(e) => { e.stopPropagation(); handlePortDragEnd(e, m.id, port, true); }}
@@ -1964,6 +1977,7 @@ export default function BoredModularEmulator() {
                       key={`ih-${port}`}
                       cx={pos.x} cy={pos.y} r={PORT_HIT_SIZE}
                       fill="transparent"
+                      data-port="1"
                       style={{ cursor: "pointer" }}
                       onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); handlePortDragStart(e, m.id, port, false); }}
                       onMouseUp={(e) => { e.stopPropagation(); handlePortDragEnd(e, m.id, port, false); }}
