@@ -1,7 +1,7 @@
 // ─── Audio Engine ───────────────────────────────────────────────────────────
 // Web Audio API based modular synthesis engine
 
-import { applyAttenuatorCurve } from "./moduleDefs";
+import { applyAttenuatorCurve, PORT_ATTENUATOR_TYPES } from "./moduleDefs";
 
 // Note-to-frequency conversion
 const NOTE_FREQ = (note) => 440 * Math.pow(2, (note - 69) / 12);
@@ -120,8 +120,43 @@ class AudioEngine {
       case "NoteSeqB": mod = this._createNoteSeqB(id); break;
       default: return null;
     }
+    this._autoAddAttenuators(mod);
     this.modules.set(id, mod);
     return mod;
+  }
+
+  // Wraps each modulation input listed in PORT_ATTENUATOR_TYPES with a GainNode
+  // attenuator + a "<port>Atten" param. Skips ports whose impl already routes
+  // through a GainNode (existing fmDepth/pwModDepth knobs) or virtual ports
+  // (null). Note-source connections bypass these via `mod._originalInputs`
+  // because the Note source replaces the target's value rather than modulating it.
+  _autoAddAttenuators(mod) {
+    if (!mod) return;
+    const spec = PORT_ATTENUATOR_TYPES[mod.type];
+    if (!spec) return;
+    mod._originalInputs = mod._originalInputs || {};
+    for (const portName of Object.keys(spec)) {
+      const target = mod.inputs[portName];
+      // Skip if virtual (null) or already wrapped in a GainNode (typeof connect === "function")
+      if (!target || typeof target.connect === "function") continue;
+      const curve = spec[portName];
+      const attenGain = this.ctx.createGain();
+      attenGain.gain.value = 1;
+      attenGain.connect(target);
+      mod._originalInputs[portName] = target;
+      mod.inputs[portName] = attenGain;
+      mod._nodes.push(attenGain);
+      const paramName = portName + "Atten";
+      const isBipolar = curve === "III";
+      mod.params[paramName] = {
+        value: 1,
+        min: isBipolar ? -1 : 0,
+        max: 1,
+        audioParam: attenGain.gain,
+        label: portName + " Atn",
+        curve,
+      };
+    }
   }
 
   // ── Oscillators ──────────────────────────────────────────────────────────
@@ -1864,12 +1899,17 @@ class AudioEngine {
 
     if (!outputNode || !inputNode) return false;
 
-    // Note -> PitchMod: direct pitch tracking (Keyboard, NoteSeqA, NoteSeqB)
+    // Note -> PitchMod: direct pitch tracking (Keyboard, NoteSeqA, NoteSeqB).
+    // The Note source replaces the target's value rather than modulating it, so
+    // we bypass any auto-inserted attenuator and write to the original AudioParam.
     const isNoteSource = (fromMod.type === "Keyboard" || fromMod.type === "NoteSeqA" || fromMod.type === "NoteSeqB") && fromPort === "Note";
-    if (isNoteSource && inputNode instanceof AudioParam) {
-      fromMod._pitchTargets.push({ audioParam: inputNode, moduleId: toId, port: toPort });
-      this.connections.push({ fromId, fromPort, toId, toPort });
-      return true;
+    if (isNoteSource) {
+      const pitchTarget = toMod._originalInputs?.[toPort] || inputNode;
+      if (pitchTarget instanceof AudioParam) {
+        fromMod._pitchTargets.push({ audioParam: pitchTarget, moduleId: toId, port: toPort });
+        this.connections.push({ fromId, fromPort, toId, toPort });
+        return true;
+      }
     }
 
     try {
@@ -1935,9 +1975,11 @@ class AudioEngine {
     const inputNode = toMod.inputs[toPort];
     if (!outputNode || !inputNode) return;
 
-    // Note pitch targets (Keyboard, NoteSeqA, NoteSeqB)
+    // Note pitch targets (Keyboard, NoteSeqA, NoteSeqB) — mirror connect()'s
+    // _originalInputs lookup so we cleanly remove the tracked AudioParam.
     const isNoteSource = (fromMod.type === "Keyboard" || fromMod.type === "NoteSeqA" || fromMod.type === "NoteSeqB") && fromPort === "Note";
-    if (isNoteSource && inputNode instanceof AudioParam) {
+    const pitchTarget = isNoteSource ? (toMod._originalInputs?.[toPort] || inputNode) : null;
+    if (isNoteSource && pitchTarget instanceof AudioParam) {
       fromMod._pitchTargets = fromMod._pitchTargets.filter(
         pt => !(pt.moduleId === toId && pt.port === toPort)
       );
