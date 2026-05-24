@@ -522,6 +522,7 @@ function ParamNumericInput({ x, y, width, height, p, color, onCommit, onCancel }
           else if (e.key === "Escape") onCancel();
         }}
         onBlur={(e) => tryCommit(e.target.value)}
+        onFocus={(e) => e.target.select()}
         onMouseDown={(e) => e.stopPropagation()}
       />
     </foreignObject>
