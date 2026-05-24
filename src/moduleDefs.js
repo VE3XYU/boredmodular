@@ -454,8 +454,23 @@ const SIGNAL_TYPE_COLORS = {
   slave: "#9aa",
 };
 
+// Per-module overrides for ports whose signal type can't be derived from the
+// port name alone. Spec source: sourcemats/MODULE_LAYOUTS.md.
+const PORT_SIGNAL_TYPE_OVERRIDES = {
+  OscA: { PitchMod1: "audio", PitchMod2: "audio", FmMod: "audio", PWMod: "audio" },
+  OscB: { FmMod: "audio" },
+  OscC: { PitchMod: "audio" },
+  OscSlvB: { PwMod: "audio" },
+  PercOsc: { Trig: "audio" },
+};
+
 // kind: "output" | "input" | "modInput"
-function getPortSignalType(portName, kind) {
+// moduleType (optional): when supplied, PORT_SIGNAL_TYPE_OVERRIDES is checked first.
+function getPortSignalType(portName, kind, moduleType) {
+  if (moduleType) {
+    const override = PORT_SIGNAL_TYPE_OVERRIDES[moduleType]?.[portName];
+    if (override) return override;
+  }
   if (kind === "output") {
     if (portName === "Slv" || portName === "SlvOut") return "slave";
     if (portName === "Gate" || portName === "Clk24" || portName === "Clk4" || portName === "Sync") return "logic";
@@ -473,8 +488,8 @@ function getPortSignalType(portName, kind) {
   return "control";
 }
 
-function getPortColor(portName, kind) {
-  return SIGNAL_TYPE_COLORS[getPortSignalType(portName, kind)];
+function getPortColor(portName, kind, moduleType) {
+  return SIGNAL_TYPE_COLORS[getPortSignalType(portName, kind, moduleType)];
 }
 
-export { MODULE_DEFS, CATEGORIES, SIGNAL_TYPE_COLORS, getPortSignalType, getPortColor };
+export { MODULE_DEFS, CATEGORIES, SIGNAL_TYPE_COLORS, PORT_SIGNAL_TYPE_OVERRIDES, getPortSignalType, getPortColor };
