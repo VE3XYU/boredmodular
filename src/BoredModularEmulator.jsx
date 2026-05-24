@@ -339,7 +339,7 @@ function Scope({ engine }) {
   return <canvas ref={canvasRef} width={280} height={90} style={{ borderRadius: 4, border: "1px solid #1a2a1a" }} />;
 }
 
-function SvgKnob({ x, y, width, min, max, value, onChange, color }) {
+function SvgKnob({ x, y, width, min, max, value, onChange, color, onDoubleClick }) {
   const range = max - min;
   const pct = Math.max(0, Math.min(1, (value - min) / range));
 
@@ -396,7 +396,7 @@ function SvgKnob({ x, y, width, min, max, value, onChange, color }) {
   };
 
   return (
-    <g onMouseDown={handleMouseDown} style={{ cursor: "ns-resize" }}>
+    <g onMouseDown={handleMouseDown} onDoubleClick={onDoubleClick} style={{ cursor: "ns-resize" }}>
       <path
         d={`M ${tx0} ${ty0} A ${arcR} ${arcR} 0 1 1 ${tx1} ${ty1}`}
         stroke="#333"
@@ -487,6 +487,44 @@ function Port({ x, y, name, isOutput, isMod, onMouseDown, onMouseUp, isConnected
         {name}
       </text>
     </g>
+  );
+}
+
+function ParamNumericInput({ x, y, width, height, p, color, onCommit, onCancel }) {
+  const fmt = (v) => (v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : Math.round(v));
+  const tryCommit = (raw) => {
+    const v = parseFloat(raw);
+    if (!isNaN(v)) onCommit(Math.max(p.min, Math.min(p.max, v)));
+    else onCancel();
+  };
+  return (
+    <foreignObject x={x} y={y} width={width} height={height}>
+      <input
+        type="text"
+        defaultValue={fmt(p.value)}
+        autoFocus
+        style={{
+          width: "100%",
+          height: "100%",
+          background: "#111",
+          color: "#fff",
+          border: `1px solid ${color}`,
+          borderRadius: 2,
+          fontSize: 13,
+          fontFamily: "'Pixel Operator', 'DM Mono', monospace",
+          padding: "0 3px",
+          outline: "none",
+          boxSizing: "border-box",
+        }}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === "Enter") tryCommit(e.target.value);
+          else if (e.key === "Escape") onCancel();
+        }}
+        onBlur={(e) => tryCommit(e.target.value)}
+        onMouseDown={(e) => e.stopPropagation()}
+      />
+    </foreignObject>
   );
 }
 
@@ -586,16 +624,30 @@ function ModuleNode({
                 const cx = ki * slot + slot / 2;
                 return (
                   <g key={k}>
-                    <SvgKnob
-                      x={cx - 20}
-                      y={py + 18}
-                      width={40}
-                      min={p.min}
-                      max={p.max}
-                      value={p.value}
-                      onChange={(v) => onParamChange(moduleState.id, k, v)}
-                      color={def.color}
-                    />
+                    {editingParam === k ? (
+                      <ParamNumericInput
+                        x={cx - 25}
+                        y={py + 19}
+                        width={50}
+                        height={18}
+                        p={p}
+                        color={def.color}
+                        onCommit={(v) => { onParamChange(moduleState.id, k, v); setEditingParam(null); }}
+                        onCancel={() => setEditingParam(null)}
+                      />
+                    ) : (
+                      <SvgKnob
+                        x={cx - 20}
+                        y={py + 18}
+                        width={40}
+                        min={p.min}
+                        max={p.max}
+                        value={p.value}
+                        onChange={(v) => onParamChange(moduleState.id, k, v)}
+                        color={def.color}
+                        onDoubleClick={(e) => { e.stopPropagation(); setEditingParam(k); }}
+                      />
+                    )}
                     <text
                       x={cx}
                       y={py + 50}
@@ -661,44 +713,19 @@ function ModuleNode({
               value={p.value}
               onChange={(v) => onParamChange(moduleState.id, key, v)}
               color={def.color}
+              onDoubleClick={(e) => { e.stopPropagation(); setEditingParam(key); }}
             />
             {editingParam === key ? (
-              <foreignObject x={156} y={py + 1} width={58} height={18}>
-                <input
-                  type="text"
-                  defaultValue={p.value < 10 ? p.value.toFixed(2) : p.value < 100 ? p.value.toFixed(1) : Math.round(p.value)}
-                  autoFocus
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    background: "#111",
-                    color: "#fff",
-                    border: `1px solid ${def.color}`,
-                    borderRadius: 2,
-                    fontSize: 13,
-                    fontFamily: "'Pixel Operator', 'DM Mono', monospace",
-                    padding: "0 3px",
-                    outline: "none",
-                    boxSizing: "border-box",
-                  }}
-                  onKeyDown={(e) => {
-                    e.stopPropagation();
-                    if (e.key === "Enter") {
-                      const v = parseFloat(e.target.value);
-                      if (!isNaN(v)) onParamChange(moduleState.id, key, Math.max(p.min, Math.min(p.max, v)));
-                      setEditingParam(null);
-                    } else if (e.key === "Escape") {
-                      setEditingParam(null);
-                    }
-                  }}
-                  onBlur={(e) => {
-                    const v = parseFloat(e.target.value);
-                    if (!isNaN(v)) onParamChange(moduleState.id, key, Math.max(p.min, Math.min(p.max, v)));
-                    setEditingParam(null);
-                  }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                />
-              </foreignObject>
+              <ParamNumericInput
+                x={156}
+                y={py + 1}
+                width={58}
+                height={18}
+                p={p}
+                color={def.color}
+                onCommit={(v) => { onParamChange(moduleState.id, key, v); setEditingParam(null); }}
+                onCancel={() => setEditingParam(null)}
+              />
             ) : (
               <LcdDisplay
                 x={156}
@@ -706,10 +733,7 @@ function ModuleNode({
                 width={58}
                 height={18}
                 text={p.value < 10 ? p.value.toFixed(2) : p.value < 100 ? p.value.toFixed(1) : Math.round(p.value)}
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  setEditingParam(key);
-                }}
+                onDoubleClick={(e) => { e.stopPropagation(); setEditingParam(key); }}
               />
             )}
           </g>
