@@ -76,9 +76,15 @@ These cross-cutting findings affect every module. Recording once here; not repea
 ### S2. Attenuator-type metadata
 
 - **Spec:** every modulation input is tagged with attenuator type — Type I (linear), Type II (exponential), or Type III (bipolar). Examples: `Pitch Mod x2 (Inputs, Red): [Attenuator Type II]` (`BORED_MODULAR_DESIGN.md:134`).
-- **Impl:** no Type I/II/III metadata anywhere. `MODULE_DEFS` lists mod inputs as port-name strings; `_create<Type>` returns raw `AudioParam` references with no curve / response-shape annotation.
-- **Severity:** Critical.
-- **Disposition:** `fix-toward-spec (blocked: requires threading attenuator behavior through MODULE_DEFS, the cable-drag UI, and per-input curve logic — substantial cross-cutting change)`. Surfaces here so per-module audits don't repeat "no attenuator-type metadata" across all 39 modules.
+- **Impl (before):** no Type I/II/III metadata anywhere. `MODULE_DEFS` listed mod inputs as port-name strings; `_create<Type>` returned raw `AudioParam` references with no curve / response-shape annotation.
+- **Impl (after, 2026-05-24):** Phases 1+2 shipped (PR `feat/attenuator-types-phase-1-2`):
+  - **Phase 1 (metadata)** — `PORT_ATTENUATOR_TYPES` table added to `src/moduleDefs.js` enumerating the spec curve type for every implemented modulation input (~25 entries across 18 modules); helpers `getModInputAttenuatorType(moduleType, portName)` and `applyAttenuatorCurve(value, min, max, curve)` exported.
+  - **Phase 2 (existing depth-knob curves)** — `pwModDepth` (Type I) and the six `fmDepth` knobs (Type II) tagged with `curve` in their param defs. `setParam` now consults the `curve` field and applies the appropriate transformation when writing to the bound `AudioParam`. UI-displayed knob values are unchanged; only the audio-graph response curve changes (Type II FM knobs now feel finer at low settings, matching spec).
+- **Severity:** Critical (rated before resolution; remaining phases below).
+- **Disposition:** `fix-toward-spec — Phase 1+2 RESOLVED 2026-05-24`. **Deferred phases** (not yet scoped to a PR):
+  - **Phase 3 (per-port attenuator UI)** — render an attenuator knob next to every modulation input that doesn't already have a depth knob. Adds knobs to ~50 mod inputs across ~30 modules; introduces a saved-patch migration for the new param IDs.
+  - **Phase 4 (max-modulation summing/clamping)** — sum incoming modulation per AudioParam, clamp at ±64 (±128 for filter frequency params per spec line 44). Touches `connect`/`disconnect` graph plumbing.
+  - **Phase 5 (Type III bipolar curve)** — filter `FreqMod*` ports and `Panner.PanMod` need bipolar (-1..+1) attenuator knobs; current `applyAttenuatorCurve` falls back to linear for Type III pending the bipolar UI work.
 
 ### S3. Layout encoding
 
