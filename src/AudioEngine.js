@@ -1,6 +1,8 @@
 // ─── Audio Engine ───────────────────────────────────────────────────────────
 // Web Audio API based modular synthesis engine
 
+import { applyAttenuatorCurve } from "./moduleDefs";
+
 // Note-to-frequency conversion
 const NOTE_FREQ = (note) => 440 * Math.pow(2, (note - 69) / 12);
 
@@ -158,8 +160,8 @@ class AudioEngine {
         fine: { value: 0, min: -50, max: 50, label: "Fine" },
         waveform: { value: "sawtooth", options: ["sine", "sawtooth", "square", "triangle"], label: "Wave" },
         pulseWidth: { value: 0.5, min: 0.01, max: 0.99, audioParam: pwParam, label: "PW" },
-        pwModDepth: { value: 0, min: 0, max: 1, audioParam: pwModGain.gain, label: "PW Mod" },
-        fmDepth: { value: 0, min: 0, max: 1000, audioParam: fmGain.gain, label: "FM Depth" },
+        pwModDepth: { value: 0, min: 0, max: 1, audioParam: pwModGain.gain, label: "PW Mod", curve: "I" },
+        fmDepth: { value: 0, min: 0, max: 1000, audioParam: fmGain.gain, label: "FM Depth", curve: "II" },
         level: { value: 0.8, min: 0, max: 1, audioParam: gain.gain, label: "Level" },
       },
     };
@@ -193,7 +195,7 @@ class AudioEngine {
         fine: { value: 0, min: -50, max: 50, label: "Fine" },
         kbt: { value: 1, min: 0, max: 2, label: "KBT" },
         waveform: { value: "sawtooth", options: ["sine", "sawtooth", "square", "triangle"], label: "Wave" },
-        fmDepth: { value: 0, min: 0, max: 1000, audioParam: fmGain.gain, label: "FM Depth" },
+        fmDepth: { value: 0, min: 0, max: 1000, audioParam: fmGain.gain, label: "FM Depth", curve: "II" },
         level: { value: 0.8, min: 0, max: 1, audioParam: gain.gain, label: "Level" },
       },
     };
@@ -228,7 +230,7 @@ class AudioEngine {
         coarse: { value: 0, min: -64, max: 64, label: "Coarse" },
         fine: { value: 0, min: -50, max: 50, label: "Fine" },
         kbt: { value: 1, min: 0, max: 2, label: "KBT" },
-        fmDepth: { value: 0, min: 0, max: 1000, audioParam: fmGain.gain, label: "FM Dep" },
+        fmDepth: { value: 0, min: 0, max: 1000, audioParam: fmGain.gain, label: "FM Dep", curve: "II" },
         level: { value: 0.6, min: 0, max: 1, audioParam: gain.gain, label: "Level" },
       },
     };
@@ -299,7 +301,7 @@ class AudioEngine {
         kbt: { value: "on", options: ["on", "off"], label: "KBT" },
         spectralShape: { value: 0.4, min: 0, max: 1, audioParam: partialBus.gain, label: "Shape" },
         partialsMode: { value: "all", options: ["all", "odd"], label: "Parts" },
-        fmDepth: { value: 0, min: 0, max: 1000, audioParam: fmGain.gain, label: "FM Dep" },
+        fmDepth: { value: 0, min: 0, max: 1000, audioParam: fmGain.gain, label: "FM Dep", curve: "II" },
         level: { value: 0.5, min: 0, max: 1, audioParam: output.gain, label: "Level" },
       },
     };
@@ -683,7 +685,7 @@ class AudioEngine {
       level: { value: 0.8, min: 0, max: 1, audioParam: gain.gain, label: "Level" },
     };
     if (modInputDefs.FMA || modInputDefs.FMB) {
-      params.fmDepth = { value: 0, min: 0, max: 1000, audioParam: modGains._fmGain?.gain, label: "FM Dep" };
+      params.fmDepth = { value: 0, min: 0, max: 1000, audioParam: modGains._fmGain?.gain, label: "FM Dep", curve: "II" };
     }
     if (waveform === "square" || type === "OscSlvA") {
       params.waveform = type === "OscSlvA"
@@ -757,7 +759,7 @@ class AudioEngine {
       level: { value: 0.8, min: 0, max: 1, audioParam: gain.gain, label: "Level" },
     };
     if (modInputDefs.FMA || modInputDefs.FMB) {
-      params.fmDepth = { value: 0, min: 0, max: 1000, audioParam: modGains._fmGain.gain, label: "FM Dep" };
+      params.fmDepth = { value: 0, min: 0, max: 1000, audioParam: modGains._fmGain.gain, label: "FM Dep", curve: "II" };
     }
     if (type === "OscSlvA") {
       params.waveform = { value: waveform, options: ["sine", "sawtooth", "square", "triangle"], label: "Wave" };
@@ -2013,9 +2015,11 @@ class AudioEngine {
   setParam(moduleId, paramName, value) {
     const mod = this.modules.get(moduleId);
     if (!mod || !mod.params[paramName]) return;
-    mod.params[paramName].value = value;
-    if (mod.params[paramName].audioParam) {
-      mod.params[paramName].audioParam.setValueAtTime(value, this.ctx.currentTime);
+    const p = mod.params[paramName];
+    p.value = value;
+    if (p.audioParam) {
+      const audioValue = p.curve ? applyAttenuatorCurve(value, p.min, p.max, p.curve) : value;
+      p.audioParam.setValueAtTime(audioValue, this.ctx.currentTime);
     }
     // Handle Chorus cross-updates
     if (mod.type === "Chorus" && paramName === "rate") {

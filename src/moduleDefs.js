@@ -492,4 +492,78 @@ function getPortColor(portName, kind, moduleType) {
   return SIGNAL_TYPE_COLORS[getPortSignalType(portName, kind, moduleType)];
 }
 
-export { MODULE_DEFS, CATEGORIES, SIGNAL_TYPE_COLORS, PORT_SIGNAL_TYPE_OVERRIDES, getPortSignalType, getPortColor };
+// ─── Modulation-input attenuator types (per BORED_MODULAR_DESIGN.md §"Modulation
+// Input Attenuator Types", lines 37-40). Each modulation input on a module has
+// a knob whose curve is one of:
+//   - "I"   Linear      (0=off, 64=half, 127=full).  Used for PW, general-purpose
+//   - "II"  Exponential (finer control at low end).  Used for pitch, FM
+//   - "III" Bipolar     (0=off, 64=unaffected, 127=2×). Used for filter freq
+// Ports absent from a module's entry have no attenuator: either fixed 1:1 (AM
+// modulation, Amp inputs), or logic (Trig/Gate/Clk/Rst). Spec line refs in the
+// per-module audit (sourcemats/SPEC_AUDIT_REPORT.md §S2). ─────────────────────
+
+const PORT_ATTENUATOR_TYPES = {
+  // Oscillators
+  MasterOsc: { PitchMod1: "II", PitchMod2: "II" },
+  OscA: { PitchMod1: "II", PitchMod2: "II", FmMod: "II", PWMod: "I" },
+  OscB: { PitchMod1: "II", PitchMod2: "II", FmMod: "II" },
+  OscC: { PitchMod: "II", FMA: "II" }, // AM fixed 1:1
+  SpectralOsc: { PitchMod1: "II", PitchMod2: "II", FMA: "II", ShapeMod: "I" },
+  FormantOsc: { PitchMod1: "II", PitchMod2: "II" },
+  OscSlvA: { FMA: "II" }, // AM fixed 1:1, Sync no attenuator
+  OscSlvB: { PwMod: "I" },
+  OscSlvC: { FMA: "II" },
+  OscSlvD: { FMA: "II" },
+  OscSlvE: { FMA: "II" }, // AM fixed 1:1
+  OscSlvFM: { FMB: "II" },
+  // OscSineBank AM1-6 fixed 1:1; no attenuators per spec line 267
+  PercOsc: { PitchMod: "II" }, // Amp fixed 1:1, Trig audio-rate trigger (no curve)
+  DrumSynth: { PitchMod: "II", VelMod: "I" }, // Trig is logic
+  // Filters
+  Filter: { FreqMod: "III", ResMod: "I" },
+  FilterC: { FreqMod: "III", ResMod: "I" },
+  FilterE: { FreqMod1: "III", FreqMod2: "III", ResMod: "I" },
+  // Modulators (Gate/Retrig/Rst are logic, no attenuators)
+  LFOA: { RateMod: "II" },
+  // Level
+  GainControl: { Ctrl: "I" },
+  XFade: { FadeMod: "I" },
+  Panner: { PanMod: "I" },
+  // Effects
+  ShortDelay: { TimeMod: "I" },
+};
+
+function getModInputAttenuatorType(moduleType, portName) {
+  return PORT_ATTENUATOR_TYPES[moduleType]?.[portName] || null;
+}
+
+// Apply the spec attenuator curve to a normalized 0..1 knob position. Bipolar
+// (Type III) knobs are expected to use a -1..+1 range; callers pass `value`
+// already in that frame and this helper returns the curved value in the same
+// frame. The audio engine is responsible for scaling back to the underlying
+// AudioParam's natural range.
+function applyAttenuatorCurve(value, min, max, curve) {
+  if (!curve || curve === "I") return value; // Linear — no transformation
+  if (max === min) return value;
+  if (curve === "II") {
+    // Exponential: square the normalized knob position so 50% → 25% of max
+    const span = max - min;
+    const norm = (value - min) / span;
+    const clamped = Math.max(0, Math.min(1, norm));
+    return min + clamped * clamped * span;
+  }
+  // Type III bipolar curves are introduced in a later phase (per-port UI work).
+  return value;
+}
+
+export {
+  MODULE_DEFS,
+  CATEGORIES,
+  SIGNAL_TYPE_COLORS,
+  PORT_SIGNAL_TYPE_OVERRIDES,
+  PORT_ATTENUATOR_TYPES,
+  getPortSignalType,
+  getPortColor,
+  getModInputAttenuatorType,
+  applyAttenuatorCurve,
+};
