@@ -84,7 +84,7 @@ These cross-cutting findings affect every module. Recording once here; not repea
 - **Disposition:** `fix-toward-spec — Phase 1+2 RESOLVED 2026-05-24`. **Deferred phases** (not yet scoped to a PR):
   - **Phase 3 (per-port attenuator UI)** — render an attenuator knob next to every modulation input that doesn't already have a depth knob. Adds knobs to ~50 mod inputs across ~30 modules; introduces a saved-patch migration for the new param IDs.
   - **Phase 4 (max-modulation summing/clamping)** — sum incoming modulation per AudioParam, clamp at ±64 (±128 for filter frequency params per spec line 44). Touches `connect`/`disconnect` graph plumbing.
-  - **Phase 5 (Type III bipolar curve)** — filter `FreqMod*` ports and `Panner.PanMod` need bipolar (-1..+1) attenuator knobs; current `applyAttenuatorCurve` falls back to linear for Type III pending the bipolar UI work.
+  - **Phase 5 (Type III bipolar curve)** — RESOLVED 2026-05-24 (PR `feat/attenuator-phase-5-bipolar`): `applyAttenuatorCurve` now formally supports Type III as bipolar passthrough; bipolarity comes from the param range (min<0, max>0). The per-port bipolar attenuator UI that consumes this helper lands with Phase 3.
 
 ### S3. Layout encoding
 
