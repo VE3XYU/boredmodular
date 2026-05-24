@@ -1,0 +1,67 @@
+{
+  "modules": [
+    {
+      "id": "mod_1",
+      "type": "Keyboard",
+      "x": 60,
+      "y": 320,
+      "params": {}
+    },
+    {
+      "id": "mod_2",
+      "type": "OscB",
+      "x": 300,
+      "y": 80,
+      "params": {
+        "frequency": 440,
+        "coarse": 12,
+        "waveform": "sine",
+        "level": 1.0
+      }
+    },
+    {
+      "id": "mod_3",
+      "type": "OscA",
+      "x": 300,
+      "y": 320,
+      "params": {
+        "frequency": 220,
+        "coarse": 0,
+        "waveform": "sawtooth",
+        "pulseWidth": 0.5,
+        "pwModDepth": 0,
+        "fmDepth": 400,
+        "level": 0.6
+      }
+    },
+    {
+      "id": "mod_4",
+      "type": "ADSREnv",
+      "x": 640,
+      "y": 320,
+      "params": {
+        "attack": 0.005,
+        "decay": 0.8,
+        "sustain": 0.3,
+        "release": 0.6
+      }
+    },
+    {
+      "id": "mod_5",
+      "type": "Output",
+      "x": 900,
+      "y": 360,
+      "params": {
+        "level": 0.6
+      }
+    }
+  ],
+  "connections": [
+    { "fromId": "mod_1", "fromPort": "Note", "toId": "mod_3", "toPort": "PitchMod1", "color": "#4cf" },
+    { "fromId": "mod_2", "fromPort": "Out",  "toId": "mod_3", "toPort": "FmMod",     "color": "#f44" },
+    { "fromId": "mod_3", "fromPort": "Out",  "toId": "mod_4", "toPort": "In",        "color": "#f44" },
+    { "fromId": "mod_1", "fromPort": "Gate", "toId": "mod_4", "toPort": "Gate",      "color": "#fc0" },
+    { "fromId": "mod_4", "fromPort": "Out",  "toId": "mod_5", "toPort": "InL",       "color": "#f44" },
+    { "fromId": "mod_4", "fromPort": "Out",  "toId": "mod_5", "toPort": "InR",       "color": "#f44" }
+  ]
+}
