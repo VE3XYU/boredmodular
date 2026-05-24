@@ -1,0 +1,95 @@
+{
+  "modules": [
+    {
+      "id": "mod_1",
+      "type": "Keyboard",
+      "x": 60,
+      "y": 380,
+      "params": {}
+    },
+    {
+      "id": "mod_2",
+      "type": "LFO",
+      "x": 320,
+      "y": 60,
+      "params": {
+        "rate": 5,
+        "amount": 40,
+        "waveform": "sine"
+      }
+    },
+    {
+      "id": "mod_3",
+      "type": "LFO",
+      "x": 600,
+      "y": 60,
+      "params": {
+        "rate": 2,
+        "amount": 400,
+        "waveform": "sine"
+      }
+    },
+    {
+      "id": "mod_4",
+      "type": "OscA",
+      "x": 320,
+      "y": 320,
+      "params": {
+        "frequency": 220,
+        "coarse": 0,
+        "fine": 0,
+        "waveform": "sawtooth",
+        "pulseWidth": 0.5,
+        "pwModDepth": 0,
+        "fmDepth": 0,
+        "level": 0.5,
+        "PitchMod1Atten": 1,
+        "PitchMod2Atten": 0
+      }
+    },
+    {
+      "id": "mod_5",
+      "type": "Filter",
+      "x": 640,
+      "y": 320,
+      "params": {
+        "frequency": 600,
+        "resonance": 8,
+        "filterType": "lowpass",
+        "FreqModAtten": 1,
+        "ResModAtten": 0
+      }
+    },
+    {
+      "id": "mod_6",
+      "type": "ADSREnv",
+      "x": 920,
+      "y": 320,
+      "params": {
+        "attack": 0.005,
+        "decay": 0.6,
+        "sustain": 0.3,
+        "release": 0.5
+      }
+    },
+    {
+      "id": "mod_7",
+      "type": "Output",
+      "x": 1180,
+      "y": 360,
+      "params": {
+        "level": 0.5
+      }
+    }
+  ],
+  "connections": [
+    { "fromId": "mod_1", "fromPort": "Note", "toId": "mod_4", "toPort": "PitchMod1", "color": "#4cf" },
+    { "fromId": "mod_2", "fromPort": "Out",  "toId": "mod_4", "toPort": "PitchMod1", "color": "#f44" },
+    { "fromId": "mod_3", "fromPort": "Out",  "toId": "mod_5", "toPort": "FreqMod",   "color": "#f44" },
+    { "fromId": "mod_4", "fromPort": "Out",  "toId": "mod_5", "toPort": "In",        "color": "#f44" },
+    { "fromId": "mod_5", "fromPort": "Out",  "toId": "mod_6", "toPort": "In",        "color": "#f44" },
+    { "fromId": "mod_1", "fromPort": "Gate", "toId": "mod_6", "toPort": "Gate",      "color": "#fc0" },
+    { "fromId": "mod_6", "fromPort": "Out",  "toId": "mod_7", "toPort": "InL",       "color": "#f44" },
+    { "fromId": "mod_6", "fromPort": "Out",  "toId": "mod_7", "toPort": "InR",       "color": "#f44" }
+  ]
+}
