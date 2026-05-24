@@ -2,6 +2,8 @@
 
 A growing record of how the implementation in `src/` compares to the spec corpus, audited per batch. Each batch appends its scoped audit; the report is allowed to be incomplete.
 
+**Status: 2026-05-23.** Systemic finding **S1 (port-colour semantics) resolved** for the common-case rewire via PR `feat/port-colours-by-signal-type` (signal-type-based colouring driven by a `getPortSignalType` inference helper). Known per-port divergences (OscA mods, OscC.PitchMod, OscSlvB.PWMod, PercOsc.Trig, FmMod-named-but-FMA-in-spec ports) are enumerated under S1 and slated for a follow-up override pass. Original Pass 1 status below.
+
 **Status: 2026-05-15.** Six batches landed; all 42 currently-implemented modules audited. Batch 3 (2026-05-12) was a single audit-only sweep covering the 38 modules previously unaudited; Batch 4 (2026-05-13) split the impl `Amplifier` hybrid into a spec §6.13 fixed-gain `Amplifier` plus a new spec §6.3 `GainControl` (VCA with `Unipolar` toggle), resolving Amplifier findings F1/F2a/F3/F4/F7 in one batch; Batch 5 (2026-05-14) applied eight patch-load-safe range widenings drawn from Batch 3's quick-win recommendations (MstOsc-F2, OscA-F3, OscC-F6, FormantOsc-F3, PercOsc-F1, Filter-F7, FilterC-F2, FilterE-F10); Batch 6 (2026-05-15) applied two range narrowings (OscA-F2 Fine, Porta-F2 time) — the playbook §5 saved-patch scan was waived because the project is still in development mode and the maintainer confirmed no saved patches need preservation. Batches 1 and 2 covered Amplifier (initial range fixes), ClkGen, and RandomGen. Systemic findings: S1-S6 (port-colour, attenuator-type, layout, non-oscillator master/slave architecture, mute-affordance absence, KBT cosmetic-only). On 2026-05-06 the disposition framework was reframed to make spec the source of truth (see Disposition section). Batches 1-3 left every `fix-toward-spec` finding blocked on a systemic dependency, a design call, or a patch-load safety check; Batches 4, 5, and 6 are the first since then to apply `fix-toward-spec` changes in `src/`.
 
 ## Sources
@@ -60,9 +62,16 @@ These cross-cutting findings affect every module. Recording once here; not repea
 ### S1. Port-colour semantics
 
 - **Spec:** signal-type-based — Red=audio, Blue=control, Yellow=logic, Gray=slave (`BORED_MODULAR_DESIGN.md:13-17`).
-- **Impl:** direction-based — Red=output, Blue=audio-in, Yellow=mod-in (`src/BoredModularEmulator.jsx:184` — `const color = isOutput ? "#f44" : isMod ? "#fc0" : "#4cf";`).
+- **Impl (before):** direction-based — Red=output, Blue=audio-in, Yellow=mod-in.
+- **Impl (after, 2026-05-23):** signal-type-based, driven by a `getPortSignalType(portName, kind)` helper in `src/moduleDefs.js` and applied in `src/BoredModularEmulator.jsx` Port component. Inference covers the common cases (Slv/SlvOut→slave, Mst→slave, Gate/Clk*/Sync output→logic, Clk/Rst input→logic, Note/Vel output→control, AM*/FMA/FMB/Amp mod→audio, Gate/Trig/Retrig/Rst mod→logic, everything else by direction default).
 - **Severity:** Critical (cross-cutting; every module's port colours read differently than spec).
-- **Disposition:** `fix-toward-spec (blocked: cross-cutting overhaul requires its own brainstorm + plan due to scope and visual-design implications)`. The "more learnable for users without prior modular-synth fluency" argument is feature-level, not DSP-level, and does not survive the spec-as-source-of-truth frame; spec convention is canonical pending a deliberate design call to keep the divergence. See `docs/plans/2026-05-04-001-feat-module-completeness-playbook-plan.md` Scope Boundaries for the deferral.
+- **Disposition:** `fix-toward-spec — RESOLVED 2026-05-23` for the common-case rewire. **Known residual divergences** from inference-only classification, deferred to a follow-up that introduces per-port object overrides in `MODULE_DEFS`:
+  - **OscA** — `PitchMod1/2`, `FmMod`, `PWMod` are audio-rate per `MODULE_LAYOUTS.md:80` (all RED on the OscA panel); inferred as control (BLUE).
+  - **OscC** — `PitchMod` is audio-rate per `MODULE_LAYOUTS.md:91` (RED); inferred as control (BLUE).
+  - **OscSlvB** — `PWMod` is audio-rate per `MODULE_LAYOUTS.md:116` (RED); inferred as control (BLUE).
+  - **PercOsc** — `Trig` is audio-rate per `MODULE_LAYOUTS.md:155` (RED); inferred as logic (YELLOW).
+  - **OscB / SpectralOsc / OscSlvC / OscSlvE / OscSlvFM** — `FmMod` (named `FmMod` in `MODULE_DEFS` but `FMA` in spec layout) is audio-rate per spec; inferred as control. Naming inconsistency between impl and spec compounds the issue.
+  - Each follow-up will: (a) add object-syntax port entries `{ name, type }` to the affected `MODULE_DEFS` entries; (b) update `getPortSignalType` to honour explicit `type` on object entries before falling back to inference.
 
 ### S2. Attenuator-type metadata
 

@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import AudioEngine from "./AudioEngine";
-import { MODULE_DEFS, CATEGORIES } from "./moduleDefs";
+import { MODULE_DEFS, CATEGORIES, SIGNAL_TYPE_COLORS, getPortSignalType } from "./moduleDefs";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -454,8 +454,8 @@ function LcdDisplay({ x, y, width, height, text, onDoubleClick }) {
   );
 }
 
-function Port({ x, y, name, isOutput, isMod, onMouseDown, onMouseUp, isConnected }) {
-  const color = isOutput ? "#f44" : isMod ? "#fc0" : "#4cf";
+function Port({ x, y, name, signalType, onMouseDown, onMouseUp, isConnected }) {
+  const color = SIGNAL_TYPE_COLORS[signalType] || SIGNAL_TYPE_COLORS.audio;
   return (
     <g>
       <circle
@@ -1023,14 +1023,14 @@ function ModuleNode({
         const px = worldPos.x - moduleState.x;
         const py = worldPos.y - moduleState.y;
         const isMod = (def.modInputs || []).includes(port);
+        const signalType = getPortSignalType(port, isMod ? "modInput" : "input");
         return (
           <Port
             key={`in-${port}`}
             x={px}
             y={py}
             name={port}
-            isOutput={false}
-            isMod={isMod}
+            signalType={signalType}
             isConnected={connectedPorts.has(`in:${port}`)}
             onMouseDown={(e) => onPortDragStart(e, moduleState.id, port, false)}
             onMouseUp={(e) => onPortDragEnd(e, moduleState.id, port, false)}
@@ -1043,14 +1043,14 @@ function ModuleNode({
         const worldPos = getPortPosition(moduleState, port, true);
         const px = worldPos.x - moduleState.x;
         const py = worldPos.y - moduleState.y;
+        const signalType = getPortSignalType(port, "output");
         return (
           <Port
             key={`out-${port}`}
             x={px}
             y={py}
             name={port}
-            isOutput={true}
-            isMod={false}
+            signalType={signalType}
             isConnected={connectedPorts.has(`out:${port}`)}
             onMouseDown={(e) => onPortDragStart(e, moduleState.id, port, true)}
             onMouseUp={(e) => onPortDragEnd(e, moduleState.id, port, true)}

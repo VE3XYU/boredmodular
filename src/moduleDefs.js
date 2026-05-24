@@ -442,4 +442,39 @@ const CATEGORIES = [
   { key: "io", label: "I/O", modules: ["Keyboard", "Output"] },
 ];
 
-export { MODULE_DEFS, CATEGORIES };
+// ─── Signal-type taxonomy (4 classes, per BORED_MODULAR_DESIGN.md) ──────────
+// Colours match the spec's connector-colour scheme: audio=red, control=blue,
+// logic=yellow, slave=grey. Replaces the previous direction-based scheme
+// (output=red / audio-in=blue / mod-in=yellow). Closes IMPL_AUDIT_REPORT S1.
+
+const SIGNAL_TYPE_COLORS = {
+  audio: "#f44",
+  control: "#4cf",
+  logic: "#fc0",
+  slave: "#9aa",
+};
+
+// kind: "output" | "input" | "modInput"
+function getPortSignalType(portName, kind) {
+  if (kind === "output") {
+    if (portName === "Slv" || portName === "SlvOut") return "slave";
+    if (portName === "Gate" || portName === "Clk24" || portName === "Clk4" || portName === "Sync") return "logic";
+    if (portName === "Note" || portName === "Vel") return "control";
+    return "audio";
+  }
+  if (kind === "input") {
+    if (portName === "Mst") return "slave";
+    if (portName === "Clk" || portName === "Rst") return "logic";
+    return "audio";
+  }
+  // modInput
+  if (portName === "AM" || /^AM\d$/.test(portName) || portName === "FMA" || portName === "FMB" || portName === "Amp") return "audio";
+  if (portName === "Gate" || portName === "Trig" || portName === "Retrig" || portName === "Rst") return "logic";
+  return "control";
+}
+
+function getPortColor(portName, kind) {
+  return SIGNAL_TYPE_COLORS[getPortSignalType(portName, kind)];
+}
+
+export { MODULE_DEFS, CATEGORIES, SIGNAL_TYPE_COLORS, getPortSignalType, getPortColor };
