@@ -1032,7 +1032,7 @@ function ModuleNode({
         const px = worldPos.x - moduleState.x;
         const py = worldPos.y - moduleState.y;
         const isMod = (def.modInputs || []).includes(port);
-        const signalType = getPortSignalType(port, isMod ? "modInput" : "input");
+        const signalType = getPortSignalType(port, isMod ? "modInput" : "input", moduleState.type);
         return (
           <Port
             key={`in-${port}`}
@@ -1053,7 +1053,7 @@ function ModuleNode({
         const worldPos = getPortPosition(moduleState, port, true);
         const px = worldPos.x - moduleState.x;
         const py = worldPos.y - moduleState.y;
-        const signalType = getPortSignalType(port, "output");
+        const signalType = getPortSignalType(port, "output", moduleState.type);
         return (
           <Port
             key={`out-${port}`}
