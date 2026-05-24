@@ -1448,7 +1448,7 @@ export default function BoredModularEmulator() {
             fromPort: outPort,
             toId: inId,
             toPort: inPort,
-            color: `hsl(${Math.random() * 360}, 70%, 55%)`,
+            color: SIGNAL_TYPE_COLORS[getPortSignalType(outPort, "output")],
           },
         ]);
       }
