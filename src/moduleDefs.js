@@ -537,13 +537,17 @@ function getModInputAttenuatorType(moduleType, portName) {
   return PORT_ATTENUATOR_TYPES[moduleType]?.[portName] || null;
 }
 
-// Apply the spec attenuator curve to a normalized 0..1 knob position. Bipolar
-// (Type III) knobs are expected to use a -1..+1 range; callers pass `value`
-// already in that frame and this helper returns the curved value in the same
-// frame. The audio engine is responsible for scaling back to the underlying
-// AudioParam's natural range.
+// Apply the spec attenuator curve to a knob position. The audio engine
+// stores knob values in their natural param range [min..max]; this helper
+// returns the value to write to the bound AudioParam.
+//   - Type I  (linear):      passthrough
+//   - Type II (exponential): square the normalized 0..1 position
+//   - Type III (bipolar):    passthrough — bipolarity comes from a min<0,
+//                             max>0 param range; the linear response across
+//                             [-max..+max] gives off at 0, full polarity at
+//                             ±max, and intermediate scaling in between
 function applyAttenuatorCurve(value, min, max, curve) {
-  if (!curve || curve === "I") return value; // Linear — no transformation
+  if (!curve || curve === "I" || curve === "III") return value;
   if (max === min) return value;
   if (curve === "II") {
     // Exponential: square the normalized knob position so 50% → 25% of max
@@ -552,7 +556,6 @@ function applyAttenuatorCurve(value, min, max, curve) {
     const clamped = Math.max(0, Math.min(1, norm));
     return min + clamped * clamped * span;
   }
-  // Type III bipolar curves are introduced in a later phase (per-port UI work).
   return value;
 }
 
