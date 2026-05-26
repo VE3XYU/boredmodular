@@ -182,7 +182,7 @@ User shared three Nord Modular Editor reference screenshots in chat — used as 
 
 ## Status / Next Action
 
-Plan in `draft`. **Shipped:** Phase 1 (knob), Phase 2 (font), grey re-skin, Phase 3a (density), Phase 4 (LCD), Phase 3b Tier 1 fan-out (PR #47), Phase 3b Tier 2 MasterOsc / OscA/B/C / DrumSynth (PRs #49 / #51 / #53), Phase 3b Tier 3 Mixer8 / OscSineBank (PRs #56 / #57), **Phase 7 (port colours by signal type / S1)** in PRs #61–#64, **S2 (attenuator-type metadata + per-port knobs)** in PRs #65–#68, and **Phase 6 (per-module mute button)** in PR #69.
+Plan `active`. **Shipped:** Phase 1 (knob), Phase 2 (font), grey re-skin, Phase 3a (density), Phase 4 (LCD), Phase 3b Tier 1 fan-out (PR #47), Phase 3b Tier 2 MasterOsc / OscA/B/C / DrumSynth (PRs #49 / #51 / #53), Phase 3b Tier 3 Mixer8 / OscSineBank (PRs #56 / #57), **Phase 7 (port colours by signal type / S1)** in PRs #61–#64, **S2 (attenuator-type metadata + per-port knobs)** in PRs #65–#68, and **Phase 6 (per-module mute button)** in PR #69.
 
 PR #69 also picked up several side-fixes while testing the mute work: spec-correct signal types for `LFO`, `LFOA`, `RandomGen`, `CtrlSeq`, `EventSeq.Out1/2`, and `PortamentoA`; a rename of `PitchMod1`/`PitchMod2` → `Pitch1`/`Pitch2` (with load-time migration) to match the Nord labels; a `getPortPosition` fallback so cables to stale port names anchor to the module instead of the canvas origin; a cable-colour backfill in `loadPatchData` for hand-authored patches with no `color` field; and shipped `.woff2` versions of the Pixel Operator fonts so the console no longer logs OTS parse errors during dev. A reusable mute-coverage test patch is checked in at `examples/mute-test.json`.
 
