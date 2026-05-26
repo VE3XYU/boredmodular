@@ -57,11 +57,47 @@
     }
   ],
   "connections": [
-    { "fromId": "mod_1", "fromPort": "Note", "toId": "mod_3", "toPort": "PitchMod1", "color": "#4cf" },
-    { "fromId": "mod_2", "fromPort": "Out",  "toId": "mod_3", "toPort": "FmMod",     "color": "#f44" },
-    { "fromId": "mod_3", "fromPort": "Out",  "toId": "mod_4", "toPort": "In",        "color": "#f44" },
-    { "fromId": "mod_1", "fromPort": "Gate", "toId": "mod_4", "toPort": "Gate",      "color": "#fc0" },
-    { "fromId": "mod_4", "fromPort": "Out",  "toId": "mod_5", "toPort": "InL",       "color": "#f44" },
-    { "fromId": "mod_4", "fromPort": "Out",  "toId": "mod_5", "toPort": "InR",       "color": "#f44" }
+    {
+      "fromId": "mod_1",
+      "fromPort": "Note",
+      "toId": "mod_3",
+      "toPort": "Pitch1",
+      "color": "#4cf"
+    },
+    {
+      "fromId": "mod_2",
+      "fromPort": "Out",
+      "toId": "mod_3",
+      "toPort": "FmMod",
+      "color": "#f44"
+    },
+    {
+      "fromId": "mod_3",
+      "fromPort": "Out",
+      "toId": "mod_4",
+      "toPort": "In",
+      "color": "#f44"
+    },
+    {
+      "fromId": "mod_1",
+      "fromPort": "Gate",
+      "toId": "mod_4",
+      "toPort": "Gate",
+      "color": "#fc0"
+    },
+    {
+      "fromId": "mod_4",
+      "fromPort": "Out",
+      "toId": "mod_5",
+      "toPort": "InL",
+      "color": "#f44"
+    },
+    {
+      "fromId": "mod_4",
+      "fromPort": "Out",
+      "toId": "mod_5",
+      "toPort": "InR",
+      "color": "#f44"
+    }
   ]
 }

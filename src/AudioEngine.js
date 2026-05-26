@@ -159,6 +159,39 @@ class AudioEngine {
     }
   }
 
+  // Lazy per-port mute interposer. The first connect() from a given port
+  // creates a GainNode wired outputNode → muteGain → (downstream inputs);
+  // subsequent connects from the same port reuse it. setMute() flips every
+  // mute gain on the module. Pushed onto _nodes for removeModule cleanup.
+  // Slave/clock/note-source paths return early in connect() and never reach
+  // here, so virtual signals propagate even when muted (documented limitation).
+  _getOrCreateMuteGain(mod, port, outputNode) {
+    if (!mod._muteGains) mod._muteGains = {};
+    const existing = mod._muteGains[port];
+    if (existing) return existing;
+    const g = this.ctx.createGain();
+    g.gain.value = mod._muted ? 0 : 1;
+    outputNode.connect(g);
+    mod._muteGains[port] = g;
+    if (mod._nodes) mod._nodes.push(g);
+    return g;
+  }
+
+  setMute(moduleId, muted) {
+    const mod = this.modules.get(moduleId);
+    if (!mod) return;
+    mod._muted = !!muted;
+    const gainValue = mod._muted ? 0 : 1;
+    if (mod._muteGains) {
+      for (const port in mod._muteGains) {
+        mod._muteGains[port].gain.value = gainValue;
+      }
+    }
+    if (mod._outputMuteGain) {
+      mod._outputMuteGain.gain.value = gainValue;
+    }
+  }
+
   // ── Oscillators ──────────────────────────────────────────────────────────
 
   _createOscA(id) {
@@ -185,7 +218,7 @@ class AudioEngine {
     return {
       id, type: "OscA", node: osc, outputNode: gain,
       outputs: { Out: gain, Slv: slaveGain },
-      inputs: { PitchMod1: freqParam, PitchMod2: freqParam, FmMod: fmGain, Sync: osc, PWMod: pwModGain },
+      inputs: { Pitch1: freqParam, Pitch2: freqParam, FmMod: fmGain, Sync: osc, PWMod: pwModGain },
       _nodes: [osc, gain, slaveGain, fmGain, pwModGain],
       _slaveTargets: [],
       _frequency: 220,
@@ -219,8 +252,7 @@ class AudioEngine {
     return {
       id, type: "OscB", node: osc, outputNode: gain,
       outputs: { Out: gain, Slv: slaveGain },
-      // PitchMod is a legacy alias for PitchMod1; preserves load of patches saved before split
-      inputs: { PitchMod1: osc.frequency, PitchMod2: osc.frequency, PitchMod: osc.frequency, FmMod: fmGain },
+      inputs: { Pitch1: osc.frequency, Pitch2: osc.frequency, FmMod: fmGain },
       _nodes: [osc, gain, slaveGain, fmGain],
       _slaveTargets: [],
       _frequency: 220,
@@ -320,7 +352,7 @@ class AudioEngine {
     const mod = {
       id, type: "SpectralOsc", node: partials[0].osc, outputNode: output,
       outputs: { Out: output, Slv: slvOut },
-      inputs: { PitchMod1: freqSrc.offset, PitchMod2: freqSrc.offset, FMA: fmGain, ShapeMod: partialBus.gain },
+      inputs: { Pitch1: freqSrc.offset, Pitch2: freqSrc.offset, FMA: fmGain, ShapeMod: partialBus.gain },
       _nodes: [output, slvOut, freqSrc, fmGain, partialBus,
         ...partials.flatMap(p => [p.osc, p.gain, p.partialFreqSrc, p.partialFmGain])],
       _slaveTargets: [],
@@ -633,8 +665,7 @@ class AudioEngine {
     const mod = {
       id, type: "FormantOsc", node: osc, outputNode: output,
       outputs: { Out: output, Slv: slvOut },
-      // PitchMod is a legacy alias for PitchMod1; preserves load of patches saved before split
-      inputs: { PitchMod1: osc.frequency, PitchMod2: osc.frequency, PitchMod: osc.frequency },
+      inputs: { Pitch1: osc.frequency, Pitch2: osc.frequency },
       _nodes: [osc, ...filters, ...filterGains, output, slvOut],
       _slaveTargets: [],
       _frequency: 150,
@@ -664,7 +695,7 @@ class AudioEngine {
     return {
       id, type: "MasterOsc", node: slvOut, outputNode: slvOut,
       outputs: { Slv: slvOut },
-      inputs: { PitchMod1: slvOut.offset, PitchMod2: slvOut.offset },
+      inputs: { Pitch1: slvOut.offset, Pitch2: slvOut.offset },
       _nodes: [slvOut],
       _slaveTargets: [], // { moduleId, mod } — slaves connected to Slv output
       _frequency: 220,
@@ -1214,12 +1245,17 @@ class AudioEngine {
       clk24.offset.setValueAtTime(0, now + pulseLen);
 
       clk._tickCount++;
+      // Audio-rate Clk pulses are silenced by the per-port mute gain when
+      // patched; subscriber dispatch (clockTick / resetSeq) bypasses the
+      // mute interposer, so skip those when muted. _tickCount keeps
+      // advancing so the clock stays in phase when unmuted.
+      const dispatchSubs = !clk._muted;
       // Clk4 = every 6 ticks (quarter note at 24 PPQN)
       if (clk._tickCount % 6 === 0) {
         clk4.offset.setValueAtTime(1, now);
         clk4.offset.setValueAtTime(0, now + pulseLen);
         // Notify clock subscribers on quarter note
-        if (clk._clockSubscribers) {
+        if (dispatchSubs && clk._clockSubscribers) {
           clk._clockSubscribers.forEach(({ moduleId }) => {
             const sub = this.modules.get(moduleId);
             if (sub && sub.clockTick) sub.clockTick();
@@ -1231,7 +1267,7 @@ class AudioEngine {
         sync.offset.setValueAtTime(1, now);
         sync.offset.setValueAtTime(0, now + pulseLen);
         // Notify reset subscribers on bar
-        if (clk._resetSubscribers) {
+        if (dispatchSubs && clk._resetSubscribers) {
           clk._resetSubscribers.forEach(({ moduleId }) => {
             const sub = this.modules.get(moduleId);
             if (sub && sub.resetSeq) sub.resetSeq();
@@ -1333,10 +1369,14 @@ class AudioEngine {
         const step = seq._currentStep;
         const now = this.ctx.currentTime;
         const pulseLen = 0.01;
+        // Audio-rate pulses are silenced by the per-port mute gain; the JS
+        // envelope-trigger dispatch bypasses it, so skip those when muted.
+        // Step advance stays unguarded so timing remains coherent when unmuted.
+        const dispatchEnvelopes = !seq._muted;
         if (seq._triggers1[step]) {
           out1.offset.setValueAtTime(1, now);
           out1.offset.setValueAtTime(0, now + pulseLen);
-          seq._gateTargetEnvelopes1.forEach(envId => {
+          if (dispatchEnvelopes) seq._gateTargetEnvelopes1.forEach(envId => {
             const envMod = this.modules.get(envId);
             if (envMod && envMod.trigger) envMod.trigger();
             if (envMod && envMod.releaseEnv) setTimeout(() => envMod.releaseEnv(), pulseLen * 1000 + 10);
@@ -1345,7 +1385,7 @@ class AudioEngine {
         if (seq._triggers2[step]) {
           out2.offset.setValueAtTime(1, now);
           out2.offset.setValueAtTime(0, now + pulseLen);
-          seq._gateTargetEnvelopes2.forEach(envId => {
+          if (dispatchEnvelopes) seq._gateTargetEnvelopes2.forEach(envId => {
             const envMod = this.modules.get(envId);
             if (envMod && envMod.trigger) envMod.trigger();
             if (envMod && envMod.releaseEnv) setTimeout(() => envMod.releaseEnv(), pulseLen * 1000 + 10);
@@ -1411,9 +1451,13 @@ class AudioEngine {
         const freq = NOTE_FREQ(midi);
         const now = this.ctx.currentTime;
         const gateOn = seq._gatePattern[step];
+        // Audio-rate Note/Gate writes are silenced by the per-port mute gain
+        // when patched; the virtual _pitchTargets / _gateTargetEnvelopes
+        // dispatches bypass it, so skip those when muted. Step advance and
+        // ConstantSource writes stay unguarded for timing coherence.
+        const dispatch = !seq._muted;
         noteOut.offset.setValueAtTime(freq, now);
-        // Set pitch targets directly; propagate to slaves when target is a master osc
-        seq._pitchTargets.forEach(({ audioParam, moduleId }) => {
+        if (dispatch) seq._pitchTargets.forEach(({ audioParam, moduleId }) => {
           audioParam.setValueAtTime(freq, now);
           const targetMod = this.modules.get(moduleId);
           if (targetMod && targetMod._slaveTargets) {
@@ -1424,7 +1468,7 @@ class AudioEngine {
         if (gateOn) {
           gateOut.offset.setValueAtTime(1, now);
           gateOut.offset.setValueAtTime(0, now + 0.05);
-          seq._gateTargetEnvelopes.forEach(envId => {
+          if (dispatch) seq._gateTargetEnvelopes.forEach(envId => {
             const envMod = this.modules.get(envId);
             if (envMod && envMod.trigger) envMod.trigger();
             if (envMod && envMod.releaseEnv) setTimeout(() => envMod.releaseEnv(), 60);
@@ -1467,9 +1511,10 @@ class AudioEngine {
         const freq = NOTE_FREQ(midi);
         const now = this.ctx.currentTime;
         const gateOn = seq._gatePattern[step];
+        // See NoteSeqA above — mute skips JS dispatch only.
+        const dispatch = !seq._muted;
         noteOut.offset.setValueAtTime(freq, now);
-        // Propagate to slaves when the pitch target is a master oscillator
-        seq._pitchTargets.forEach(({ audioParam, moduleId }) => {
+        if (dispatch) seq._pitchTargets.forEach(({ audioParam, moduleId }) => {
           audioParam.setValueAtTime(freq, now);
           const targetMod = this.modules.get(moduleId);
           if (targetMod && targetMod._slaveTargets) {
@@ -1480,7 +1525,7 @@ class AudioEngine {
         if (gateOn) {
           gateOut.offset.setValueAtTime(1, now);
           gateOut.offset.setValueAtTime(0, now + 0.05);
-          seq._gateTargetEnvelopes.forEach(envId => {
+          if (dispatch) seq._gateTargetEnvelopes.forEach(envId => {
             const envMod = this.modules.get(envId);
             if (envMod && envMod.trigger) envMod.trigger();
             if (envMod && envMod.releaseEnv) setTimeout(() => envMod.releaseEnv(), 60);
@@ -1648,12 +1693,20 @@ class AudioEngine {
   _createOutput(id) {
     const gain = this.ctx.createGain();
     gain.gain.value = 0.5;
-    gain.connect(this.masterGain);
+    // Output has no audio output port, so the lazy per-port mute pattern in
+    // connect()/disconnect() never reaches it. Interpose a dedicated mute gain
+    // between Output's level gain and the master bus so the M button still
+    // does something meaningful on Output (silences the final mix).
+    const outputMuteGain = this.ctx.createGain();
+    outputMuteGain.gain.value = 1;
+    gain.connect(outputMuteGain);
+    outputMuteGain.connect(this.masterGain);
     return {
       id, type: "Output", node: gain, outputNode: null,
       outputs: {},
       inputs: { InL: gain, InR: gain },
-      _nodes: [gain],
+      _nodes: [gain, outputMuteGain],
+      _outputMuteGain: outputMuteGain,
       params: {
         level: { value: 0.5, min: 0, max: 1, audioParam: gain.gain, label: "Level" },
       },
@@ -1817,8 +1870,15 @@ class AudioEngine {
       params: {
         octave: { value: 0, min: -2, max: 4, label: "Oct" },
       },
-      // Play a note: set frequency, trigger connected envelopes
+      // Play a note: set frequency, trigger connected envelopes.
+      // Skip everything when muted — Note/Gate/Vel are virtual CV outputs
+      // that bypass the per-port mute gain (they're written via direct
+      // _pitchTargets / _gateTargetEnvelopes dispatch in connect()), so
+      // the audio-rate mute interposer can't silence them. releaseNote
+      // intentionally stays unguarded so envelopes triggered before the
+      // mute can still release cleanly.
       playNote: (midiNote) => {
+        if (kbd._muted) return;
         const octShift = kbd.params.octave.value * 12;
         const freq = NOTE_FREQ(midiNote + octShift);
         const now = this.ctx.currentTime;
@@ -1913,7 +1973,8 @@ class AudioEngine {
     }
 
     try {
-      outputNode.connect(inputNode);
+      const muteGain = this._getOrCreateMuteGain(fromMod, fromPort, outputNode);
+      muteGain.connect(inputNode);
       this.connections.push({ fromId, fromPort, toId, toPort });
 
       // Gate target tracking: Keyboard/NoteSeq Gate -> envelope
@@ -1984,8 +2045,11 @@ class AudioEngine {
         pt => !(pt.moduleId === toId && pt.port === toPort)
       );
     } else {
+      // Mirror connect(): the per-port mute gain owns the downstream edges,
+      // so disconnect against it (not the raw outputNode) when one exists.
+      const sourceNode = fromMod._muteGains?.[fromPort] || outputNode;
       try {
-        outputNode.disconnect(inputNode);
+        sourceNode.disconnect(inputNode);
       } catch (e) {
         if (e.name !== "InvalidAccessError") {
           console.error("AudioEngine.disconnect: unexpected error", e);

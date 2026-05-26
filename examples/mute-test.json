@@ -1,0 +1,429 @@
+{
+  "modules": [
+    {
+      "id": "mod_1",
+      "type": "ClkGen",
+      "x": 20,
+      "y": 20,
+      "params": {
+        "bpm": 110,
+        "active": "on"
+      }
+    },
+    {
+      "id": "mod_2",
+      "type": "NoteSeqA",
+      "x": 20,
+      "y": 140,
+      "params": {
+        "steps": 16
+      },
+      "internalState": {
+        "pitchValues": [
+          60,
+          64,
+          67,
+          64,
+          60,
+          64,
+          67,
+          72,
+          67,
+          64,
+          67,
+          64,
+          60,
+          64,
+          67,
+          64
+        ],
+        "gatePattern": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      }
+    },
+    {
+      "id": "mod_3",
+      "type": "OscA",
+      "x": 260,
+      "y": 140,
+      "params": {
+        "waveform": "sawtooth",
+        "level": 0.6
+      }
+    },
+    {
+      "id": "mod_4",
+      "type": "ADSREnv",
+      "x": 500,
+      "y": 140,
+      "params": {
+        "attack": 0.01,
+        "decay": 0.18,
+        "sustain": 0.3,
+        "release": 0.25
+      }
+    },
+    {
+      "id": "mod_5",
+      "type": "NoteSeqB",
+      "x": 20,
+      "y": 440,
+      "params": {
+        "steps": 8,
+        "baseOctave": 2
+      },
+      "internalState": {
+        "pitchValues": [
+          36,
+          36,
+          48,
+          36,
+          36,
+          36,
+          43,
+          36,
+          60,
+          60,
+          60,
+          60,
+          60,
+          60,
+          60,
+          60
+        ],
+        "gatePattern": [
+          true,
+          false,
+          true,
+          false,
+          true,
+          true,
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ]
+      }
+    },
+    {
+      "id": "mod_6",
+      "type": "OscB",
+      "x": 260,
+      "y": 440,
+      "params": {
+        "waveform": "square",
+        "level": 0.5
+      }
+    },
+    {
+      "id": "mod_7",
+      "type": "ADSREnv",
+      "x": 500,
+      "y": 440,
+      "params": {
+        "attack": 0.005,
+        "decay": 0.12,
+        "sustain": 0.2,
+        "release": 0.2
+      }
+    },
+    {
+      "id": "mod_8",
+      "type": "EventSeq",
+      "x": 20,
+      "y": 760,
+      "params": {
+        "steps": 16
+      },
+      "internalState": {
+        "triggers1": [
+          true,
+          false,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false
+        ],
+        "triggers2": [
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          true,
+          false
+        ]
+      }
+    },
+    {
+      "id": "mod_9",
+      "type": "Noise",
+      "x": 260,
+      "y": 760,
+      "params": {
+        "level": 0.6
+      }
+    },
+    {
+      "id": "mod_10",
+      "type": "ADSREnv",
+      "x": 500,
+      "y": 760,
+      "params": {
+        "attack": 0.001,
+        "decay": 0.08,
+        "sustain": 0,
+        "release": 0.05
+      }
+    },
+    {
+      "id": "mod_11",
+      "type": "Keyboard",
+      "x": 20,
+      "y": 990,
+      "params": {
+        "octave": 0
+      }
+    },
+    {
+      "id": "mod_12",
+      "type": "OscC",
+      "x": 260,
+      "y": 990,
+      "params": {
+        "waveform": "sine",
+        "level": 0.6
+      }
+    },
+    {
+      "id": "mod_13",
+      "type": "ADSREnv",
+      "x": 500,
+      "y": 990,
+      "params": {
+        "attack": 0.02,
+        "decay": 0.5,
+        "sustain": 0.5,
+        "release": 0.6
+      }
+    },
+    {
+      "id": "mod_14",
+      "type": "Mixer8",
+      "x": 740,
+      "y": 20,
+      "params": {
+        "level1": 0.5,
+        "level2": 0.5,
+        "level3": 0.4,
+        "level4": 0.5
+      }
+    },
+    {
+      "id": "mod_15",
+      "type": "Output",
+      "x": 740,
+      "y": 320,
+      "params": {
+        "level": 0.4
+      }
+    }
+  ],
+  "connections": [
+    {
+      "fromId": "mod_1",
+      "fromPort": "Clk4",
+      "toId": "mod_2",
+      "toPort": "Clk",
+      "color": "#fc0"
+    },
+    {
+      "fromId": "mod_1",
+      "fromPort": "Sync",
+      "toId": "mod_2",
+      "toPort": "Rst",
+      "color": "#fc0"
+    },
+    {
+      "fromId": "mod_1",
+      "fromPort": "Clk4",
+      "toId": "mod_5",
+      "toPort": "Clk",
+      "color": "#fc0"
+    },
+    {
+      "fromId": "mod_1",
+      "fromPort": "Sync",
+      "toId": "mod_5",
+      "toPort": "Rst",
+      "color": "#fc0"
+    },
+    {
+      "fromId": "mod_1",
+      "fromPort": "Clk4",
+      "toId": "mod_8",
+      "toPort": "Clk",
+      "color": "#fc0"
+    },
+    {
+      "fromId": "mod_1",
+      "fromPort": "Sync",
+      "toId": "mod_8",
+      "toPort": "Rst",
+      "color": "#fc0"
+    },
+    {
+      "fromId": "mod_2",
+      "fromPort": "Note",
+      "toId": "mod_3",
+      "toPort": "Pitch1",
+      "color": "#4cf"
+    },
+    {
+      "fromId": "mod_2",
+      "fromPort": "Gate",
+      "toId": "mod_4",
+      "toPort": "Gate",
+      "color": "#fc0"
+    },
+    {
+      "fromId": "mod_3",
+      "fromPort": "Out",
+      "toId": "mod_4",
+      "toPort": "In",
+      "color": "#f44"
+    },
+    {
+      "fromId": "mod_4",
+      "fromPort": "Out",
+      "toId": "mod_14",
+      "toPort": "In1",
+      "color": "#f44"
+    },
+    {
+      "fromId": "mod_5",
+      "fromPort": "Note",
+      "toId": "mod_6",
+      "toPort": "Pitch1",
+      "color": "#4cf"
+    },
+    {
+      "fromId": "mod_5",
+      "fromPort": "Gate",
+      "toId": "mod_7",
+      "toPort": "Gate",
+      "color": "#fc0"
+    },
+    {
+      "fromId": "mod_6",
+      "fromPort": "Out",
+      "toId": "mod_7",
+      "toPort": "In",
+      "color": "#f44"
+    },
+    {
+      "fromId": "mod_7",
+      "fromPort": "Out",
+      "toId": "mod_14",
+      "toPort": "In2",
+      "color": "#f44"
+    },
+    {
+      "fromId": "mod_8",
+      "fromPort": "Out1",
+      "toId": "mod_10",
+      "toPort": "Gate",
+      "color": "#fc0"
+    },
+    {
+      "fromId": "mod_9",
+      "fromPort": "Out",
+      "toId": "mod_10",
+      "toPort": "In",
+      "color": "#f44"
+    },
+    {
+      "fromId": "mod_10",
+      "fromPort": "Out",
+      "toId": "mod_14",
+      "toPort": "In3",
+      "color": "#f44"
+    },
+    {
+      "fromId": "mod_11",
+      "fromPort": "Note",
+      "toId": "mod_12",
+      "toPort": "PitchMod",
+      "color": "#4cf"
+    },
+    {
+      "fromId": "mod_11",
+      "fromPort": "Gate",
+      "toId": "mod_13",
+      "toPort": "Gate",
+      "color": "#fc0"
+    },
+    {
+      "fromId": "mod_12",
+      "fromPort": "Out",
+      "toId": "mod_13",
+      "toPort": "In",
+      "color": "#f44"
+    },
+    {
+      "fromId": "mod_13",
+      "fromPort": "Out",
+      "toId": "mod_14",
+      "toPort": "In4",
+      "color": "#f44"
+    },
+    {
+      "fromId": "mod_14",
+      "fromPort": "Out",
+      "toId": "mod_15",
+      "toPort": "InL",
+      "color": "#f44"
+    }
+  ]
+}

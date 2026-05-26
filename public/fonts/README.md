@@ -1,12 +1,20 @@
 # Fonts
 
-The UI uses **Pixel Operator** as its primary typeface. The font isn't checked
-in — drop the files here yourself:
+The UI uses **Pixel Operator** as its primary typeface. Both formats ship in
+this directory:
 
-- `PixelOperator.woff2` (or `.ttf`) — regular weight
-- `PixelOperator-Bold.woff2` (or `.ttf`) — bold weight
+- `PixelOperator.woff2` + `.ttf` — regular weight
+- `PixelOperator-Bold.woff2` + `.ttf` — bold weight
 
-Either format works; the loader tries woff2 first, falls back to ttf.
+The loader prefers woff2 (~73% smaller) and falls back to ttf if the woff2
+fetch fails. To regenerate the woff2 files from the ttf source:
+
+```bash
+brew install woff2
+cd public/fonts
+woff2_compress PixelOperator.ttf
+woff2_compress PixelOperator-Bold.ttf
+```
 
 ## Where to get it
 

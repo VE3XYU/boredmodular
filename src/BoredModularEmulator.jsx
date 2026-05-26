@@ -49,11 +49,23 @@ function getPortPosition(moduleState, portName, isOutput) {
   const allOutputs = def.outputs || [];
   const list = isOutput ? allOutputs : allInputs;
   const idx = list.indexOf(portName);
-  if (idx === -1) return { x: 0, y: 0 };
 
   const paramsH = buildParamLayout(def, moduleState.params).totalH;
   const customH = def.customUIHeight || 0;
   const baseY = HEADER_H + paramsH + customH;
+
+  // Port not in MODULE_DEFS — engine may have accepted it via a legacy input
+  // alias that doesn't exist in modInputs, leaving the cable rendered to
+  // canvas (0,0) and pinned to the top-left. Anchor to the module's port
+  // row centre so the cable at least visibly attaches to the right module,
+  // and warn so a stale connection is debuggable.
+  if (idx === -1) {
+    if (typeof console !== "undefined" && console.warn) {
+      console.warn(`getPortPosition: ${moduleState.type}.${portName} (${isOutput ? "output" : "input"}) not in MODULE_DEFS; cable will anchor to module centre.`);
+    }
+    const fallbackY = baseY + (isOutput ? PORT_OUTPUT_OFFSET : PORT_INPUT_OFFSET);
+    return { x: moduleState.x + MODULE_WIDTH / 2, y: moduleState.y + fallbackY };
+  }
 
   if (isOutput) {
     const spacing = MODULE_WIDTH / (allOutputs.length + 1);
@@ -546,6 +558,7 @@ function ModuleNode({
   onPortDragEnd,
   connections,
   onParamChange,
+  onMuteToggle,
   onRemove,
   seqFrame,
 }) {
@@ -596,6 +609,39 @@ function ModuleNode({
       <text x={8} y={15} fill="#111" fontSize={15} fontWeight={700} fontFamily="'Pixel Operator', 'DM Mono', monospace">
         {def.label}
       </text>
+      {/* Mute button — small Nord-style M with an LED-style fill when active */}
+      <g
+        style={{ cursor: "pointer" }}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          onMuteToggle(moduleState.id);
+        }}
+      >
+        <title>{moduleState.mute ? "Unmute module" : "Mute module"}</title>
+        <rect
+          x={MODULE_WIDTH - 32}
+          y={4}
+          width={14}
+          height={14}
+          rx={2}
+          fill={moduleState.mute ? "#e04848" : "#5a5a5a"}
+          stroke="#2a2a2a"
+          strokeWidth={1}
+        />
+        <text
+          x={MODULE_WIDTH - 25}
+          y={15}
+          textAnchor="middle"
+          fill={moduleState.mute ? "#fff" : "#bbb"}
+          fontSize={11}
+          fontWeight={700}
+          fontFamily="'Pixel Operator', 'DM Mono', monospace"
+          style={{ pointerEvents: "none" }}
+        >
+          M
+        </text>
+      </g>
       {/* Close */}
       <text
         x={MODULE_WIDTH - 12}
@@ -1262,6 +1308,17 @@ export default function BoredModularEmulator() {
     );
   }, []);
 
+  const handleMuteToggle = useCallback((moduleId) => {
+    setModules((prev) =>
+      prev.map((m) => {
+        if (m.id !== moduleId) return m;
+        const next = !m.mute;
+        engineRef.current.setMute(moduleId, next);
+        return { ...m, mute: next };
+      })
+    );
+  }, []);
+
   const fileInputRef = useRef(null);
   const [patchMsg, setPatchMsg] = useState(null);
 
@@ -1307,7 +1364,13 @@ export default function BoredModularEmulator() {
             params[k] = { ...v };
           });
         }
-        Object.entries(m.params || {}).forEach(([k, v]) => {
+        Object.entries(m.params || {}).forEach(([rawKey, v]) => {
+          // Pitch port rename (2026-05-25): PitchMod1Atten / PitchMod2Atten
+          // params from pre-rename patches map onto the new Pitch1Atten /
+          // Pitch2Atten attenuator params created by _autoAddAttenuators.
+          const k = rawKey === "PitchMod1Atten" ? "Pitch1Atten"
+            : rawKey === "PitchMod2Atten" ? "Pitch2Atten"
+            : rawKey;
           let value = v && typeof v === "object" && "value" in v ? v.value : v;
           // Amplifier kept as fixed-gain: clamp pre-split level values into [0.25, 4.0].
           if (m.type === "Amplifier" && type === "Amplifier" && k === "level") {
@@ -1316,18 +1379,35 @@ export default function BoredModularEmulator() {
           if (params[k]) params[k].value = value;
           engineRef.current.setParam(m.id, k, value);
         });
-        rebuilt.push({ id: m.id, type, x: m.x, y: m.y, params });
+        // Restore mute before reconnection so the lazy mute-gain (created on the
+        // first connect from each port) starts at the right gain value.
+        if (m.mute) engineRef.current.setMute(m.id, true);
+        rebuilt.push({ id: m.id, type, x: m.x, y: m.y, params, ...(m.mute ? { mute: true } : {}) });
       }
       // Update _idCounter
       const maxId = Math.max(...patch.modules.map((m) => parseInt(m.id.split("_")[1]) || 0), 0);
       if (maxId >= _idCounter) _idCounter = maxId;
       // Reconnect — for Amplifier→GainControl retypes, rename GainMod port to Ctrl
       // so both engine connections and rendered cables target the new module shape.
+      // Backfill `color` from the source-port signal type when missing, so patches
+      // saved before the colour-by-signal-type system (and hand-authored patches
+      // that skip the field) still render with the correct cable colours.
+      const fromModType = (id) => rebuilt.find((m) => m.id === id)?.type;
       const migratedConnections = (patch.connections || []).map((c) => {
+        let next = c;
         if (amplifierRetypes.has(c.toId) && c.toPort === "GainMod") {
-          return { ...c, toPort: "Ctrl" };
+          next = { ...next, toPort: "Ctrl" };
         }
-        return c;
+        // Pitch port rename (2026-05-25): PitchMod1/PitchMod2 → Pitch1/Pitch2
+        // on the oscillators that carried numbered pitch mods (OscA, OscB,
+        // MasterOsc, FormantOsc, SpectralOsc). Other modules' connections
+        // pass through unchanged.
+        if (next.toPort === "PitchMod1") next = { ...next, toPort: "Pitch1" };
+        else if (next.toPort === "PitchMod2") next = { ...next, toPort: "Pitch2" };
+        if (!next.color) {
+          next = { ...next, color: SIGNAL_TYPE_COLORS[getPortSignalType(next.fromPort, "output", fromModType(next.fromId))] };
+        }
+        return next;
       });
       migratedConnections.forEach((c) => {
         engineRef.current.connect(c.fromId, c.fromPort, c.toId, c.toPort);
@@ -1934,6 +2014,7 @@ export default function BoredModularEmulator() {
               onPortDragStart={handlePortDragStart}
               onPortDragEnd={handlePortDragEnd}
               onParamChange={handleParamChange}
+              onMuteToggle={handleMuteToggle}
               onRemove={removeModule}
               seqFrame={seqFrame}
             />

@@ -43,8 +43,8 @@
         "pwModDepth": 0,
         "fmDepth": 0,
         "level": 0.5,
-        "PitchMod1Atten": 1,
-        "PitchMod2Atten": 0
+        "Pitch1Atten": 1,
+        "Pitch2Atten": 0
       }
     },
     {
@@ -83,13 +83,61 @@
     }
   ],
   "connections": [
-    { "fromId": "mod_1", "fromPort": "Note", "toId": "mod_4", "toPort": "PitchMod1", "color": "#4cf" },
-    { "fromId": "mod_2", "fromPort": "Out",  "toId": "mod_4", "toPort": "PitchMod1", "color": "#f44" },
-    { "fromId": "mod_3", "fromPort": "Out",  "toId": "mod_5", "toPort": "FreqMod",   "color": "#f44" },
-    { "fromId": "mod_4", "fromPort": "Out",  "toId": "mod_5", "toPort": "In",        "color": "#f44" },
-    { "fromId": "mod_5", "fromPort": "Out",  "toId": "mod_6", "toPort": "In",        "color": "#f44" },
-    { "fromId": "mod_1", "fromPort": "Gate", "toId": "mod_6", "toPort": "Gate",      "color": "#fc0" },
-    { "fromId": "mod_6", "fromPort": "Out",  "toId": "mod_7", "toPort": "InL",       "color": "#f44" },
-    { "fromId": "mod_6", "fromPort": "Out",  "toId": "mod_7", "toPort": "InR",       "color": "#f44" }
+    {
+      "fromId": "mod_1",
+      "fromPort": "Note",
+      "toId": "mod_4",
+      "toPort": "Pitch1",
+      "color": "#4cf"
+    },
+    {
+      "fromId": "mod_2",
+      "fromPort": "Out",
+      "toId": "mod_4",
+      "toPort": "Pitch1",
+      "color": "#f44"
+    },
+    {
+      "fromId": "mod_3",
+      "fromPort": "Out",
+      "toId": "mod_5",
+      "toPort": "FreqMod",
+      "color": "#f44"
+    },
+    {
+      "fromId": "mod_4",
+      "fromPort": "Out",
+      "toId": "mod_5",
+      "toPort": "In",
+      "color": "#f44"
+    },
+    {
+      "fromId": "mod_5",
+      "fromPort": "Out",
+      "toId": "mod_6",
+      "toPort": "In",
+      "color": "#f44"
+    },
+    {
+      "fromId": "mod_1",
+      "fromPort": "Gate",
+      "toId": "mod_6",
+      "toPort": "Gate",
+      "color": "#fc0"
+    },
+    {
+      "fromId": "mod_6",
+      "fromPort": "Out",
+      "toId": "mod_7",
+      "toPort": "InL",
+      "color": "#f44"
+    },
+    {
+      "fromId": "mod_6",
+      "fromPort": "Out",
+      "toId": "mod_7",
+      "toPort": "InR",
+      "color": "#f44"
+    }
   ]
 }
