@@ -8,7 +8,7 @@ const MODULE_DEFS = {
     color: "#c22",
     inputs: ["Sync"],
     outputs: ["Out", "Slv"],
-    modInputs: ["PitchMod1", "PitchMod2", "FmMod", "PWMod"],
+    modInputs: ["Pitch1", "Pitch2", "FmMod", "PWMod"],
     description: "Master oscillator - Full-featured with FM, PW, sync",
     paramRows: [
       { knobs: ["frequency", "coarse", "fine"] },
@@ -22,7 +22,7 @@ const MODULE_DEFS = {
     color: "#c33",
     inputs: [],
     outputs: ["Out", "Slv"],
-    modInputs: ["PitchMod1", "PitchMod2", "FmMod"],
+    modInputs: ["Pitch1", "Pitch2", "FmMod"],
     description: "Oscillator B - Classic analog waveforms with FM",
     paramRows: [
       { knobs: ["frequency", "coarse", "fine"] },
@@ -72,7 +72,7 @@ const MODULE_DEFS = {
     color: "#c55",
     inputs: [],
     outputs: ["Out", "Slv"],
-    modInputs: ["PitchMod1", "PitchMod2"],
+    modInputs: ["Pitch1", "Pitch2"],
     description: "Formant oscillator - Vowel synthesis with slave output",
   },
   MasterOsc: {
@@ -81,7 +81,7 @@ const MODULE_DEFS = {
     color: "#d44",
     inputs: [],
     outputs: ["Slv"],
-    modInputs: ["PitchMod1", "PitchMod2"],
+    modInputs: ["Pitch1", "Pitch2"],
     description: "Master oscillator - Pitch controller for slaves",
     paramRows: [{ knobs: ["frequency", "coarse", "fine"] }],
   },
@@ -162,7 +162,7 @@ const MODULE_DEFS = {
     color: "#c66",
     inputs: [],
     outputs: ["Out", "Slv"],
-    modInputs: ["PitchMod1", "PitchMod2", "FMA", "ShapeMod"],
+    modInputs: ["Pitch1", "Pitch2", "FMA", "ShapeMod"],
     description: "Spectral oscillator - Additive partial stack",
   },
   PercOsc: {
@@ -457,7 +457,7 @@ const SIGNAL_TYPE_COLORS = {
 // Per-module overrides for ports whose signal type can't be derived from the
 // port name alone. Spec source: sourcemats/MODULE_LAYOUTS.md.
 const PORT_SIGNAL_TYPE_OVERRIDES = {
-  OscA: { PitchMod1: "audio", PitchMod2: "audio", FmMod: "audio", PWMod: "audio" },
+  OscA: { Pitch1: "audio", Pitch2: "audio", FmMod: "audio", PWMod: "audio" },
   OscB: { FmMod: "audio" },
   OscC: { PitchMod: "audio" },
   OscSlvB: { PwMod: "audio" },
@@ -515,12 +515,12 @@ function getPortColor(portName, kind, moduleType) {
 
 const PORT_ATTENUATOR_TYPES = {
   // Oscillators
-  MasterOsc: { PitchMod1: "II", PitchMod2: "II" },
-  OscA: { PitchMod1: "II", PitchMod2: "II", FmMod: "II", PWMod: "I" },
-  OscB: { PitchMod1: "II", PitchMod2: "II", FmMod: "II" },
+  MasterOsc: { Pitch1: "II", Pitch2: "II" },
+  OscA: { Pitch1: "II", Pitch2: "II", FmMod: "II", PWMod: "I" },
+  OscB: { Pitch1: "II", Pitch2: "II", FmMod: "II" },
   OscC: { PitchMod: "II", FMA: "II" }, // AM fixed 1:1
-  SpectralOsc: { PitchMod1: "II", PitchMod2: "II", FMA: "II", ShapeMod: "I" },
-  FormantOsc: { PitchMod1: "II", PitchMod2: "II" },
+  SpectralOsc: { Pitch1: "II", Pitch2: "II", FMA: "II", ShapeMod: "I" },
+  FormantOsc: { Pitch1: "II", Pitch2: "II" },
   OscSlvA: { FMA: "II" }, // AM fixed 1:1, Sync no attenuator
   OscSlvB: { PwMod: "I" },
   OscSlvC: { FMA: "II" },

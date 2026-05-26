@@ -317,7 +317,7 @@
       "fromId": "mod_2",
       "fromPort": "Note",
       "toId": "mod_3",
-      "toPort": "PitchMod1",
+      "toPort": "Pitch1",
       "color": "#4cf"
     },
     {
@@ -345,7 +345,7 @@
       "fromId": "mod_5",
       "fromPort": "Note",
       "toId": "mod_6",
-      "toPort": "PitchMod1",
+      "toPort": "Pitch1",
       "color": "#4cf"
     },
     {

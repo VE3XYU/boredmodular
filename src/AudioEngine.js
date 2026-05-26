@@ -218,7 +218,7 @@ class AudioEngine {
     return {
       id, type: "OscA", node: osc, outputNode: gain,
       outputs: { Out: gain, Slv: slaveGain },
-      inputs: { PitchMod1: freqParam, PitchMod2: freqParam, FmMod: fmGain, Sync: osc, PWMod: pwModGain },
+      inputs: { Pitch1: freqParam, Pitch2: freqParam, FmMod: fmGain, Sync: osc, PWMod: pwModGain },
       _nodes: [osc, gain, slaveGain, fmGain, pwModGain],
       _slaveTargets: [],
       _frequency: 220,
@@ -252,8 +252,7 @@ class AudioEngine {
     return {
       id, type: "OscB", node: osc, outputNode: gain,
       outputs: { Out: gain, Slv: slaveGain },
-      // PitchMod is a legacy alias for PitchMod1; preserves load of patches saved before split
-      inputs: { PitchMod1: osc.frequency, PitchMod2: osc.frequency, PitchMod: osc.frequency, FmMod: fmGain },
+      inputs: { Pitch1: osc.frequency, Pitch2: osc.frequency, FmMod: fmGain },
       _nodes: [osc, gain, slaveGain, fmGain],
       _slaveTargets: [],
       _frequency: 220,
@@ -353,7 +352,7 @@ class AudioEngine {
     const mod = {
       id, type: "SpectralOsc", node: partials[0].osc, outputNode: output,
       outputs: { Out: output, Slv: slvOut },
-      inputs: { PitchMod1: freqSrc.offset, PitchMod2: freqSrc.offset, FMA: fmGain, ShapeMod: partialBus.gain },
+      inputs: { Pitch1: freqSrc.offset, Pitch2: freqSrc.offset, FMA: fmGain, ShapeMod: partialBus.gain },
       _nodes: [output, slvOut, freqSrc, fmGain, partialBus,
         ...partials.flatMap(p => [p.osc, p.gain, p.partialFreqSrc, p.partialFmGain])],
       _slaveTargets: [],
@@ -666,8 +665,7 @@ class AudioEngine {
     const mod = {
       id, type: "FormantOsc", node: osc, outputNode: output,
       outputs: { Out: output, Slv: slvOut },
-      // PitchMod is a legacy alias for PitchMod1; preserves load of patches saved before split
-      inputs: { PitchMod1: osc.frequency, PitchMod2: osc.frequency, PitchMod: osc.frequency },
+      inputs: { Pitch1: osc.frequency, Pitch2: osc.frequency },
       _nodes: [osc, ...filters, ...filterGains, output, slvOut],
       _slaveTargets: [],
       _frequency: 150,
@@ -697,7 +695,7 @@ class AudioEngine {
     return {
       id, type: "MasterOsc", node: slvOut, outputNode: slvOut,
       outputs: { Slv: slvOut },
-      inputs: { PitchMod1: slvOut.offset, PitchMod2: slvOut.offset },
+      inputs: { Pitch1: slvOut.offset, Pitch2: slvOut.offset },
       _nodes: [slvOut],
       _slaveTargets: [], // { moduleId, mod } — slaves connected to Slv output
       _frequency: 220,

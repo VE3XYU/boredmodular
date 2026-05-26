@@ -1352,7 +1352,13 @@ export default function BoredModularEmulator() {
             params[k] = { ...v };
           });
         }
-        Object.entries(m.params || {}).forEach(([k, v]) => {
+        Object.entries(m.params || {}).forEach(([rawKey, v]) => {
+          // Pitch port rename (2026-05-25): PitchMod1Atten / PitchMod2Atten
+          // params from pre-rename patches map onto the new Pitch1Atten /
+          // Pitch2Atten attenuator params created by _autoAddAttenuators.
+          const k = rawKey === "PitchMod1Atten" ? "Pitch1Atten"
+            : rawKey === "PitchMod2Atten" ? "Pitch2Atten"
+            : rawKey;
           let value = v && typeof v === "object" && "value" in v ? v.value : v;
           // Amplifier kept as fixed-gain: clamp pre-split level values into [0.25, 4.0].
           if (m.type === "Amplifier" && type === "Amplifier" && k === "level") {
@@ -1380,6 +1386,12 @@ export default function BoredModularEmulator() {
         if (amplifierRetypes.has(c.toId) && c.toPort === "GainMod") {
           next = { ...next, toPort: "Ctrl" };
         }
+        // Pitch port rename (2026-05-25): PitchMod1/PitchMod2 → Pitch1/Pitch2
+        // on the oscillators that carried numbered pitch mods (OscA, OscB,
+        // MasterOsc, FormantOsc, SpectralOsc). Other modules' connections
+        // pass through unchanged.
+        if (next.toPort === "PitchMod1") next = { ...next, toPort: "Pitch1" };
+        else if (next.toPort === "PitchMod2") next = { ...next, toPort: "Pitch2" };
         if (!next.color) {
           next = { ...next, color: SIGNAL_TYPE_COLORS[getPortSignalType(next.fromPort, "output", fromModType(next.fromId))] };
         }

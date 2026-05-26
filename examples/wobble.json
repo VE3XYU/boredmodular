@@ -63,11 +63,47 @@
     }
   ],
   "connections": [
-    { "fromId": "mod_1", "fromPort": "Note", "toId": "mod_2", "toPort": "PitchMod1", "color": "hsl(60, 70%, 55%)" },
-    { "fromId": "mod_2", "fromPort": "Out",  "toId": "mod_3", "toPort": "In",        "color": "hsl(180, 70%, 55%)" },
-    { "fromId": "mod_4", "fromPort": "Out",  "toId": "mod_3", "toPort": "FreqMod",   "color": "hsl(280, 70%, 55%)" },
-    { "fromId": "mod_3", "fromPort": "Out",  "toId": "mod_5", "toPort": "In",        "color": "hsl(180, 70%, 55%)" },
-    { "fromId": "mod_1", "fromPort": "Gate", "toId": "mod_5", "toPort": "Gate",      "color": "hsl(40, 70%, 55%)" },
-    { "fromId": "mod_5", "fromPort": "Out",  "toId": "mod_6", "toPort": "InL",       "color": "hsl(330, 70%, 55%)" }
+    {
+      "fromId": "mod_1",
+      "fromPort": "Note",
+      "toId": "mod_2",
+      "toPort": "Pitch1",
+      "color": "hsl(60, 70%, 55%)"
+    },
+    {
+      "fromId": "mod_2",
+      "fromPort": "Out",
+      "toId": "mod_3",
+      "toPort": "In",
+      "color": "hsl(180, 70%, 55%)"
+    },
+    {
+      "fromId": "mod_4",
+      "fromPort": "Out",
+      "toId": "mod_3",
+      "toPort": "FreqMod",
+      "color": "hsl(280, 70%, 55%)"
+    },
+    {
+      "fromId": "mod_3",
+      "fromPort": "Out",
+      "toId": "mod_5",
+      "toPort": "In",
+      "color": "hsl(180, 70%, 55%)"
+    },
+    {
+      "fromId": "mod_1",
+      "fromPort": "Gate",
+      "toId": "mod_5",
+      "toPort": "Gate",
+      "color": "hsl(40, 70%, 55%)"
+    },
+    {
+      "fromId": "mod_5",
+      "fromPort": "Out",
+      "toId": "mod_6",
+      "toPort": "InL",
+      "color": "hsl(330, 70%, 55%)"
+    }
   ]
 }

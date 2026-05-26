@@ -105,7 +105,7 @@ Slave oscillators (`OscSlvA`–`E`, `OscSlvFM`, `OscSineBank`) take pitch from a
 
 These modules track their pitch and gate targets directly rather than through the standard audio graph:
 
-- `Note` output is a `ConstantSourceNode` whose offset = frequency in Hz. When `Note → PitchMod` is patched, the target `AudioParam` is pushed onto the source's `_pitchTargets[]` and `connect()` does **not** call `outputNode.connect(inputNode)`.
+- `Note` output is a `ConstantSourceNode` whose offset = frequency in Hz. When `Note → Pitch1` (or any pitch input) is patched, the target `AudioParam` is pushed onto the source's `_pitchTargets[]` and `connect()` does **not** call `outputNode.connect(inputNode)`.
 - On `playNote(midi)`, the source iterates `_pitchTargets` and `setValueAtTime(freq, now)` directly. This is the trick that makes oscillators play in tune — adding the Note's offset to the oscillator's `frequency` would *sum* not *replace*.
 - `Gate` output is a real audio-rate `ConstantSourceNode` (0/1), but additionally tracks `_gateTargetEnvelopes[]`: any envelope module connected to it gets `trigger()`/`releaseEnv()` calls on note on/off.
 - Computer keys: `ASDFGHJK` = white keys C–C, `WETYU` = black keys (see `KEY_NOTE_MAP`). Spacebar still triggers the global gate.
