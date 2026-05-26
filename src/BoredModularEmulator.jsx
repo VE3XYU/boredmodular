@@ -546,6 +546,7 @@ function ModuleNode({
   onPortDragEnd,
   connections,
   onParamChange,
+  onMuteToggle,
   onRemove,
   seqFrame,
 }) {
@@ -596,6 +597,39 @@ function ModuleNode({
       <text x={8} y={15} fill="#111" fontSize={15} fontWeight={700} fontFamily="'Pixel Operator', 'DM Mono', monospace">
         {def.label}
       </text>
+      {/* Mute button — small Nord-style M with an LED-style fill when active */}
+      <g
+        style={{ cursor: "pointer" }}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          onMuteToggle(moduleState.id);
+        }}
+      >
+        <title>{moduleState.mute ? "Unmute module" : "Mute module"}</title>
+        <rect
+          x={MODULE_WIDTH - 32}
+          y={4}
+          width={14}
+          height={14}
+          rx={2}
+          fill={moduleState.mute ? "#e04848" : "#5a5a5a"}
+          stroke="#2a2a2a"
+          strokeWidth={1}
+        />
+        <text
+          x={MODULE_WIDTH - 25}
+          y={15}
+          textAnchor="middle"
+          fill={moduleState.mute ? "#fff" : "#bbb"}
+          fontSize={11}
+          fontWeight={700}
+          fontFamily="'Pixel Operator', 'DM Mono', monospace"
+          style={{ pointerEvents: "none" }}
+        >
+          M
+        </text>
+      </g>
       {/* Close */}
       <text
         x={MODULE_WIDTH - 12}
@@ -1262,6 +1296,17 @@ export default function BoredModularEmulator() {
     );
   }, []);
 
+  const handleMuteToggle = useCallback((moduleId) => {
+    setModules((prev) =>
+      prev.map((m) => {
+        if (m.id !== moduleId) return m;
+        const next = !m.mute;
+        engineRef.current.setMute(moduleId, next);
+        return { ...m, mute: next };
+      })
+    );
+  }, []);
+
   const fileInputRef = useRef(null);
   const [patchMsg, setPatchMsg] = useState(null);
 
@@ -1316,7 +1361,10 @@ export default function BoredModularEmulator() {
           if (params[k]) params[k].value = value;
           engineRef.current.setParam(m.id, k, value);
         });
-        rebuilt.push({ id: m.id, type, x: m.x, y: m.y, params });
+        // Restore mute before reconnection so the lazy mute-gain (created on the
+        // first connect from each port) starts at the right gain value.
+        if (m.mute) engineRef.current.setMute(m.id, true);
+        rebuilt.push({ id: m.id, type, x: m.x, y: m.y, params, ...(m.mute ? { mute: true } : {}) });
       }
       // Update _idCounter
       const maxId = Math.max(...patch.modules.map((m) => parseInt(m.id.split("_")[1]) || 0), 0);
@@ -1934,6 +1982,7 @@ export default function BoredModularEmulator() {
               onPortDragStart={handlePortDragStart}
               onPortDragEnd={handlePortDragEnd}
               onParamChange={handleParamChange}
+              onMuteToggle={handleMuteToggle}
               onRemove={removeModule}
               seqFrame={seqFrame}
             />

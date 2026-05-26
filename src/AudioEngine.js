@@ -159,6 +159,39 @@ class AudioEngine {
     }
   }
 
+  // Lazy per-port mute interposer. The first connect() from a given port
+  // creates a GainNode wired outputNode → muteGain → (downstream inputs);
+  // subsequent connects from the same port reuse it. setMute() flips every
+  // mute gain on the module. Pushed onto _nodes for removeModule cleanup.
+  // Slave/clock/note-source paths return early in connect() and never reach
+  // here, so virtual signals propagate even when muted (documented limitation).
+  _getOrCreateMuteGain(mod, port, outputNode) {
+    if (!mod._muteGains) mod._muteGains = {};
+    const existing = mod._muteGains[port];
+    if (existing) return existing;
+    const g = this.ctx.createGain();
+    g.gain.value = mod._muted ? 0 : 1;
+    outputNode.connect(g);
+    mod._muteGains[port] = g;
+    if (mod._nodes) mod._nodes.push(g);
+    return g;
+  }
+
+  setMute(moduleId, muted) {
+    const mod = this.modules.get(moduleId);
+    if (!mod) return;
+    mod._muted = !!muted;
+    const gainValue = mod._muted ? 0 : 1;
+    if (mod._muteGains) {
+      for (const port in mod._muteGains) {
+        mod._muteGains[port].gain.value = gainValue;
+      }
+    }
+    if (mod._outputMuteGain) {
+      mod._outputMuteGain.gain.value = gainValue;
+    }
+  }
+
   // ── Oscillators ──────────────────────────────────────────────────────────
 
   _createOscA(id) {
@@ -1648,12 +1681,20 @@ class AudioEngine {
   _createOutput(id) {
     const gain = this.ctx.createGain();
     gain.gain.value = 0.5;
-    gain.connect(this.masterGain);
+    // Output has no audio output port, so the lazy per-port mute pattern in
+    // connect()/disconnect() never reaches it. Interpose a dedicated mute gain
+    // between Output's level gain and the master bus so the M button still
+    // does something meaningful on Output (silences the final mix).
+    const outputMuteGain = this.ctx.createGain();
+    outputMuteGain.gain.value = 1;
+    gain.connect(outputMuteGain);
+    outputMuteGain.connect(this.masterGain);
     return {
       id, type: "Output", node: gain, outputNode: null,
       outputs: {},
       inputs: { InL: gain, InR: gain },
-      _nodes: [gain],
+      _nodes: [gain, outputMuteGain],
+      _outputMuteGain: outputMuteGain,
       params: {
         level: { value: 0.5, min: 0, max: 1, audioParam: gain.gain, label: "Level" },
       },
@@ -1913,7 +1954,8 @@ class AudioEngine {
     }
 
     try {
-      outputNode.connect(inputNode);
+      const muteGain = this._getOrCreateMuteGain(fromMod, fromPort, outputNode);
+      muteGain.connect(inputNode);
       this.connections.push({ fromId, fromPort, toId, toPort });
 
       // Gate target tracking: Keyboard/NoteSeq Gate -> envelope
@@ -1984,8 +2026,11 @@ class AudioEngine {
         pt => !(pt.moduleId === toId && pt.port === toPort)
       );
     } else {
+      // Mirror connect(): the per-port mute gain owns the downstream edges,
+      // so disconnect against it (not the raw outputNode) when one exists.
+      const sourceNode = fromMod._muteGains?.[fromPort] || outputNode;
       try {
-        outputNode.disconnect(inputNode);
+        sourceNode.disconnect(inputNode);
       } catch (e) {
         if (e.name !== "InvalidAccessError") {
           console.error("AudioEngine.disconnect: unexpected error", e);
