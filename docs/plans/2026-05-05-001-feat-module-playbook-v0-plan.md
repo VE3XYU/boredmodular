@@ -1,12 +1,15 @@
 ---
 title: "Module playbook v0: codify Unit 1 friction into MODULE_PLAYBOOK.md"
 type: feat
-status: active
+status: closed
 date: 2026-05-05
+closed: 2026-05-05
 origin: docs/plans/2026-05-04-001-feat-module-completeness-playbook-plan.md
 ---
 
 # Module playbook v0: codify Unit 1 friction into MODULE_PLAYBOOK.md
+
+> **Plan closed 2026-05-05.** Unit 2 deliverables shipped in PR #7 (`sourcemats/MODULE_PLAYBOOK.md` v0); the friction notes file was deleted as planned. Parent plan (origin) was subsequently closed on 2026-05-06. Implementation Unit checkboxes below were never reconciled — see PR #7 and the parent plan's retrospective for the canonical record.
 
 ## Overview
 
