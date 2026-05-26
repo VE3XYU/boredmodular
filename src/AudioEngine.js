@@ -1858,8 +1858,15 @@ class AudioEngine {
       params: {
         octave: { value: 0, min: -2, max: 4, label: "Oct" },
       },
-      // Play a note: set frequency, trigger connected envelopes
+      // Play a note: set frequency, trigger connected envelopes.
+      // Skip everything when muted — Note/Gate/Vel are virtual CV outputs
+      // that bypass the per-port mute gain (they're written via direct
+      // _pitchTargets / _gateTargetEnvelopes dispatch in connect()), so
+      // the audio-rate mute interposer can't silence them. releaseNote
+      // intentionally stays unguarded so envelopes triggered before the
+      // mute can still release cleanly.
       playNote: (midiNote) => {
+        if (kbd._muted) return;
         const octShift = kbd.params.octave.value * 12;
         const freq = NOTE_FREQ(midiNote + octShift);
         const now = this.ctx.currentTime;
