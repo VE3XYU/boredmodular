@@ -49,11 +49,23 @@ function getPortPosition(moduleState, portName, isOutput) {
   const allOutputs = def.outputs || [];
   const list = isOutput ? allOutputs : allInputs;
   const idx = list.indexOf(portName);
-  if (idx === -1) return { x: 0, y: 0 };
 
   const paramsH = buildParamLayout(def, moduleState.params).totalH;
   const customH = def.customUIHeight || 0;
   const baseY = HEADER_H + paramsH + customH;
+
+  // Port not in MODULE_DEFS — engine may have accepted it via a legacy input
+  // alias that doesn't exist in modInputs, leaving the cable rendered to
+  // canvas (0,0) and pinned to the top-left. Anchor to the module's port
+  // row centre so the cable at least visibly attaches to the right module,
+  // and warn so a stale connection is debuggable.
+  if (idx === -1) {
+    if (typeof console !== "undefined" && console.warn) {
+      console.warn(`getPortPosition: ${moduleState.type}.${portName} (${isOutput ? "output" : "input"}) not in MODULE_DEFS; cable will anchor to module centre.`);
+    }
+    const fallbackY = baseY + (isOutput ? PORT_OUTPUT_OFFSET : PORT_INPUT_OFFSET);
+    return { x: moduleState.x + MODULE_WIDTH / 2, y: moduleState.y + fallbackY };
+  }
 
   if (isOutput) {
     const spacing = MODULE_WIDTH / (allOutputs.length + 1);
