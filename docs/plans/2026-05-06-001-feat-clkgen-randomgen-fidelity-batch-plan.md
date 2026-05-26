@@ -1,12 +1,15 @@
 ---
 title: "ClkGen + RandomGen fidelity batch (Unit 3)"
 type: feat
-status: active
+status: closed
 date: 2026-05-06
+closed: 2026-05-06
 origin: docs/plans/2026-05-04-001-feat-module-completeness-playbook-plan.md
 ---
 
 # ClkGen + RandomGen fidelity batch (Unit 3)
+
+> **Plan closed 2026-05-06.** Unit 3 deliverables shipped in PR #9 (audit append + friction notes), then the parent plan rolled into Unit 4 (playbook refinement, PR #11) and was closed on 2026-05-06. Implementation Unit checkboxes below were never reconciled — see the parent plan's retrospective for the canonical record.
 
 > Sub-plan locking the cluster pick and audit pre-flight for Unit 3 of the parent module-completeness plan. Scope is "execute one fidelity batch using `MODULE_PLAYBOOK.md` v0"; the deliverables are an audit append, any `fix-toward-spec` code changes that pass the divergence rationale rule's blocking-conditions check, and a friction-notes file capturing playbook usage observations for Unit 4.
 
