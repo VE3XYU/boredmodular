@@ -374,7 +374,7 @@
       "fromPort": "Out1",
       "toId": "mod_10",
       "toPort": "Gate",
-      "color": "#f44"
+      "color": "#fc0"
     },
     {
       "fromId": "mod_9",

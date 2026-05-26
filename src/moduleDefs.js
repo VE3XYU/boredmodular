@@ -462,6 +462,17 @@ const PORT_SIGNAL_TYPE_OVERRIDES = {
   OscC: { PitchMod: "audio" },
   OscSlvB: { PwMod: "audio" },
   PercOsc: { Trig: "audio" },
+  // Module outputs that the default-by-name fallback assumes are audio but the
+  // spec marks as control or logic. Without these, every cable from these
+  // modules renders red instead of blue / yellow.
+  LFO: { Out: "control" },
+  LFOA: { Out: "control" },
+  RandomGen: { Out: "control" },
+  CtrlSeq: { Out: "control" },
+  EventSeq: { Out1: "logic", Out2: "logic" },
+  // PortamentoA processes pitch CV, not audio — both its input and output are
+  // blue per §8.3.
+  PortamentoA: { In: "control", Out: "control" },
 };
 
 // kind: "output" | "input" | "modInput"
