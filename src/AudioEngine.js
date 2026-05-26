@@ -1247,12 +1247,17 @@ class AudioEngine {
       clk24.offset.setValueAtTime(0, now + pulseLen);
 
       clk._tickCount++;
+      // Audio-rate Clk pulses are silenced by the per-port mute gain when
+      // patched; subscriber dispatch (clockTick / resetSeq) bypasses the
+      // mute interposer, so skip those when muted. _tickCount keeps
+      // advancing so the clock stays in phase when unmuted.
+      const dispatchSubs = !clk._muted;
       // Clk4 = every 6 ticks (quarter note at 24 PPQN)
       if (clk._tickCount % 6 === 0) {
         clk4.offset.setValueAtTime(1, now);
         clk4.offset.setValueAtTime(0, now + pulseLen);
         // Notify clock subscribers on quarter note
-        if (clk._clockSubscribers) {
+        if (dispatchSubs && clk._clockSubscribers) {
           clk._clockSubscribers.forEach(({ moduleId }) => {
             const sub = this.modules.get(moduleId);
             if (sub && sub.clockTick) sub.clockTick();
@@ -1264,7 +1269,7 @@ class AudioEngine {
         sync.offset.setValueAtTime(1, now);
         sync.offset.setValueAtTime(0, now + pulseLen);
         // Notify reset subscribers on bar
-        if (clk._resetSubscribers) {
+        if (dispatchSubs && clk._resetSubscribers) {
           clk._resetSubscribers.forEach(({ moduleId }) => {
             const sub = this.modules.get(moduleId);
             if (sub && sub.resetSeq) sub.resetSeq();
@@ -1366,10 +1371,14 @@ class AudioEngine {
         const step = seq._currentStep;
         const now = this.ctx.currentTime;
         const pulseLen = 0.01;
+        // Audio-rate pulses are silenced by the per-port mute gain; the JS
+        // envelope-trigger dispatch bypasses it, so skip those when muted.
+        // Step advance stays unguarded so timing remains coherent when unmuted.
+        const dispatchEnvelopes = !seq._muted;
         if (seq._triggers1[step]) {
           out1.offset.setValueAtTime(1, now);
           out1.offset.setValueAtTime(0, now + pulseLen);
-          seq._gateTargetEnvelopes1.forEach(envId => {
+          if (dispatchEnvelopes) seq._gateTargetEnvelopes1.forEach(envId => {
             const envMod = this.modules.get(envId);
             if (envMod && envMod.trigger) envMod.trigger();
             if (envMod && envMod.releaseEnv) setTimeout(() => envMod.releaseEnv(), pulseLen * 1000 + 10);
@@ -1378,7 +1387,7 @@ class AudioEngine {
         if (seq._triggers2[step]) {
           out2.offset.setValueAtTime(1, now);
           out2.offset.setValueAtTime(0, now + pulseLen);
-          seq._gateTargetEnvelopes2.forEach(envId => {
+          if (dispatchEnvelopes) seq._gateTargetEnvelopes2.forEach(envId => {
             const envMod = this.modules.get(envId);
             if (envMod && envMod.trigger) envMod.trigger();
             if (envMod && envMod.releaseEnv) setTimeout(() => envMod.releaseEnv(), pulseLen * 1000 + 10);
@@ -1444,9 +1453,13 @@ class AudioEngine {
         const freq = NOTE_FREQ(midi);
         const now = this.ctx.currentTime;
         const gateOn = seq._gatePattern[step];
+        // Audio-rate Note/Gate writes are silenced by the per-port mute gain
+        // when patched; the virtual _pitchTargets / _gateTargetEnvelopes
+        // dispatches bypass it, so skip those when muted. Step advance and
+        // ConstantSource writes stay unguarded for timing coherence.
+        const dispatch = !seq._muted;
         noteOut.offset.setValueAtTime(freq, now);
-        // Set pitch targets directly; propagate to slaves when target is a master osc
-        seq._pitchTargets.forEach(({ audioParam, moduleId }) => {
+        if (dispatch) seq._pitchTargets.forEach(({ audioParam, moduleId }) => {
           audioParam.setValueAtTime(freq, now);
           const targetMod = this.modules.get(moduleId);
           if (targetMod && targetMod._slaveTargets) {
@@ -1457,7 +1470,7 @@ class AudioEngine {
         if (gateOn) {
           gateOut.offset.setValueAtTime(1, now);
           gateOut.offset.setValueAtTime(0, now + 0.05);
-          seq._gateTargetEnvelopes.forEach(envId => {
+          if (dispatch) seq._gateTargetEnvelopes.forEach(envId => {
             const envMod = this.modules.get(envId);
             if (envMod && envMod.trigger) envMod.trigger();
             if (envMod && envMod.releaseEnv) setTimeout(() => envMod.releaseEnv(), 60);
@@ -1500,9 +1513,10 @@ class AudioEngine {
         const freq = NOTE_FREQ(midi);
         const now = this.ctx.currentTime;
         const gateOn = seq._gatePattern[step];
+        // See NoteSeqA above — mute skips JS dispatch only.
+        const dispatch = !seq._muted;
         noteOut.offset.setValueAtTime(freq, now);
-        // Propagate to slaves when the pitch target is a master oscillator
-        seq._pitchTargets.forEach(({ audioParam, moduleId }) => {
+        if (dispatch) seq._pitchTargets.forEach(({ audioParam, moduleId }) => {
           audioParam.setValueAtTime(freq, now);
           const targetMod = this.modules.get(moduleId);
           if (targetMod && targetMod._slaveTargets) {
@@ -1513,7 +1527,7 @@ class AudioEngine {
         if (gateOn) {
           gateOut.offset.setValueAtTime(1, now);
           gateOut.offset.setValueAtTime(0, now + 0.05);
-          seq._gateTargetEnvelopes.forEach(envId => {
+          if (dispatch) seq._gateTargetEnvelopes.forEach(envId => {
             const envMod = this.modules.get(envId);
             if (envMod && envMod.trigger) envMod.trigger();
             if (envMod && envMod.releaseEnv) setTimeout(() => envMod.releaseEnv(), 60);
