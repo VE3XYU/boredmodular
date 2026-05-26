@@ -275,133 +275,155 @@
       "fromId": "mod_1",
       "fromPort": "Clk4",
       "toId": "mod_2",
-      "toPort": "Clk"
+      "toPort": "Clk",
+      "color": "#fc0"
     },
     {
       "fromId": "mod_1",
       "fromPort": "Sync",
       "toId": "mod_2",
-      "toPort": "Rst"
+      "toPort": "Rst",
+      "color": "#fc0"
     },
     {
       "fromId": "mod_1",
       "fromPort": "Clk4",
       "toId": "mod_5",
-      "toPort": "Clk"
+      "toPort": "Clk",
+      "color": "#fc0"
     },
     {
       "fromId": "mod_1",
       "fromPort": "Sync",
       "toId": "mod_5",
-      "toPort": "Rst"
+      "toPort": "Rst",
+      "color": "#fc0"
     },
     {
       "fromId": "mod_1",
       "fromPort": "Clk4",
       "toId": "mod_8",
-      "toPort": "Clk"
+      "toPort": "Clk",
+      "color": "#fc0"
     },
     {
       "fromId": "mod_1",
       "fromPort": "Sync",
       "toId": "mod_8",
-      "toPort": "Rst"
+      "toPort": "Rst",
+      "color": "#fc0"
     },
     {
       "fromId": "mod_2",
       "fromPort": "Note",
       "toId": "mod_3",
-      "toPort": "PitchMod1"
+      "toPort": "PitchMod1",
+      "color": "#4cf"
     },
     {
       "fromId": "mod_2",
       "fromPort": "Gate",
       "toId": "mod_4",
-      "toPort": "Gate"
+      "toPort": "Gate",
+      "color": "#fc0"
     },
     {
       "fromId": "mod_3",
       "fromPort": "Out",
       "toId": "mod_4",
-      "toPort": "In"
+      "toPort": "In",
+      "color": "#f44"
     },
     {
       "fromId": "mod_4",
       "fromPort": "Out",
       "toId": "mod_14",
-      "toPort": "In1"
+      "toPort": "In1",
+      "color": "#f44"
     },
     {
       "fromId": "mod_5",
       "fromPort": "Note",
       "toId": "mod_6",
-      "toPort": "PitchMod1"
+      "toPort": "PitchMod1",
+      "color": "#4cf"
     },
     {
       "fromId": "mod_5",
       "fromPort": "Gate",
       "toId": "mod_7",
-      "toPort": "Gate"
+      "toPort": "Gate",
+      "color": "#fc0"
     },
     {
       "fromId": "mod_6",
       "fromPort": "Out",
       "toId": "mod_7",
-      "toPort": "In"
+      "toPort": "In",
+      "color": "#f44"
     },
     {
       "fromId": "mod_7",
       "fromPort": "Out",
       "toId": "mod_14",
-      "toPort": "In2"
+      "toPort": "In2",
+      "color": "#f44"
     },
     {
       "fromId": "mod_8",
       "fromPort": "Out1",
       "toId": "mod_10",
-      "toPort": "Gate"
+      "toPort": "Gate",
+      "color": "#f44"
     },
     {
       "fromId": "mod_9",
       "fromPort": "Out",
       "toId": "mod_10",
-      "toPort": "In"
+      "toPort": "In",
+      "color": "#f44"
     },
     {
       "fromId": "mod_10",
       "fromPort": "Out",
       "toId": "mod_14",
-      "toPort": "In3"
+      "toPort": "In3",
+      "color": "#f44"
     },
     {
       "fromId": "mod_11",
       "fromPort": "Note",
       "toId": "mod_12",
-      "toPort": "PitchMod"
+      "toPort": "PitchMod",
+      "color": "#4cf"
     },
     {
       "fromId": "mod_11",
       "fromPort": "Gate",
       "toId": "mod_13",
-      "toPort": "Gate"
+      "toPort": "Gate",
+      "color": "#fc0"
     },
     {
       "fromId": "mod_12",
       "fromPort": "Out",
       "toId": "mod_13",
-      "toPort": "In"
+      "toPort": "In",
+      "color": "#f44"
     },
     {
       "fromId": "mod_13",
       "fromPort": "Out",
       "toId": "mod_14",
-      "toPort": "In4"
+      "toPort": "In4",
+      "color": "#f44"
     },
     {
       "fromId": "mod_14",
       "fromPort": "Out",
       "toId": "mod_15",
-      "toPort": "InL"
+      "toPort": "InL",
+      "color": "#f44"
     }
   ]
 }

@@ -1371,11 +1371,19 @@ export default function BoredModularEmulator() {
       if (maxId >= _idCounter) _idCounter = maxId;
       // Reconnect — for Amplifier→GainControl retypes, rename GainMod port to Ctrl
       // so both engine connections and rendered cables target the new module shape.
+      // Backfill `color` from the source-port signal type when missing, so patches
+      // saved before the colour-by-signal-type system (and hand-authored patches
+      // that skip the field) still render with the correct cable colours.
+      const fromModType = (id) => rebuilt.find((m) => m.id === id)?.type;
       const migratedConnections = (patch.connections || []).map((c) => {
+        let next = c;
         if (amplifierRetypes.has(c.toId) && c.toPort === "GainMod") {
-          return { ...c, toPort: "Ctrl" };
+          next = { ...next, toPort: "Ctrl" };
         }
-        return c;
+        if (!next.color) {
+          next = { ...next, color: SIGNAL_TYPE_COLORS[getPortSignalType(next.fromPort, "output", fromModType(next.fromId))] };
+        }
+        return next;
       });
       migratedConnections.forEach((c) => {
         engineRef.current.connect(c.fromId, c.fromPort, c.toId, c.toPort);
