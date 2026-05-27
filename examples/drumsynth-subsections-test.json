@@ -1,0 +1,60 @@
+{
+  "modules": [
+    {
+      "id": "mod_1",
+      "type": "Keyboard",
+      "x": 60,
+      "y": 260,
+      "params": {}
+    },
+    {
+      "id": "mod_2",
+      "type": "DrumSynth",
+      "x": 340,
+      "y": 40,
+      "params": {
+        "masterPitch": 62,
+        "masterDecay": 0.35,
+        "masterLevel": 0.9,
+        "slaveRatio": 1.75,
+        "slaveDecay": 0.12,
+        "slaveLevel": 0.4,
+        "filterMode": "BP",
+        "filterFreq": 1400,
+        "filterRes": 3.2,
+        "filterSweep": 2.5,
+        "filterDecay": 0.18,
+        "bendAmt": 1.5,
+        "bendDecay": 0.06,
+        "click": 0.5,
+        "noiseLevel": 0.3,
+        "level": 0.75
+      }
+    },
+    {
+      "id": "mod_3",
+      "type": "Filter",
+      "x": 340,
+      "y": 520,
+      "params": {
+        "frequency": 1200,
+        "resonance": 2,
+        "type": "lowpass"
+      }
+    },
+    {
+      "id": "mod_4",
+      "type": "Output",
+      "x": 660,
+      "y": 260,
+      "params": {
+        "level": 0.6
+      }
+    }
+  ],
+  "connections": [
+    { "fromId": "mod_1", "fromPort": "Gate", "toId": "mod_2", "toPort": "Trig", "color": "hsl(40, 70%, 55%)" },
+    { "fromId": "mod_2", "fromPort": "Out",  "toId": "mod_3", "toPort": "In",   "color": "hsl(330, 70%, 55%)" },
+    { "fromId": "mod_3", "fromPort": "Out",  "toId": "mod_4", "toPort": "InL",  "color": "hsl(200, 70%, 55%)" }
+  ]
+}
