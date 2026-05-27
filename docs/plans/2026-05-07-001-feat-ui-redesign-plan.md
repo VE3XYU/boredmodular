@@ -182,11 +182,11 @@ User shared three Nord Modular Editor reference screenshots in chat — used as 
 
 ## Status / Next Action
 
-Plan `active`. **Shipped:** Phase 1 (knob), Phase 2 (font), grey re-skin, Phase 3a (density), Phase 4 (LCD), Phase 3b Tier 1 fan-out (PR #47), Phase 3b Tier 2 MasterOsc / OscA/B/C / DrumSynth (PRs #49 / #51 / #53), Phase 3b Tier 3 Mixer8 / OscSineBank (PRs #56 / #57), **Phase 7 (port colours by signal type / S1)** in PRs #61–#64, **S2 (attenuator-type metadata + per-port knobs)** in PRs #65–#68, and **Phase 6 (per-module mute button)** in PR #69.
+Plan `active`. **Shipped:** Phase 1 (knob), Phase 2 (font), grey re-skin, Phase 3a (density), Phase 4 (LCD), Phase 3b Tier 1 fan-out (PR #47), Phase 3b Tier 2 MasterOsc / OscA/B/C / DrumSynth (PRs #49 / #51 / #53), Phase 3b Tier 3 Mixer8 / OscSineBank (PRs #56 / #57), **Phase 7 (port colours by signal type / S1)** in PRs #61–#64, **S2 (attenuator-type metadata + per-port knobs)** in PRs #65–#68, **Phase 6 (per-module mute button)** in PR #69, and **Phase 8 Unit 1 (sub-section frames + DrumSynth labels)** in PR #71.
 
 PR #69 also picked up several side-fixes while testing the mute work: spec-correct signal types for `LFO`, `LFOA`, `RandomGen`, `CtrlSeq`, `EventSeq.Out1/2`, and `PortamentoA`; a rename of `PitchMod1`/`PitchMod2` → `Pitch1`/`Pitch2` (with load-time migration) to match the Nord labels; a `getPortPosition` fallback so cables to stale port names anchor to the module instead of the canvas origin; a cable-colour backfill in `loadPatchData` for hand-authored patches with no `color` field; and shipped `.woff2` versions of the Pixel Operator fonts so the console no longer logs OTS parse errors during dev. A reusable mute-coverage test patch is checked in at `examples/mute-test.json`.
 
-**Next concrete step for the next agent:** Phase 5 (inline ports next to their controls) or Phase 8 (sub-section frames). Phase 5 restructures port layout system-wide and is the bigger of the two; Phase 8 is mostly a `MODULE_DEFS` schema extension and a renderer addition for nested frames. See *Phases still pending* below for the full slate.
+**Next concrete step for the next agent:** Phase 5 (inline ports next to their controls) or Phase 8 Unit 2 (fan-out the new `paramRows[i].label` field to OscA/B/C + MasterOsc per the sub-plan's table). Phase 5 restructures port layout system-wide and is the bigger of the two; Phase 8 Unit 2 is purely a `moduleDefs.js` edit using the schema and renderer Unit 1 already shipped. See *Phases still pending* below for the full slate.
 
 ### paramRows fan-out — candidate batches
 
@@ -215,12 +215,13 @@ PR #69 also picked up several side-fixes while testing the mute work: spec-corre
 ### Phases still pending
 
 - **Phase 5** — inline ports next to controls. Restructures port layout system-wide; bigger risk on cables.
-- **Phase 8** — sub-section frames within a module (Nord's nested `OCTAVE` rows etc.). Extends `MODULE_DEFS` schema.
+- **Phase 8 Unit 2 (fan-out)** — apply the new `paramRows[i].label` field to OscA/B/C + MasterOsc. Schema and renderer already shipped in Unit 1 (PR #71); this is a `moduleDefs.js` edit only. Tracked in `docs/plans/2026-05-26-001-feat-ui-module-subsections-plan.md`.
 
 ### Phases shipped post-Phase-3b
 
 - ~~**Phase 6** — per-module mute (M) button.~~ Shipped in PR #69 (2026-05-25). Per-port lazy mute `GainNode` in `connect`/`disconnect`, dedicated `_outputMuteGain` on the `Output` module, JS-dispatch guards on `Keyboard.playNote` and the `NoteSeqA/B` / `EventSeq` / `ClkGen` subscriber callbacks so virtual signal paths also stop when the source is muted, and `mute` state round-trips through `buildPatch`/`loadPatchData`.
 - ~~**Phase 7** — port colours by signal type (S1).~~ Shipped in PRs #61–#64. Default inference in `getPortSignalType`, per-module overrides in `PORT_SIGNAL_TYPE_OVERRIDES`, and per-port renderer recolouring. Cable colour follows source-port signal type in `handlePortDragEnd`. Output ports render as squares, inputs as circles.
+- ~~**Phase 8 Unit 1** — sub-section frames + DrumSynth labels.~~ Shipped in PR #71 (2026-05-26). Optional `paramRows[i].label` field; renderer wraps labelled rows in a recessed-well rectangle with an uppercase header. DrumSynth's 4 rows now carry MASTER / SLAVE / FILTER / BEND labels per `MODULE_LAYOUTS.md` §2.16. Unlabelled rows render byte-identical. Sub-plan: `docs/plans/2026-05-26-001-feat-ui-module-subsections-plan.md` (stays `active` until the fan-out PR ships).
 
 ### Open design questions still relevant
 
@@ -230,7 +231,7 @@ From the original Open Design Questions list, settled and outstanding:
 |---|---|
 | Q1 — module width policy | **Settled:** uniform fixed-width, 4 modules across canvas |
 | Q2 — variable-port-count modules under horizontal layout | **Settled by PRs #56 / #57** — Mixer8 ships 2×4, OscSineBank ships 6×3 per-partial; both stay within `MODULE_WIDTH = 220` with no strip variant needed |
-| Q3 — sub-section frame styling | **Open** — Phase 8 |
+| Q3 — sub-section frame styling | **Settled by PR #71** — framed wells per `MODULE_LAYOUTS.md` §General UI Patterns; opt-in via `paramRows[i].label` |
 | Q4 — sidebar drop-zone position | **Open** — current impl is random-near-origin |
 | Q5 — cable attachment under new layout | **Settled by Phase 3a** — bottom port strip works |
 | Q6 — bitmap font choice | **Settled:** Pixel Operator |
