@@ -1,0 +1,87 @@
+{
+  "modules": [
+    {
+      "id": "mod_1",
+      "type": "MasterOsc",
+      "x": 60,
+      "y": 40,
+      "params": {
+        "frequency": 220,
+        "coarse": 0,
+        "fine": 0,
+        "kbt": 1
+      }
+    },
+    {
+      "id": "mod_2",
+      "type": "OscA",
+      "x": 60,
+      "y": 220,
+      "params": {
+        "frequency": 220,
+        "coarse": 0,
+        "fine": 0,
+        "waveform": "sawtooth",
+        "pulseWidth": 0.5,
+        "pwModDepth": 0.25,
+        "fmDepth": 0.3,
+        "level": 0.4
+      }
+    },
+    {
+      "id": "mod_3",
+      "type": "OscB",
+      "x": 340,
+      "y": 40,
+      "params": {
+        "frequency": 330,
+        "coarse": 0,
+        "fine": 0,
+        "waveform": "square",
+        "kbt": 1,
+        "fmDepth": 0.2,
+        "level": 0.35
+      }
+    },
+    {
+      "id": "mod_4",
+      "type": "OscC",
+      "x": 340,
+      "y": 360,
+      "params": {
+        "frequency": 440,
+        "coarse": 0,
+        "fine": 0,
+        "kbt": 1,
+        "fmDepth": 0.1,
+        "level": 0.3
+      }
+    },
+    {
+      "id": "mod_5",
+      "type": "Mixer3",
+      "x": 660,
+      "y": 200,
+      "params": {
+        "level1": 0.6,
+        "level2": 0.5,
+        "level3": 0.45
+      }
+    },
+    {
+      "id": "mod_6",
+      "type": "Output",
+      "x": 940,
+      "y": 200,
+      "params": {
+        "level": 0.4
+      }
+    }
+  ],
+  "connections": [
+    { "fromId": "mod_2", "fromPort": "Out", "toId": "mod_5", "toPort": "In1", "color": "hsl(330, 70%, 55%)" },
+    { "fromId": "mod_3", "fromPort": "Out", "toId": "mod_5", "toPort": "In2", "color": "hsl(20, 70%, 55%)" },
+    { "fromId": "mod_4", "fromPort": "Out", "toId": "mod_5", "toPort": "In3", "color": "hsl(280, 70%, 55%)" },
+    { "fromId": "mod_5", "fromPort": "Out", "toId": "mod_6", "toPort": "InL", "color": "hsl(200, 70%, 55%)" }
+  ]
+}
