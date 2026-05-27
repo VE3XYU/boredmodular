@@ -18,6 +18,8 @@ const PORTS_H_NONE = 6;
 const PORT_OUTPUT_OFFSET = 10;
 const PORT_INPUT_OFFSET = 30;
 const PARAM_STRIP_H = 56;
+const PARAM_STRIP_LABEL_BAND_H = 12;
+const PARAM_STRIP_LABELED_H = PARAM_STRIP_H + PARAM_STRIP_LABEL_BAND_H;
 
 function buildParamLayout(def, params) {
   const items = [];
@@ -30,9 +32,10 @@ function buildParamLayout(def, params) {
     if (seen.has(key)) return;
     if (paramRowMap.has(key)) {
       const row = paramRowMap.get(key);
-      items.push({ kind: "row", row, y });
+      const labeled = !!row.label;
+      items.push({ kind: "row", row, y, labeled });
       row.knobs.forEach((k) => seen.add(k));
-      y += PARAM_STRIP_H;
+      y += labeled ? PARAM_STRIP_LABELED_H : PARAM_STRIP_H;
     } else {
       items.push({ kind: "single", key, p, y });
       seen.add(key);
@@ -664,6 +667,8 @@ function ModuleNode({
         const py = paramsStartY + item.y;
         if (item.kind === "row") {
           const knobs = item.row.knobs;
+          const labeled = item.labeled;
+          const yOff = labeled ? PARAM_STRIP_LABEL_BAND_H : 0;
           const lcdText = knobs
             .map((k) => {
               const v = params[k]?.value ?? 0;
@@ -672,7 +677,32 @@ function ModuleNode({
             .join("  ");
           return (
             <g key={`row-${idx}`}>
-              <LcdDisplay x={6} y={py} width={MODULE_WIDTH - 12} height={14} text={lcdText} />
+              {labeled && (
+                <>
+                  <rect
+                    x={4}
+                    y={py}
+                    width={MODULE_WIDTH - 8}
+                    height={PARAM_STRIP_LABELED_H - 4}
+                    fill="#a8a8a8"
+                    stroke="#888"
+                    strokeWidth={1}
+                    rx={2}
+                    ry={2}
+                  />
+                  <text
+                    x={10}
+                    y={py + 9}
+                    fill="#444"
+                    fontSize={9}
+                    fontWeight={700}
+                    fontFamily="'Pixel Operator', 'DM Mono', monospace"
+                  >
+                    {item.row.label}
+                  </text>
+                </>
+              )}
+              <LcdDisplay x={6} y={py + yOff} width={MODULE_WIDTH - 12} height={14} text={lcdText} />
               {knobs.map((k, ki) => {
                 const p = params[k];
                 if (!p) return null;
@@ -683,7 +713,7 @@ function ModuleNode({
                     {editingParam === k ? (
                       <ParamNumericInput
                         x={cx - 25}
-                        y={py + 19}
+                        y={py + 19 + yOff}
                         width={50}
                         height={18}
                         p={p}
@@ -694,7 +724,7 @@ function ModuleNode({
                     ) : (
                       <SvgKnob
                         x={cx - 20}
-                        y={py + 18}
+                        y={py + 18 + yOff}
                         width={40}
                         min={p.min}
                         max={p.max}
@@ -706,7 +736,7 @@ function ModuleNode({
                     )}
                     <text
                       x={cx}
-                      y={py + 50}
+                      y={py + 50 + yOff}
                       textAnchor="middle"
                       fill="#111"
                       fontSize={12}

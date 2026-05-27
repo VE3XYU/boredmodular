@@ -60,10 +60,10 @@ const MODULE_DEFS = {
     modInputs: ["Trig", "VelMod", "PitchMod"],
     description: "Drum synth - Dual osc, multimode noise filter, bend",
     paramRows: [
-      { knobs: ["masterPitch", "masterDecay", "masterLevel"] },
-      { knobs: ["slaveRatio", "slaveDecay", "slaveLevel"] },
-      { knobs: ["filterFreq", "filterRes", "filterSweep", "filterDecay"] },
-      { knobs: ["bendAmt", "bendDecay"] },
+      { label: "MASTER", knobs: ["masterPitch", "masterDecay", "masterLevel"] },
+      { label: "SLAVE", knobs: ["slaveRatio", "slaveDecay", "slaveLevel"] },
+      { label: "FILTER", knobs: ["filterFreq", "filterRes", "filterSweep", "filterDecay"] },
+      { label: "BEND", knobs: ["bendAmt", "bendDecay"] },
     ],
   },
   FormantOsc: {
