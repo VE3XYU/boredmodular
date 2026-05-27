@@ -169,6 +169,6 @@ These are tentative — the fan-out PR's commit description should treat them as
 
 ## Status / Next Action
 
-Plan `active`. Branch `feat/ui-module-subsections-drumsynth` opened. First commit: this plan. Subsequent commits on the same branch: schema + renderer + DrumSynth labels + test patch. PR opens once visual verification clears.
+Plan `active`. **Unit 1 shipped in PR #71 (2026-05-26):** optional `paramRows[i].label` field, recessed-well renderer, DrumSynth's 4 rows labelled MASTER / SLAVE / FILTER / BEND. Unlabelled rows in every other module render byte-identical (verified visually against `Filter` and `Envelope` in `examples/drumsynth-subsections-test.json`).
 
-The fan-out (OscA/B/C/MasterOsc) is a separate follow-up branch and PR; this plan stays `active` until that ships, then closes.
+**Unit 2 still pending:** apply `label` to OscA/B/C + MasterOsc per the *Fan-out PR labels* table above. No schema or renderer changes — this is a `moduleDefs.js` edit only. Branch name: `feat/ui-module-subsections-fanout`. Plan closes after that PR merges.
