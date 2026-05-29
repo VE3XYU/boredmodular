@@ -1,12 +1,15 @@
 ---
 title: "UI module sub-section frames — Phase 8"
 type: feat
-status: active
+status: closed
 date: 2026-05-26
+closed: 2026-05-28
 origin: docs/plans/2026-05-07-001-feat-ui-redesign-plan.md
 ---
 
 # UI module sub-section frames — Phase 8
+
+> **Plan closed 2026-05-28.** Unit 1 (schema + renderer + DrumSynth labels) shipped in PR #71 (2026-05-26); Unit 2 (OscA/B/C + MasterOsc labels) shipped in PR #73 (2026-05-28). Both visually verified via the committed test patches (`examples/drumsynth-subsections-test.json`, `examples/osc-subsections-test.json`). Phase 8 in the parent UI-redesign plan is now fully complete.
 
 > Sub-plan executing Phase 8 of the parent UI-redesign plan: nested labelled regions within a module (the Nord screenshot's "DCO contains OCTAVE rows" pattern). Extends `MODULE_DEFS.paramRows` with an optional `label`; renderer draws a recessed-well rectangle plus a section header above the strip. Scoped to `paramRows`-bearing modules where the spec gives section names; rolls out as two PRs.
 
@@ -169,6 +172,9 @@ These are tentative — the fan-out PR's commit description should treat them as
 
 ## Status / Next Action
 
-Plan `active`. **Unit 1 shipped in PR #71 (2026-05-26):** optional `paramRows[i].label` field, recessed-well renderer, DrumSynth's 4 rows labelled MASTER / SLAVE / FILTER / BEND. Unlabelled rows in every other module render byte-identical (verified visually against `Filter` and `Envelope` in `examples/drumsynth-subsections-test.json`).
+Plan `closed` 2026-05-28.
 
-**Unit 2 still pending:** apply `label` to OscA/B/C + MasterOsc per the *Fan-out PR labels* table above. No schema or renderer changes — this is a `moduleDefs.js` edit only. Branch name: `feat/ui-module-subsections-fanout`. Plan closes after that PR merges.
+- **Unit 1 shipped in PR #71 (2026-05-26):** optional `paramRows[i].label` field, recessed-well renderer, DrumSynth's 4 rows labelled MASTER / SLAVE / FILTER / BEND. Unlabelled rows in every other module render byte-identical.
+- **Unit 2 shipped in PR #73 (2026-05-28):** MasterOsc (`PITCH`), OscA (`PITCH` / `PW` / `FM`), OscB (`PITCH` / `FM`), OscC (`PITCH` / `FM`). The fmDepth/level rows shipped as `FM` rather than the sub-plan's tentative `FM / LVL` — cleaner header in Pixel Operator at 9 px, and the spec doesn't name these rows.
+
+Parent UI-redesign plan's Phase 8 entry updated to mark both units shipped.
