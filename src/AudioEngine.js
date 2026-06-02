@@ -57,6 +57,13 @@ class AudioEngine {
     if (this.ctx.state === "suspended") {
       this.ctx.resume().catch(() => {});
     }
+    // Surface lifecycle transitions (suspended/running) so backgrounding,
+    // screen lock, and recovery are visible in the console.
+    this.ctx.onstatechange = () => {
+      if (typeof console !== "undefined" && console.info) {
+        console.info("[AudioEngine] state=%s", this.ctx.state);
+      }
+    };
     if (typeof console !== "undefined" && console.info) {
       console.info(
         "[AudioEngine] state=%s sampleRate=%d baseLatency=%s outputLatency=%s",
@@ -78,6 +85,12 @@ class AudioEngine {
       this.ctx.audioWorklet.addModule(`${base}/sync-osc-processor.js`),
     ]).catch((err) => { console.error('worklet load failed', err); });
     this.isRunning = true;
+  }
+
+  // Recover audio after the context suspends (mobile/Safari backgrounding,
+  // screen lock). Safe to call on every gesture/focus — no-op when running.
+  resumeIfNeeded() {
+    if (this.ctx && this.ctx.state === "suspended") this.ctx.resume().catch(() => {});
   }
 
   async createModule(id, type) {
@@ -1435,7 +1448,10 @@ class AudioEngine {
             if (envMod && envMod.releaseEnv) setTimeout(() => envMod.releaseEnv(), pulseLen * 1000 + 10);
           });
         }
-        seq._currentStep = (step + 1) % seq.params.steps.value;
+        // Clamp the step count to [1,16] before the modulo so a steps:0 from a
+        // hand-edited patch can't produce (step+1)%0 = NaN → setValueAtTime(NaN).
+        const count = Math.max(1, Math.min(16, Math.floor(Number(seq.params.steps.value)) || 1));
+        seq._currentStep = (step + 1) % count;
       },
       resetSeq: () => { seq._currentStep = 0; },
     };
@@ -1462,7 +1478,10 @@ class AudioEngine {
         const step = seq._currentStep;
         const val = seq._values[step];
         out.offset.setValueAtTime(val, this.ctx.currentTime);
-        seq._currentStep = (step + 1) % seq.params.steps.value;
+        // Clamp the step count to [1,16] before the modulo so a steps:0 from a
+        // hand-edited patch can't produce (step+1)%0 = NaN → setValueAtTime(NaN).
+        const count = Math.max(1, Math.min(16, Math.floor(Number(seq.params.steps.value)) || 1));
+        seq._currentStep = (step + 1) % count;
       },
       resetSeq: () => { seq._currentStep = 0; },
     };
@@ -1520,7 +1539,10 @@ class AudioEngine {
         } else {
           gateOut.offset.setValueAtTime(0, now);
         }
-        seq._currentStep = (step + 1) % seq.params.steps.value;
+        // Clamp the step count to [1,16] before the modulo so a steps:0 from a
+        // hand-edited patch can't produce (step+1)%0 = NaN → setValueAtTime(NaN).
+        const count = Math.max(1, Math.min(16, Math.floor(Number(seq.params.steps.value)) || 1));
+        seq._currentStep = (step + 1) % count;
       },
       resetSeq: () => { seq._currentStep = 0; },
     };
@@ -1577,7 +1599,10 @@ class AudioEngine {
         } else {
           gateOut.offset.setValueAtTime(0, now);
         }
-        seq._currentStep = (step + 1) % seq.params.steps.value;
+        // Clamp the step count to [1,16] before the modulo so a steps:0 from a
+        // hand-edited patch can't produce (step+1)%0 = NaN → setValueAtTime(NaN).
+        const count = Math.max(1, Math.min(16, Math.floor(Number(seq.params.steps.value)) || 1));
+        seq._currentStep = (step + 1) % count;
       },
       resetSeq: () => { seq._currentStep = 0; },
     };
@@ -2160,6 +2185,22 @@ class AudioEngine {
     const mod = this.modules.get(moduleId);
     if (!mod || !mod.params[paramName]) return;
     const p = mod.params[paramName];
+    // Finiteness guard: for numeric params, coerce with Number() and fall back
+    // to the current value when non-finite, then clamp into [min,max] when both
+    // are defined. Hardens every downstream branch against a setValueAtTime(NaN)
+    // throw from a garbage value. Enum/string params (non-numeric) pass through.
+    if (typeof value !== "string") {
+      const num = Number(value);
+      if (!Number.isFinite(num)) {
+        value = p.value;
+      } else {
+        let clamped = num;
+        if (typeof p.min === "number" && typeof p.max === "number") {
+          clamped = Math.max(p.min, Math.min(p.max, clamped));
+        }
+        value = clamped;
+      }
+    }
     p.value = value;
     if (p.audioParam) {
       const audioValue = p.curve ? applyAttenuatorCurve(value, p.min, p.max, p.curve) : value;

@@ -1248,6 +1248,10 @@ export default function BoredModularEmulator() {
     if (!audioStarted) {
       engineRef.current.init();
       setAudioStarted(true);
+    } else {
+      // Already started: every subsequent gesture is a chance to recover audio
+      // if the context suspended (mobile/Safari backgrounding, screen lock).
+      engineRef.current.resumeIfNeeded();
     }
   }, [audioStarted]);
 
@@ -1360,6 +1364,16 @@ export default function BoredModularEmulator() {
 
   const loadPatchData = useCallback(
     async (patch) => {
+      // Malformed-patch guard: validate shape BEFORE any engine teardown so a
+      // bad import (e.g. a {}-shaped JSON) can't destroy the live graph and
+      // white-screen the canvas. Surface a brief on-screen note and bail.
+      if (!patch || typeof patch !== "object" || !Array.isArray(patch.modules)) {
+        console.error("loadPatchData: malformed patch (expected { modules: [...] })", patch);
+        setPatchMsg("Invalid patch file");
+        setTimeout(() => setPatchMsg(null), 2500);
+        return;
+      }
+
       // Clear existing
       modules.forEach((m) => engineRef.current.removeModule(m.id));
       initAudio();
@@ -1388,6 +1402,12 @@ export default function BoredModularEmulator() {
         let type = m.type === "Mixer2" ? "Mixer3" : m.type;
         if (amplifierRetypes.has(m.id)) type = amplifierRetypes.get(m.id);
         const audioMod = await engineRef.current.createModule(m.id, type);
+        // Unknown-type skip: a type the engine/UI doesn't know would otherwise
+        // push a phantom module that white-screens the canvas on next render.
+        if (!audioMod || !MODULE_DEFS[type]) {
+          console.warn("Skipping unknown module type", type);
+          continue;
+        }
         const params = {};
         if (audioMod) {
           Object.entries(audioMod.params).forEach(([k, v]) => {
@@ -1402,6 +1422,21 @@ export default function BoredModularEmulator() {
             : rawKey === "PitchMod2Atten" ? "Pitch2Atten"
             : rawKey;
           let value = v && typeof v === "object" && "value" in v ? v.value : v;
+          // Param clamp on restore: for numeric params, coerce with Number() and
+          // clamp into the engine def's [min,max]. A non-finite/garbage saved value
+          // keeps the engine default. Enum/string params (no numeric def) pass through.
+          const def = params[k];
+          if (def && typeof def.value === "number" && typeof value !== "string") {
+            const num = Number(value);
+            if (Number.isFinite(num)) {
+              let clamped = num;
+              if (typeof def.min === "number") clamped = Math.max(def.min, clamped);
+              if (typeof def.max === "number") clamped = Math.min(def.max, clamped);
+              value = clamped;
+            } else {
+              value = def.value; // keep engine default when the saved value is garbage
+            }
+          }
           // Amplifier kept as fixed-gain: clamp pre-split level values into [0.25, 4.0].
           if (m.type === "Amplifier" && type === "Amplifier" && k === "level") {
             value = Math.max(0.25, value);
@@ -1476,19 +1511,23 @@ export default function BoredModularEmulator() {
     setTimeout(() => setPatchMsg(null), 1500);
   }, [buildPatch]);
 
-  const loadPatch = useCallback(() => {
+  const loadPatch = useCallback(async () => {
     const raw = localStorage.getItem("bored-patch-1");
     if (!raw) {
       setPatchMsg("No saved patch");
       setTimeout(() => setPatchMsg(null), 1500);
       return;
     }
+    // Await so async failures inside loadPatchData surface here instead of
+    // escaping as an unhandled rejection.
     try {
-      loadPatchData(JSON.parse(raw));
+      await loadPatchData(JSON.parse(raw));
       setPatchMsg("Loaded!");
       setTimeout(() => setPatchMsg(null), 1500);
     } catch (e) {
       console.error("Load error:", e);
+      setPatchMsg("Load failed");
+      setTimeout(() => setPatchMsg(null), 2500);
     }
   }, [loadPatchData]);
 
@@ -1507,13 +1546,17 @@ export default function BoredModularEmulator() {
       const file = e.target.files[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = (ev) => {
+      // Await so async failures inside loadPatchData surface here instead of
+      // escaping as an unhandled rejection.
+      reader.onload = async (ev) => {
         try {
-          loadPatchData(JSON.parse(ev.target.result));
+          await loadPatchData(JSON.parse(ev.target.result));
           setPatchMsg("Imported!");
           setTimeout(() => setPatchMsg(null), 1500);
         } catch (err) {
           console.error("Import error:", err);
+          setPatchMsg("Load failed");
+          setTimeout(() => setPatchMsg(null), 2500);
         }
       };
       reader.readAsText(file);
@@ -1679,6 +1722,29 @@ export default function BoredModularEmulator() {
     setIsPanning(false);
   }, [dragging]);
 
+  // Releasing the mouse over the sidebar or off-window never reaches the <svg>
+  // onMouseUp, so a drag/pan would stay stuck. Mirror the finalize logic on a
+  // window mouseup while a drag or pan is active. Gated so it's only bound when
+  // needed, and cleaned up when the interaction ends.
+  useEffect(() => {
+    if (!dragging && !isPanning) return;
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => window.removeEventListener("mouseup", handleMouseUp);
+  }, [dragging, isPanning, handleMouseUp]);
+
+  // Audio-context recovery: refocusing the window or revealing the tab is a
+  // chance to resume after the context suspended (backgrounding, screen lock).
+  useEffect(() => {
+    const recover = () => engineRef.current.resumeIfNeeded();
+    const onVisibility = () => { if (!document.hidden) recover(); };
+    window.addEventListener("focus", recover);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", recover);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
   const handleSvgMouseDown = useCallback(
     (e) => {
       if (e.target === svgRef.current || e.target.tagName === "rect") {
@@ -1760,11 +1826,29 @@ export default function BoredModularEmulator() {
         });
       }
     };
+    // Stuck-notes panic: when the window loses focus or the tab is hidden
+    // (Alt-Tab, screen lock), keyup events can be lost — leaving notes/gates
+    // held forever. Release everything and clear local held state.
+    const panic = () => {
+      heldNotes.forEach((note) => {
+        engineRef.current.modules.forEach((mod) => {
+          if (mod.type === "Keyboard" && mod.releaseNote) mod.releaseNote(note);
+        });
+      });
+      heldNotes.clear();
+      setKeyHeld(false);
+      engineRef.current.releaseEnvelopes();
+    };
+    const onVisibility = () => { if (document.hidden) panic(); };
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
+    window.addEventListener("blur", panic);
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", panic);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [keyHeld, initAudio, handleParamChange, cableDrag]);
 
