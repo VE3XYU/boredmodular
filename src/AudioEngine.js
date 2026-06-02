@@ -1009,12 +1009,20 @@ class AudioEngine {
     lp.type = "lowpass"; bp.type = "bandpass"; hp.type = "highpass";
     [lp, bp, hp].forEach(f => { f.frequency.value = 1200; f.Q.value = 4; });
     input.connect(lp); input.connect(bp); input.connect(hp);
+    // Per-output makeup gains for gain compensation (GComp). Default 1 =
+    // passthrough, so default audio is unchanged when gainComp is "off".
+    const lpG = this.ctx.createGain();
+    const bpG = this.ctx.createGain();
+    const hpG = this.ctx.createGain();
+    lpG.gain.value = 1; bpG.gain.value = 1; hpG.gain.value = 1;
+    lp.connect(lpG); bp.connect(bpG); hp.connect(hpG);
     return {
-      id, type: "FilterC", node: input, outputNode: lp,
-      outputs: { LP: lp, BP: bp, HP: hp },
+      id, type: "FilterC", node: input, outputNode: lpG,
+      outputs: { LP: lpG, BP: bpG, HP: hpG },
       inputs: { In: input, FreqMod: lp.frequency, ResMod: lp.Q },
-      _nodes: [input, lp, bp, hp],
+      _nodes: [input, lp, bp, hp, lpG, bpG, hpG],
       _filters: [lp, bp, hp],
+      _makeupGains: [lpG, bpG, hpG],
       params: {
         frequency: { value: 1200, min: 10, max: 15800, audioParam: lp.frequency, label: "Freq" },
         resonance: { value: 4, min: 0.1, max: 30, audioParam: lp.Q, label: "Res" },
@@ -2147,6 +2155,12 @@ class AudioEngine {
       } else if (paramName === "resonance") {
         mod._filters.forEach(f => f.Q.setValueAtTime(value, this.ctx.currentTime));
       }
+      // GComp: bounded, monotonic-decreasing makeup vs Q; 1 when off.
+      if (paramName === "resonance" || paramName === "gainComp") {
+        const q = mod.params.resonance.value;
+        const comp = mod.params.gainComp.value === "on" ? 1 / Math.sqrt(Math.max(1, q)) : 1;
+        mod._makeupGains.forEach(g => g.gain.setValueAtTime(comp, this.ctx.currentTime));
+      }
     }
     // FilterE: sync freq/res/type across both filters, handle slope change
     if (mod.type === "FilterE") {
@@ -2170,6 +2184,13 @@ class AudioEngine {
           mod._filter1.connect(mod._output);
         }
         mod._slope = value;
+      }
+      // GComp: bounded, monotonic-decreasing makeup vs Q applied at the
+      // downstream _output gain (composes with the slope rewire); 1 when off.
+      if (paramName === "resonance" || paramName === "gainComp") {
+        const q = mod.params.resonance.value;
+        const comp = mod.params.gainComp.value === "on" ? 1 / Math.sqrt(Math.max(1, q)) : 1;
+        mod._output.gain.setValueAtTime(comp, this.ctx.currentTime);
       }
     }
     // XFade: update both gains inversely
