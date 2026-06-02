@@ -2155,7 +2155,12 @@ class AudioEngine {
       } else if (paramName === "resonance") {
         mod._filters.forEach(f => f.Q.setValueAtTime(value, this.ctx.currentTime));
       }
-      // GComp: bounded, monotonic-decreasing makeup vs Q; 1 when off.
+      // GComp (Gain Compensation) — spec: FilterC "GC" button (manual p138):
+      // "lower the gain of the signal ... if the resonance is increased ... to
+      // reduce the risk of any unwanted clipping." The spec gives no transfer
+      // curve — GC is an on/off button — so the reduction depth is a licensed
+      // DSP-level approximation (playbook §2): a bounded, monotonic-decreasing
+      // factor of resonance Q, unity at low resonance / when off.
       if (paramName === "resonance" || paramName === "gainComp") {
         const q = mod.params.resonance.value;
         const comp = mod.params.gainComp.value === "on" ? 1 / Math.sqrt(Math.max(1, q)) : 1;
@@ -2185,8 +2190,12 @@ class AudioEngine {
         }
         mod._slope = value;
       }
-      // GComp: bounded, monotonic-decreasing makeup vs Q applied at the
-      // downstream _output gain (composes with the slope rewire); 1 when off.
+      // GComp (Gain Compensation) — spec: FilterE "GC" button (manual p140,
+      // same wording as FilterC): lower the gain as resonance increases to
+      // reduce clipping risk. No transfer curve is specified, so the depth is a
+      // licensed DSP-level approximation (playbook §2) — a bounded, monotonic-
+      // decreasing factor of resonance Q — applied at the downstream _output
+      // gain so it composes with the slope rewire; unity at low resonance / off.
       if (paramName === "resonance" || paramName === "gainComp") {
         const q = mod.params.resonance.value;
         const comp = mod.params.gainComp.value === "on" ? 1 / Math.sqrt(Math.max(1, q)) : 1;
