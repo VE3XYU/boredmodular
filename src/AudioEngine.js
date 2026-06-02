@@ -685,6 +685,25 @@ class AudioEngine {
     return mod;
   }
 
+  // FormantOsc: set the 3 formant filter frequencies from BOTH the current
+  // vowel and the current timbre. Anchored at the selected vowel, timbre
+  // interpolates towards the next vowel — the same model the timbre sweep uses
+  // — so changing vowel while timbre>0 stays consistent and commutative.
+  _applyFormants(mod) {
+    const vowels = mod.params.vowel.options;
+    const currentVowel = mod.params.vowel.value;
+    const idx = vowels.indexOf(currentVowel);
+    if (idx < 0) return;
+    const nextIdx = (idx + 1) % vowels.length;
+    const fromFreqs = mod._formantTable[vowels[idx]];
+    const toFreqs = mod._formantTable[vowels[nextIdx]];
+    const t = mod.params.timbre.value;
+    mod._filters.forEach((f, i) => {
+      const freq = fromFreqs[i] + (toFreqs[i] - fromFreqs[i]) * t;
+      f.frequency.setValueAtTime(freq, this.ctx.currentTime);
+    });
+  }
+
   // ── Master / Slave Oscillators ──────────────────────────────────────────
 
   _createMasterOsc(id) {
@@ -2248,28 +2267,10 @@ class AudioEngine {
       const mult = mod._rangeMultiplier || 1;
       mod.node.frequency.setValueAtTime(value * mult, this.ctx.currentTime);
     }
-    // FormantOsc: vowel change
-    if (mod.type === "FormantOsc" && paramName === "vowel") {
-      const freqs = mod._formantTable[value];
-      if (freqs) {
-        mod._filters.forEach((f, i) => {
-          f.frequency.setValueAtTime(freqs[i], this.ctx.currentTime);
-        });
-      }
-    }
-    // FormantOsc: timbre (interpolates between current vowel and next)
-    if (mod.type === "FormantOsc" && paramName === "timbre") {
-      const vowels = ["A", "E", "I", "O", "U"];
-      const currentVowel = mod.params.vowel.value;
-      const idx = vowels.indexOf(currentVowel);
-      const nextIdx = (idx + 1) % vowels.length;
-      const fromFreqs = mod._formantTable[vowels[idx]];
-      const toFreqs = mod._formantTable[vowels[nextIdx]];
-      const t = value;
-      mod._filters.forEach((f, i) => {
-        const freq = fromFreqs[i] + (toFreqs[i] - fromFreqs[i]) * t;
-        f.frequency.setValueAtTime(freq, this.ctx.currentTime);
-      });
+    // FormantOsc: vowel/timbre both feed one interpolation model so that
+    // changing vowel honours the live timbre and the two stay commutative.
+    if (mod.type === "FormantOsc" && (paramName === "vowel" || paramName === "timbre")) {
+      this._applyFormants(mod);
     }
     // FormantOsc: coarse/fine tuning + propagate to slaves
     if (mod.type === "FormantOsc" && (paramName === "coarse" || paramName === "fine" || paramName === "frequency")) {
