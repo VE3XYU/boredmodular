@@ -34,8 +34,6 @@ class AudioEngine {
     this.analyser = null;
     this.scopeData = new Float32Array(256);
     this.isRunning = false;
-    // Gate target tracking: keyboard id -> Set of envelope module ids
-    this._gateTargets = new Map();
   }
 
   init() {
@@ -1915,9 +1913,6 @@ class AudioEngine {
       },
     };
 
-    // Initialize gate targets
-    this._gateTargets.set(id, new Set());
-
     return kbd;
   }
 
@@ -2084,10 +2079,6 @@ class AudioEngine {
     if (mod.type === "ClkGen" && mod._timerId) {
       clearTimeout(mod._timerId);
       mod._active = false;
-    }
-    // Clean up gate targets
-    if (mod.type === "Keyboard") {
-      this._gateTargets.delete(id);
     }
     // Clean up master->slave references
     if (mod._slaveTargets) {

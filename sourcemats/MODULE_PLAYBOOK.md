@@ -27,7 +27,7 @@ Refactor of `CLAUDE.md`'s "Adding a module requires" 5-step list, with verificat
 5. **`setParam` cross-param branches** (`src/AudioEngine.js:1603-1715`) only when the module needs cross-param sync (e.g., FilterC syncing freq/res across three filters; XFade inverse gain). If the param is purely declarative slider metadata or a single `AudioParam`, no branch is needed.
    - Verify by: tweak each param on the canvas; the audible/visible behaviour tracks; no stale values in linked nodes.
 
-6. **`removeModule` cleanup symmetry** (`src/AudioEngine.js:1559-1595`). For every system-specific field added in step 3, verify the cleanup path. The existing `removeModule` covers: `_gateTargets` (Keyboard), master→slave references (`_slaveTargets`), slave→master references (`_masterModId`), ClkGen timer (`_timerId`), and node-level disconnect via `_nodes`. Modules introducing a new subscriber-pattern relationship need their cleanup added here.
+6. **`removeModule` cleanup symmetry** (`src/AudioEngine.js:1559-1595`). For every system-specific field added in step 3, verify the cleanup path. The existing `removeModule` covers: `_gateTargetEnvelopes` (Keyboard / note sources), master→slave references (`_slaveTargets`), slave→master references (`_masterModId`), ClkGen timer (`_timerId`), and node-level disconnect via `_nodes`. Modules introducing a new subscriber-pattern relationship need their cleanup added here.
    - Verify by: drop the module, patch it into a chain that exercises its system-specific field, then delete the module. No leaked subscribers; no stale references in counterpart modules; `npm start` console silent.
 
 ## 2. Audit methodology
