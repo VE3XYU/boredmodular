@@ -1,0 +1,77 @@
+{
+  "modules": [
+    {
+      "id": "mod_1",
+      "type": "Keyboard",
+      "x": 60,
+      "y": 400,
+      "params": {}
+    },
+    {
+      "id": "mod_2",
+      "type": "FormantOsc",
+      "x": 300,
+      "y": 120,
+      "params": {
+        "frequency": 110,
+        "coarse": 0,
+        "fine": 0,
+        "kbt": 1,
+        "vowel": "A",
+        "timbre": 0.5,
+        "level": 0.5
+      }
+    },
+    {
+      "id": "mod_3",
+      "type": "ADSREnv",
+      "x": 600,
+      "y": 400,
+      "params": {
+        "attack": 0.02,
+        "decay": 0.3,
+        "sustain": 0.85,
+        "release": 0.4
+      }
+    },
+    {
+      "id": "mod_4",
+      "type": "Output",
+      "x": 880,
+      "y": 400,
+      "params": {
+        "level": 0.5
+      }
+    }
+  ],
+  "connections": [
+    {
+      "fromId": "mod_1",
+      "fromPort": "Note",
+      "toId": "mod_2",
+      "toPort": "Pitch1",
+      "color": "hsl(60, 70%, 55%)"
+    },
+    {
+      "fromId": "mod_2",
+      "fromPort": "Out",
+      "toId": "mod_3",
+      "toPort": "In",
+      "color": "hsl(180, 70%, 55%)"
+    },
+    {
+      "fromId": "mod_1",
+      "fromPort": "Gate",
+      "toId": "mod_3",
+      "toPort": "Gate",
+      "color": "hsl(40, 70%, 55%)"
+    },
+    {
+      "fromId": "mod_3",
+      "fromPort": "Out",
+      "toId": "mod_4",
+      "toPort": "InL",
+      "color": "hsl(330, 70%, 55%)"
+    }
+  ]
+}
