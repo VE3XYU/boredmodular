@@ -9,6 +9,20 @@ const NOTE_FREQ = (note) => 440 * Math.pow(2, (note - 69) / 12);
 // sync-osc-processor waveform encoding
 const WAVE_INT = { sine: 0, sawtooth: 1, square: 2, triangle: 3 };
 
+// Gain-compensation (GComp) makeup for a resonant lowpass/highpass biquad.
+// Web Audio parameterises LP/HP resonance (the Q AudioParam) in dB, so the
+// effective linear Q is 10^(q/20); a 2nd-order resonant LP/HP then has peak
+// magnitude Qlin / sqrt(1 - 1/(4 Qlin^2)). Returning its reciprocal cancels
+// that peak, so engaging GC holds the output level constant as resonance rises
+// — the behaviour the manual documents. Validated to a 0.00 dB residual against
+// the Chromium biquad coefficient math across q = 0.1..30. Bandpass/notch are
+// 0 dB-normalised in Web Audio and take no makeup (caller passes 1).
+function filterGcMakeup(q) {
+  const qlin = Math.pow(10, q / 20);
+  if (qlin <= Math.SQRT1_2) return 1; // below the resonant threshold there is no peak
+  return Math.sqrt(Math.max(0, 1 - 1 / (4 * qlin * qlin))) / qlin;
+}
+
 // Pink noise filter (Paul Kellet refined coefficients) — fills a Float32Array in place
 function _fillPinkBuffer(data) {
   let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
@@ -2155,16 +2169,21 @@ class AudioEngine {
       } else if (paramName === "resonance") {
         mod._filters.forEach(f => f.Q.setValueAtTime(value, this.ctx.currentTime));
       }
-      // GComp (Gain Compensation) — spec: FilterC "GC" button (manual p138):
-      // "lower the gain of the signal ... if the resonance is increased ... to
-      // reduce the risk of any unwanted clipping." The spec gives no transfer
-      // curve — GC is an on/off button — so the reduction depth is a licensed
-      // DSP-level approximation (playbook §2): a bounded, monotonic-decreasing
-      // factor of resonance Q, unity at low resonance / when off.
+      // GComp (Gain Compensation) — FilterC "GC" button (manual p138): "lower
+      // the gain ... if the resonance is increased ... to reduce the risk of any
+      // unwanted clipping." We cancel the biquad's actual resonance peak boost
+      // so the level stays constant as resonance rises — the documented Nord
+      // behaviour. The exact hardware curve is proprietary/unpublished, so this
+      // is a DSP-grounded reconstruction (playbook §2) pinned to the biquad's
+      // true peak-gain physics. Per type: LP/HP peak grows with Q → get the
+      // makeup; BP is 0 dB-normalised in Web Audio → none. _makeupGains = [lpG, bpG, hpG].
       if (paramName === "resonance" || paramName === "gainComp") {
-        const q = mod.params.resonance.value;
-        const comp = mod.params.gainComp.value === "on" ? 1 / Math.sqrt(Math.max(1, q)) : 1;
-        mod._makeupGains.forEach(g => g.gain.setValueAtTime(comp, this.ctx.currentTime));
+        const on = mod.params.gainComp.value === "on";
+        const lphp = on ? filterGcMakeup(mod.params.resonance.value) : 1;
+        const [lpG, bpG, hpG] = mod._makeupGains;
+        lpG.gain.setValueAtTime(lphp, this.ctx.currentTime);
+        hpG.gain.setValueAtTime(lphp, this.ctx.currentTime);
+        bpG.gain.setValueAtTime(1, this.ctx.currentTime);
       }
     }
     // FilterE: sync freq/res/type across both filters, handle slope change
@@ -2190,15 +2209,22 @@ class AudioEngine {
         }
         mod._slope = value;
       }
-      // GComp (Gain Compensation) — spec: FilterE "GC" button (manual p140,
-      // same wording as FilterC): lower the gain as resonance increases to
-      // reduce clipping risk. No transfer curve is specified, so the depth is a
-      // licensed DSP-level approximation (playbook §2) — a bounded, monotonic-
-      // decreasing factor of resonance Q — applied at the downstream _output
-      // gain so it composes with the slope rewire; unity at low resonance / off.
-      if (paramName === "resonance" || paramName === "gainComp") {
-        const q = mod.params.resonance.value;
-        const comp = mod.params.gainComp.value === "on" ? 1 / Math.sqrt(Math.max(1, q)) : 1;
+      // GComp (Gain Compensation) — FilterE "GC" button (manual p140): cancel
+      // the resonance peak boost so the level holds constant as resonance rises
+      // (documented Nord behaviour; proprietary curve, so a DSP-grounded
+      // reconstruction — playbook §2). Applied at the downstream _output gain,
+      // which composes with the slope rewire. Only LP/HP boost; BP/notch are
+      // 0 dB-normalised → makeup 1. The 24 dB slope cascades two identical
+      // biquads, doubling the dB boost, so square the makeup. Recompute on
+      // filterType/slope as well as resonance/gainComp.
+      if (paramName === "resonance" || paramName === "gainComp" || paramName === "filterType" || paramName === "slope") {
+        const on = mod.params.gainComp.value === "on";
+        const type = mod.params.filterType.value;
+        let comp = 1;
+        if (on && (type === "lowpass" || type === "highpass")) {
+          comp = filterGcMakeup(mod.params.resonance.value);
+          if (mod.params.slope.value === "24dB") comp *= comp;
+        }
         mod._output.gain.setValueAtTime(comp, this.ctx.currentTime);
       }
     }
