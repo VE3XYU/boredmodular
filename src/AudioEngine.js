@@ -753,19 +753,12 @@ class AudioEngine {
     if (modInputDefs.FMA || modInputDefs.FMB) {
       params.fmDepth = { value: 0, min: 0, max: 1000, audioParam: modGains._fmGain?.gain, label: "FM Dep", curve: "II" };
     }
-    if (waveform === "square" || type === "OscSlvA") {
-      params.waveform = type === "OscSlvA"
-        ? { value: waveform, options: ["sine", "sawtooth", "square", "triangle"], label: "Wave" }
-        : undefined;
-    }
     if (type === "OscSlvFM") {
       params.octShift = { value: 0, min: -3, max: 3, label: "Oct" };
     }
-    // Clean undefined params
-    Object.keys(params).forEach(k => { if (params[k] === undefined) delete params[k]; });
 
     const allNodes = [osc, gain, ...Object.values(modGains)].filter(Boolean);
-    return {
+    const mod = {
       id, type, node: osc, outputNode: gain,
       outputs: { Out: gain },
       inputs,
@@ -773,17 +766,20 @@ class AudioEngine {
       _masterFreq: 0,
       _masterModId: null,
       _recalcFreq() {
-        if (!this._masterFreq) return;
+        // Free-run base of E4 (329.6 Hz) when no master is patched; tuning knobs still apply.
+        const base = this._masterFreq || 329.6;
         const p = this.params;
         const partial = p.partials.value;
         const det = p.detune.value;
         const fn = p.fine.value;
         const octShift = p.octShift ? p.octShift.value : 0;
-        const freq = this._masterFreq * partial * Math.pow(2, det / 12) * Math.pow(2, fn / 1200) * Math.pow(2, octShift);
+        const freq = base * partial * Math.pow(2, det / 12) * Math.pow(2, fn / 1200) * Math.pow(2, octShift);
         osc.frequency.setValueAtTime(freq, osc.context.currentTime);
       },
       params,
     };
+    mod._recalcFreq();
+    return mod;
   }
 
   _makeSyncSlaveOsc(id, type, waveform, modInputDefs) {
@@ -835,7 +831,7 @@ class AudioEngine {
     }
 
     const allNodes = [osc, gain, ...Object.values(modGains)];
-    return {
+    const mod = {
       id, type, node: osc, outputNode: gain,
       outputs: { Out: gain },
       inputs,
@@ -844,17 +840,20 @@ class AudioEngine {
       _masterModId: null,
       _freqParam: freqParam,
       _recalcFreq() {
-        if (!this._masterFreq) return;
+        // Free-run base of E4 (329.6 Hz) when no master is patched; tuning knobs still apply.
+        const base = this._masterFreq || 329.6;
         const p = this.params;
         const partial = p.partials.value;
         const det = p.detune.value;
         const fn = p.fine.value;
         const octShift = p.octShift ? p.octShift.value : 0;
-        const freq = this._masterFreq * partial * Math.pow(2, det / 12) * Math.pow(2, fn / 1200) * Math.pow(2, octShift);
+        const freq = base * partial * Math.pow(2, det / 12) * Math.pow(2, fn / 1200) * Math.pow(2, octShift);
         this._freqParam.setValueAtTime(freq, osc.context.currentTime);
       },
       params,
     };
+    mod._recalcFreq();
+    return mod;
   }
 
   _createOscSlvA(id) {
@@ -867,7 +866,7 @@ class AudioEngine {
     const gain = this.ctx.createGain();
     gain.gain.value = 0.8;
     pulse.connect(gain);
-    return {
+    const mod = {
       id, type: "OscSlvB", node: pulse, outputNode: gain,
       outputs: { Out: gain },
       inputs: { Mst: null, PwMod: pulse.parameters.get('pulseWidth') },
@@ -875,9 +874,10 @@ class AudioEngine {
       _masterFreq: 0,
       _masterModId: null,
       _recalcFreq() {
-        if (!this._masterFreq) return;
+        // Free-run base of E4 (329.6 Hz) when no master is patched; tuning knobs still apply.
+        const base = this._masterFreq || 329.6;
         const p = this.params;
-        const freq = this._masterFreq * p.partials.value
+        const freq = base * p.partials.value
           * Math.pow(2, p.detune.value / 12)
           * Math.pow(2, p.fine.value / 1200);
         pulse.parameters.get('frequency').setValueAtTime(freq, pulse.context.currentTime);
@@ -890,6 +890,8 @@ class AudioEngine {
         level: { value: 0.8, min: 0, max: 1, audioParam: gain.gain, label: "Level" },
       },
     };
+    mod._recalcFreq();
+    return mod;
   }
   _createOscSlvC(id) {
     return this._makeSlaveOsc(id, "OscSlvC", "sawtooth", { FMA: true });
@@ -941,7 +943,7 @@ class AudioEngine {
       params[`level${n}`] = { value: i === 0 ? 1 : +(0.5 / n).toFixed(2), min: 0, max: 1, audioParam: g.gain, label: `Lvl${n}` };
     }
 
-    return {
+    const mod = {
       id, type: "OscSineBank", node: oscs[0], outputNode: output,
       outputs: { Out: output },
       inputs,
@@ -951,14 +953,15 @@ class AudioEngine {
       _masterFreq: 0,
       _masterModId: null,
       _recalcFreq() {
-        if (!this._masterFreq) return;
+        // Free-run base of E4 (329.6 Hz) when no master is patched; per-partial tuning still applies.
+        const base = this._masterFreq || 329.6;
         const p = this.params;
         const now = oscs[0].context.currentTime;
         for (let i = 0; i < 6; i++) {
           const n = i + 1;
           const tune = p[`tune${n}`].value;
           const fine = p[`fine${n}`].value;
-          const freq = this._masterFreq * tune * Math.pow(2, fine / 1200);
+          const freq = base * tune * Math.pow(2, fine / 1200);
           freqParams[i].setValueAtTime(freq, now);
         }
       },
@@ -967,6 +970,8 @@ class AudioEngine {
         masterLevel: { value: 0.6, min: 0, max: 1, audioParam: output.gain, label: "MstLvl" },
       },
     };
+    mod._recalcFreq();
+    return mod;
   }
 
   _propagateToSlaves(masterMod) {
@@ -2007,6 +2012,7 @@ class AudioEngine {
       if (toMod._masterModId === fromId) {
         toMod._masterModId = null;
         toMod._masterFreq = 0;
+        toMod._recalcFreq();
       }
       this.connections = this.connections.filter(
         (c) => !(c.fromId === fromId && c.fromPort === fromPort && c.toId === toId && c.toPort === toPort)
@@ -2093,7 +2099,7 @@ class AudioEngine {
     if (mod._slaveTargets) {
       mod._slaveTargets.forEach(({ moduleId }) => {
         const slave = this.modules.get(moduleId);
-        if (slave) { slave._masterModId = null; slave._masterFreq = 0; }
+        if (slave) { slave._masterModId = null; slave._masterFreq = 0; slave._recalcFreq(); }
       });
     }
     // Clean up slave->master references
