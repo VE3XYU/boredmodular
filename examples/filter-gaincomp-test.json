@@ -1,0 +1,53 @@
+{
+  "modules": [
+    {
+      "id": "mod_1",
+      "type": "OscA",
+      "x": 80,
+      "y": 120,
+      "params": {
+        "frequency": 110,
+        "waveform": "sawtooth",
+        "level": 0.8
+      }
+    },
+    {
+      "id": "mod_2",
+      "type": "FilterE",
+      "x": 420,
+      "y": 120,
+      "params": {
+        "frequency": 600,
+        "resonance": 18,
+        "filterType": "lowpass",
+        "slope": "12dB",
+        "gainComp": "off"
+      }
+    },
+    {
+      "id": "mod_3",
+      "type": "Output",
+      "x": 760,
+      "y": 160,
+      "params": {
+        "level": 0.5
+      }
+    }
+  ],
+  "connections": [
+    {
+      "fromId": "mod_1",
+      "fromPort": "Out",
+      "toId": "mod_2",
+      "toPort": "In",
+      "color": "hsl(180, 70%, 55%)"
+    },
+    {
+      "fromId": "mod_2",
+      "fromPort": "Out",
+      "toId": "mod_3",
+      "toPort": "InL",
+      "color": "hsl(330, 70%, 55%)"
+    }
+  ]
+}
