@@ -1723,19 +1723,31 @@ class AudioEngine {
     const gainA = this.ctx.createGain();
     const gainB = this.ctx.createGain();
     const output = this.ctx.createGain();
-    const fadeMod = this.ctx.createGain();
-    fadeMod.gain.value = 0;
     // Default: 50/50
     gainA.gain.value = 0.5;
     gainB.gain.value = 0.5;
     gainA.connect(output);
     gainB.connect(output);
 
+    // FadeMod modulates the crossfade position. The fade knob sets the
+    // intrinsic gains inversely (setParam: gainA = 1 - fade, gainB = fade), so
+    // a CV at FadeMod must push them the same way: +CV adds to gainB and (via a
+    // -1 inverter) subtracts from gainA, sweeping the balance bipolarly around
+    // the knob centre. Unity pass-through here; the Type I input attenuator is
+    // tracked separately as systemic finding S2.
+    const fadeMod = this.ctx.createGain();
+    fadeMod.gain.value = 1;
+    const fadeModInv = this.ctx.createGain();
+    fadeModInv.gain.value = -1;
+    fadeMod.connect(gainB.gain);
+    fadeMod.connect(fadeModInv);
+    fadeModInv.connect(gainA.gain);
+
     return {
       id, type: "XFade", node: output, outputNode: output,
       outputs: { Out: output },
       inputs: { InA: gainA, InB: gainB, FadeMod: fadeMod },
-      _nodes: [gainA, gainB, output, fadeMod],
+      _nodes: [gainA, gainB, output, fadeMod, fadeModInv],
       _gainA: gainA, _gainB: gainB,
       params: {
         fade: { value: 0.5, min: 0, max: 1, label: "Fade" },

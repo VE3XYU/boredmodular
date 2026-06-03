@@ -1,0 +1,61 @@
+{
+  "modules": [
+    {
+      "id": "oscA",
+      "type": "OscA",
+      "x": 20,
+      "y": 20,
+      "params": {
+        "waveform": "sawtooth",
+        "frequency": 220,
+        "level": 0.8
+      }
+    },
+    {
+      "id": "oscB",
+      "type": "OscB",
+      "x": 20,
+      "y": 200,
+      "params": {
+        "waveform": "square",
+        "frequency": 330,
+        "level": 0.8
+      }
+    },
+    {
+      "id": "lfo",
+      "type": "LFO",
+      "x": 20,
+      "y": 360,
+      "params": {
+        "rate": 0.4,
+        "amount": 0.5,
+        "waveform": "triangle"
+      }
+    },
+    {
+      "id": "xfade",
+      "type": "XFade",
+      "x": 340,
+      "y": 140,
+      "params": {
+        "fade": 0.5
+      }
+    },
+    {
+      "id": "out",
+      "type": "Output",
+      "x": 640,
+      "y": 140,
+      "params": {
+        "level": 0.5
+      }
+    }
+  ],
+  "connections": [
+    { "fromId": "oscA", "fromPort": "Out", "toId": "xfade", "toPort": "InA", "color": "#e44" },
+    { "fromId": "oscB", "fromPort": "Out", "toId": "xfade", "toPort": "InB", "color": "#4e4" },
+    { "fromId": "lfo", "fromPort": "Out", "toId": "xfade", "toPort": "FadeMod", "color": "#fc0" },
+    { "fromId": "xfade", "fromPort": "Out", "toId": "out", "toPort": "InL", "color": "#6cf" }
+  ]
+}
