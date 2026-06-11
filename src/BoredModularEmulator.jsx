@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { useState, useRef, useCallback, useEffect, useLayoutEffect, useMemo, memo } from "react";
 import AudioEngine from "./AudioEngine";
 import { MODULE_DEFS, CATEGORIES, SIGNAL_TYPE_COLORS, getPortSignalType } from "./moduleDefs";
 
@@ -1161,7 +1161,7 @@ function cablePathD(x1, y1, x2, y2) {
   return `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;
 }
 
-function CableSVG({ x1, y1, x2, y2, color }) {
+const CableSVG = memo(function CableSVG({ x1, y1, x2, y2, color }) {
   const d = cablePathD(x1, y1, x2, y2);
   return (
     <g>
@@ -1182,7 +1182,7 @@ function CableSVG({ x1, y1, x2, y2, color }) {
       />
     </g>
   );
-}
+});
 
 // Drag-preview cable: refs onto the SVG paths and a RAF loop that reads the
 // shared mousePosRef directly. Skips React reconciliation per mousemove,
@@ -1865,16 +1865,25 @@ export default function BoredModularEmulator() {
     return () => clearInterval(id);
   }, [modules]);
 
-  // Render cables
+  // Render cables. panOffset is not a dependency: cables live inside the
+  // panned <g>, so their geometry is pan-independent.
   const cableElements = useMemo(() => {
+    const byId = new Map(modules.map((m) => [m.id, m]));
+    // Key by connection tuple so removing one cable doesn't re-key the rest
+    // (index keys churn the whole list). connect() accepts duplicate tuples,
+    // so a seen-count suffix keeps keys unique in that degenerate case.
+    const seenTuples = new Map();
     return connections.map((c, idx) => {
-      const fromMod = modules.find((m) => m.id === c.fromId);
-      const toMod = modules.find((m) => m.id === c.toId);
+      const fromMod = byId.get(c.fromId);
+      const toMod = byId.get(c.toId);
       if (!fromMod || !toMod) return null;
       const p1 = getPortPosition(fromMod, c.fromPort, true);
       const p2 = getPortPosition(toMod, c.toPort, false);
+      const tuple = `${c.fromId}:${c.fromPort}->${c.toId}:${c.toPort}`;
+      const n = (seenTuples.get(tuple) || 0) + 1;
+      seenTuples.set(tuple, n);
       return (
-        <g key={idx} onDoubleClick={() => removeCable(idx)} style={{ cursor: "pointer" }} pointerEvents="visibleStroke">
+        <g key={n === 1 ? tuple : `${tuple}#${n}`} onDoubleClick={() => removeCable(idx)} style={{ cursor: "pointer" }} pointerEvents="visibleStroke">
           <CableSVG
             x1={p1.x}
             y1={p1.y}
@@ -1885,7 +1894,7 @@ export default function BoredModularEmulator() {
         </g>
       );
     });
-  }, [connections, modules, panOffset, removeCable]);
+  }, [connections, modules, removeCable]);
 
   return (
     <div
