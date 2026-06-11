@@ -2195,7 +2195,11 @@ class AudioEngine {
 
   setParam(moduleId, paramName, value) {
     const mod = this.modules.get(moduleId);
-    if (!mod || !mod.params[paramName]) return;
+    // Own-property guard: a name like "__proto__" or "toString" passes a bare
+    // truthiness check by resolving through the prototype chain, and `p.value`
+    // below would then write onto Object.prototype or a shared built-in.
+    // Patch files are the untrusted caller here.
+    if (!mod || !Object.prototype.hasOwnProperty.call(mod.params, paramName)) return;
     const p = mod.params[paramName];
     // Finiteness guard: for numeric params, coerce with Number() and fall back
     // to the current value when non-finite, then clamp into [min,max] when both

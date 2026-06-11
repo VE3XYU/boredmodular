@@ -1,0 +1,38 @@
+{
+  "_readme": "Own-property guard test. The OscA below carries hostile param keys (__proto__, constructor, toString, hasOwnProperty) that a bare params[k] lookup would resolve through the prototype chain, writing .value onto Object.prototype or shared built-ins. Import this patch: it must load with 'Imported!', the OscA must show coarse +5 / level 0.3, a quiet saw drone must reach the Output, and in the console Object.prototype.value and ({}).toString must be untouched (undefined / native function).",
+  "modules": [
+    {
+      "id": "mod_1",
+      "type": "OscA",
+      "x": 120,
+      "y": 100,
+      "params": {
+        "__proto__": { "value": 666 },
+        "constructor": { "value": 666 },
+        "toString": 666,
+        "hasOwnProperty": { "value": "polluted" },
+        "coarse": 5,
+        "waveform": "sawtooth",
+        "level": 0.3
+      }
+    },
+    {
+      "id": "mod_2",
+      "type": "Output",
+      "x": 420,
+      "y": 100,
+      "params": {
+        "level": 0.2,
+        "valueOf": 666
+      }
+    }
+  ],
+  "connections": [
+    {
+      "fromId": "mod_1",
+      "fromPort": "Out",
+      "toId": "mod_2",
+      "toPort": "InL"
+    }
+  ]
+}

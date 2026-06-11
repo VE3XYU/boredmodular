@@ -1422,10 +1422,14 @@ export default function BoredModularEmulator() {
             : rawKey === "PitchMod2Atten" ? "Pitch2Atten"
             : rawKey;
           let value = v && typeof v === "object" && "value" in v ? v.value : v;
+          // Own-property guard: a hostile patch key like "__proto__" or
+          // "toString" resolves through the prototype chain on a bare lookup,
+          // and the `.value` write below would then land on Object.prototype
+          // or a shared built-in. Only own keys are real params.
+          const def = Object.prototype.hasOwnProperty.call(params, k) ? params[k] : undefined;
           // Param clamp on restore: for numeric params, coerce with Number() and
           // clamp into the engine def's [min,max]. A non-finite/garbage saved value
           // keeps the engine default. Enum/string params (no numeric def) pass through.
-          const def = params[k];
           if (def && typeof def.value === "number" && typeof value !== "string") {
             const num = Number(value);
             if (Number.isFinite(num)) {
@@ -1441,7 +1445,7 @@ export default function BoredModularEmulator() {
           if (m.type === "Amplifier" && type === "Amplifier" && k === "level") {
             value = Math.max(0.25, value);
           }
-          if (params[k]) params[k].value = value;
+          if (def) def.value = value;
           engineRef.current.setParam(m.id, k, value);
         });
         // Restore mute before reconnection so the lazy mute-gain (created on the
