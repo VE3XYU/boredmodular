@@ -1889,14 +1889,19 @@ export default function BoredModularEmulator() {
     };
   }, [keyHeld, initAudio, handleParamChange, cableDrag]);
 
-  // Sequencer step animation: poll at ~15fps to update step LEDs
+  // Sequencer step animation: poll at ~15fps to update step LEDs. The effect
+  // depends on the derived boolean, not the modules array: with [modules] as
+  // the dependency, every drag mousemove tore down and recreated the interval,
+  // so the 66ms timer never fired during a sustained drag. Memoized modules
+  // no longer repaint incidentally on every mousemove, so the tick must stay
+  // alive on its own for LEDs to keep stepping mid-drag.
   const [seqFrame, setSeqFrame] = useState(0);
+  const hasSeq = useMemo(() => modules.some((m) => SEQ_TYPES.has(m.type)), [modules]);
   useEffect(() => {
-    const hasSeq = modules.some(m => ["EventSeq", "CtrlSeq", "NoteSeqA", "NoteSeqB"].includes(m.type));
     if (!hasSeq) return;
     const id = setInterval(() => setSeqFrame(f => f + 1), 66);
     return () => clearInterval(id);
-  }, [modules]);
+  }, [hasSeq]);
 
   // Per-module connected-port sets, one Set per patched module. ModuleNode
   // receives its own Set (or the shared empty one), so its memo only sees a
