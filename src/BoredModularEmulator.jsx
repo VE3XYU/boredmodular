@@ -21,14 +21,24 @@ const PARAM_STRIP_H = 56;
 const PARAM_STRIP_LABEL_BAND_H = 12;
 const PARAM_STRIP_LABELED_H = PARAM_STRIP_H + PARAM_STRIP_LABEL_BAND_H;
 
+// Layout geometry depends only on the def's paramRows and the param KEY SET,
+// both fixed for a given params snapshot (edits replace the snapshot object).
+// Cache by snapshot identity: this function runs per port per module per
+// render (ports, hit overlay, module height, cables), so items deliberately
+// hold param KEYS, not param objects — values are read live by the renderer.
+const _paramLayoutCache = new WeakMap();
+
 function buildParamLayout(def, params) {
+  const cached = params ? _paramLayoutCache.get(params) : undefined;
+  if (cached && cached.def === def) return cached.layout;
+
   const items = [];
   const paramRowMap = new Map();
   (def.paramRows || []).forEach((r) => r.knobs.forEach((k) => paramRowMap.set(k, r)));
 
   const seen = new Set();
   let y = 4;
-  Object.entries(params || {}).forEach(([key, p]) => {
+  Object.keys(params || {}).forEach((key) => {
     if (seen.has(key)) return;
     if (paramRowMap.has(key)) {
       const row = paramRowMap.get(key);
@@ -37,13 +47,15 @@ function buildParamLayout(def, params) {
       row.knobs.forEach((k) => seen.add(k));
       y += labeled ? PARAM_STRIP_LABELED_H : PARAM_STRIP_H;
     } else {
-      items.push({ kind: "single", key, p, y });
+      items.push({ kind: "single", key, y });
       seen.add(key);
       y += PARAM_ROW_H;
     }
   });
   const totalH = y - 4 + PARAMS_PAD_BOTTOM;
-  return { items, totalH };
+  const layout = { items, totalH };
+  if (params) _paramLayoutCache.set(params, { def, layout });
+  return layout;
 }
 
 function getPortPosition(moduleState, portName, isOutput) {
@@ -750,7 +762,9 @@ function ModuleNode({
             </g>
           );
         }
-        const { key, p } = item;
+        const { key } = item;
+        const p = params[key];
+        if (!p) return null;
         if (p.options) {
           return (
             <g key={key}>
