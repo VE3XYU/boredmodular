@@ -574,6 +574,53 @@ function ParamNumericInput({ x, y, width, height, p, color, onCommit, onCancel }
   );
 }
 
+// NoteSeqB piano roll, memoized: 384 grid cells (each with a closure and a
+// style object) make this the heaviest module subtree by far, and the 66ms
+// seqFrame tick re-rendered all of it 15x/s. Its props only change when the
+// step actually advances (quarter-note rate), the base octave shifts, or an
+// edit lands. Pattern arrays live on the engine module and are read live.
+const NoteSeqBGrid = memo(function NoteSeqBGrid({
+  mod,
+  seqY,
+  step,
+  baseMidi,
+  onToggle,
+  paramsRev, // unread: edits replace the params snapshot, breaking the memo
+}) {
+  const cellW = MODULE_WIDTH / 16;
+  const rows = 24; // 2 octaves
+  const rowH = 4;
+  return (
+    <g>
+      {/* Step indicator */}
+      {[...Array(16)].map((_, i) => (
+        <rect key={`led-${i}`} x={i * cellW + 1} y={seqY} width={cellW - 2} height={3}
+          rx={1} fill={i === step ? "#ff0" : "#222"} />
+      ))}
+      {/* Grid */}
+      {[...Array(rows)].map((_, row) => {
+        const midi = baseMidi + (rows - 1 - row);
+        const isBlack = [1,3,6,8,10].includes(midi % 12);
+        return [...Array(16)].map((_, col) => {
+          const isActive = mod?._pitchValues[col] === midi && mod?._gatePattern[col];
+          return (
+            <rect key={`cell-${row}-${col}`}
+              x={col * cellW + 1} y={seqY + 6 + row * rowH}
+              width={cellW - 2} height={rowH - 0.5}
+              fill={isActive ? "#fc0" : isBlack ? "#181818" : "#111"}
+              stroke="#222" strokeWidth={0.25}
+              style={{ cursor: "pointer" }}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                onToggle(col, midi);
+              }} />
+          );
+        });
+      })}
+    </g>
+  );
+});
+
 const ModuleNode = memo(function ModuleNode({
   moduleState,
   engine,
@@ -589,6 +636,25 @@ const ModuleNode = memo(function ModuleNode({
   const [editingParam, setEditingParam] = useState(null);
   const def = MODULE_DEFS[moduleState.type];
   const params = moduleState.params || {};
+
+  // NoteSeqB cell toggle. Stable across seqFrame ticks (moduleState doesn't
+  // change on a tick) so NoteSeqBGrid's memo holds between steps; reads the
+  // live steps value at call time, mirroring the old inline handler.
+  const onNoteSeqBToggle = useCallback(
+    (col, midi) => {
+      const mod = engine.current?.modules?.get(moduleState.id);
+      if (!mod) return;
+      if (mod._pitchValues[col] === midi && mod._gatePattern[col]) {
+        mod._gatePattern[col] = false;
+      } else {
+        mod._pitchValues[col] = midi;
+        mod._gatePattern[col] = true;
+      }
+      onParamChange(moduleState.id, "steps", moduleState.params.steps.value);
+    },
+    [engine, moduleState, onParamChange]
+  );
+
   const allInputs = [...(def.inputs || []), ...(def.modInputs || [])];
   const allOutputs = def.outputs || [];
   const height = getModuleHeight(moduleState.type, params);
@@ -1074,48 +1140,17 @@ const ModuleNode = memo(function ModuleNode({
         const seqY = paramsStartY + Object.keys(params).length * PARAM_ROW_H + PARAMS_PAD_BOTTOM + 2;
         const mod = engine.current?.modules?.get(moduleState.id);
         const step = mod?._currentStep || 0;
-        const cellW = MODULE_WIDTH / 16;
         const baseOct = (mod?.params?.baseOctave?.value || 3);
         const baseMidi = (baseOct + 1) * 12; // octave 3 = MIDI 48
-        const rows = 24; // 2 octaves
-        const rowH = 4;
-        const gridH = rows * rowH;
-        const noteNames = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
         return (
-          <g>
-            {/* Step indicator */}
-            {[...Array(16)].map((_, i) => (
-              <rect key={`led-${i}`} x={i * cellW + 1} y={seqY} width={cellW - 2} height={3}
-                rx={1} fill={i === step ? "#ff0" : "#222"} />
-            ))}
-            {/* Grid */}
-            {[...Array(rows)].map((_, row) => {
-              const midi = baseMidi + (rows - 1 - row);
-              const isBlack = [1,3,6,8,10].includes(midi % 12);
-              return [...Array(16)].map((_, col) => {
-                const isActive = mod?._pitchValues[col] === midi && mod?._gatePattern[col];
-                return (
-                  <rect key={`cell-${row}-${col}`}
-                    x={col * cellW + 1} y={seqY + 6 + row * rowH}
-                    width={cellW - 2} height={rowH - 0.5}
-                    fill={isActive ? "#fc0" : isBlack ? "#181818" : "#111"}
-                    stroke="#222" strokeWidth={0.25}
-                    style={{ cursor: "pointer" }}
-                    onMouseDown={(e) => {
-                      e.stopPropagation();
-                      if (!mod) return;
-                      if (mod._pitchValues[col] === midi && mod._gatePattern[col]) {
-                        mod._gatePattern[col] = false;
-                      } else {
-                        mod._pitchValues[col] = midi;
-                        mod._gatePattern[col] = true;
-                      }
-                      onParamChange(moduleState.id, "steps", params.steps.value);
-                    }} />
-                );
-              });
-            })}
-          </g>
+          <NoteSeqBGrid
+            mod={mod}
+            seqY={seqY}
+            step={step}
+            baseMidi={baseMidi}
+            onToggle={onNoteSeqBToggle}
+            paramsRev={params}
+          />
         );
       })()}
 
