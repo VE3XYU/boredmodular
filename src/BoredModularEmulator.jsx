@@ -201,6 +201,15 @@ function applyDropSnap(modules, draggedId, snapped) {
   });
 }
 
+// Sequencer module types: the only custom UIs that poll engine state
+// (_currentStep, pattern arrays) at render time, so the only ones that need
+// the live seqFrame tick as a re-render trigger.
+const SEQ_TYPES = new Set(["EventSeq", "CtrlSeq", "NoteSeqA", "NoteSeqB"]);
+
+// Shared empty Set for modules with no connections — a stable identity so
+// ModuleNode's memo doesn't break on unrelated connection changes.
+const EMPTY_PORT_SET = new Set();
+
 // Keyboard note mapping: computer keys -> MIDI notes (relative to C4=60)
 const KEY_NOTE_MAP = {
   a: 60, w: 61, s: 62, e: 63, d: 64, f: 65, t: 66, g: 67, y: 68, h: 69, u: 70, j: 71, k: 72,
@@ -293,7 +302,7 @@ function SafariAdvisoryBanner() {
   );
 }
 
-function Scope({ engine }) {
+const Scope = memo(function Scope({ engine }) {
   const canvasRef = useRef(null);
   const animRef = useRef(null);
 
@@ -364,7 +373,7 @@ function Scope({ engine }) {
   }, [engine]);
 
   return <canvas ref={canvasRef} width={280} height={90} style={{ borderRadius: 4, border: "1px solid #1a2a1a" }} />;
-}
+});
 
 function SvgKnob({ x, y, width, min, max, value, onChange, color, onDoubleClick }) {
   const range = max - min;
@@ -565,17 +574,17 @@ function ParamNumericInput({ x, y, width, height, p, color, onCommit, onCancel }
   );
 }
 
-function ModuleNode({
+const ModuleNode = memo(function ModuleNode({
   moduleState,
   engine,
   onDragStart,
   onPortDragStart,
   onPortDragEnd,
-  connections,
+  connectedPorts,
   onParamChange,
   onMuteToggle,
   onRemove,
-  seqFrame,
+  seqFrame, // unread: its change is the re-render trigger for sequencer UIs
 }) {
   const [editingParam, setEditingParam] = useState(null);
   const def = MODULE_DEFS[moduleState.type];
@@ -586,12 +595,6 @@ function ModuleNode({
 
   const headerH = HEADER_H;
   const paramsStartY = headerH;
-
-  const connectedPorts = new Set();
-  connections.forEach((c) => {
-    if (c.fromId === moduleState.id) connectedPorts.add(`out:${c.fromPort}`);
-    if (c.toId === moduleState.id) connectedPorts.add(`in:${c.toPort}`);
-  });
 
   return (
     <g
@@ -1161,7 +1164,7 @@ function ModuleNode({
 
     </g>
   );
-}
+});
 
 function cablePathD(x1, y1, x2, y2) {
   const dx = x2 - x1;
@@ -1258,6 +1261,20 @@ export default function BoredModularEmulator() {
   const [audioStarted, setAudioStarted] = useState(false);
   const [keyHeld, setKeyHeld] = useState(false);
 
+  // Latest-value refs, synced after every commit. Gesture handlers passed to
+  // memoized children read live values through these instead of closing over
+  // state — a handler whose identity changed per render would defeat
+  // React.memo on every ModuleNode. Handlers only fire on user events (always
+  // after a commit), so the refs are never stale when read.
+  const modulesRef = useRef(modules);
+  const panOffsetRef = useRef(panOffset);
+  const cableDragRef = useRef(cableDrag);
+  useLayoutEffect(() => {
+    modulesRef.current = modules;
+    panOffsetRef.current = panOffset;
+    cableDragRef.current = cableDrag;
+  });
+
   const initAudio = useCallback(() => {
     if (!audioStarted) {
       engineRef.current.init();
@@ -1310,8 +1327,8 @@ export default function BoredModularEmulator() {
         params[k] = { ...v };
       });
 
-      const candidateX = 80 + Math.random() * 200 - panOffset.x;
-      const candidateY = 80 + Math.random() * 150 - panOffset.y;
+      const candidateX = 80 + Math.random() * 200 - panOffsetRef.current.x;
+      const candidateY = 80 + Math.random() * 150 - panOffsetRef.current.y;
       setModules((prev) => {
         const pos = { x: candidateX, y: candidateY };
         let attempts = 0;
@@ -1328,7 +1345,7 @@ export default function BoredModularEmulator() {
         return [...prev, { id, type, x: pos.x, y: pos.y, params }];
       });
     },
-    [initAudio, panOffset]
+    [initAudio]
   );
 
   const removeModule = useCallback(
@@ -1589,19 +1606,21 @@ export default function BoredModularEmulator() {
       if (e.button === 1 || e.button === 2) return;
       const svg = svgRef.current;
       const rect = svg.getBoundingClientRect();
-      const mod = modules.find((m) => m.id === id);
+      const mod = modulesRef.current.find((m) => m.id === id);
       if (!mod) return;
+      const pan = panOffsetRef.current;
       setDragging({
         id,
-        offsetX: (e.clientX - rect.left) / 1 - panOffset.x - mod.x,
-        offsetY: (e.clientY - rect.top) / 1 - panOffset.y - mod.y,
+        offsetX: (e.clientX - rect.left) / 1 - pan.x - mod.x,
+        offsetY: (e.clientY - rect.top) / 1 - pan.y - mod.y,
       });
     },
-    [modules, panOffset]
+    []
   );
 
   const handlePortDragEnd = useCallback(
     (e, moduleId, portName, isOutput) => {
+      const cableDrag = cableDragRef.current;
       if (!cableDrag) return;
       // Releasing on the same port that started the cable — leave it pending
       // so the user can click a target next (click-then-click mode).
@@ -1636,19 +1655,19 @@ export default function BoredModularEmulator() {
       }
       setCableDrag(null);
     },
-    [cableDrag]
+    []
   );
 
   const handlePortDragStart = useCallback(
     (e, moduleId, portName, isOutput) => {
       e.preventDefault();
       // If a cable is already pending, treat this click as the drop target.
-      if (cableDrag) {
+      if (cableDragRef.current) {
         handlePortDragEnd(e, moduleId, portName, isOutput);
         return;
       }
       initAudio();
-      const mod = modules.find((m) => m.id === moduleId);
+      const mod = modulesRef.current.find((m) => m.id === moduleId);
       if (!mod) return;
       const pos = getPortPosition(mod, portName, isOutput);
       setCableDrag({
@@ -1659,7 +1678,7 @@ export default function BoredModularEmulator() {
         startY: pos.y,
       });
     },
-    [modules, initAudio, panOffset, cableDrag, handlePortDragEnd]
+    [initAudio, handlePortDragEnd]
   );
 
   const removeCable = useCallback((idx) => {
@@ -1879,6 +1898,147 @@ export default function BoredModularEmulator() {
     return () => clearInterval(id);
   }, [modules]);
 
+  // Per-module connected-port sets, one Set per patched module. ModuleNode
+  // receives its own Set (or the shared empty one), so its memo only sees a
+  // prop change when the connection list itself changes.
+  const connectedPortsByModule = useMemo(() => {
+    const map = new Map();
+    connections.forEach((c) => {
+      let from = map.get(c.fromId);
+      if (!from) map.set(c.fromId, (from = new Set()));
+      from.add(`out:${c.fromPort}`);
+      let to = map.get(c.toId);
+      if (!to) map.set(c.toId, (to = new Set()));
+      to.add(`in:${c.toPort}`);
+    });
+    return map;
+  }, [connections]);
+
+  // Sidebar palette: ~250 elements that only depend on static defs and the
+  // stable addModule handler — without this, every drag mousemove rebuilt it.
+  const paletteElements = useMemo(() => (
+    CATEGORIES.map((cat) => (
+      <div key={cat.key} style={{ marginBottom: 4 }}>
+        <div
+          style={{
+            fontSize: 17,
+            color: "#555",
+            textTransform: "uppercase",
+            letterSpacing: 2,
+            padding: "4px 12px",
+          }}
+        >
+          {cat.label}
+        </div>
+        {cat.modules.map((type) => {
+          const d = MODULE_DEFS[type];
+          return (
+            <div
+              key={type}
+              draggable
+              onClick={() => addModule(type)}
+              onDragStart={(e) => {
+                e.dataTransfer.setData("application/x-bored-modular", type);
+                e.dataTransfer.effectAllowed = "copy";
+                const chip = e.currentTarget.querySelector("[data-drag-chip]");
+                if (chip) e.dataTransfer.setDragImage(chip, 0, 0);
+              }}
+              style={{
+                padding: "6px 12px",
+                cursor: "grab",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                transition: "background 0.15s",
+                position: "relative",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "#1e1e22")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+            >
+              <div
+                data-drag-chip
+                style={{
+                  position: "absolute",
+                  top: -9999,
+                  left: -9999,
+                  padding: "4px 8px",
+                  background: "#1e1e22",
+                  border: "1px solid #333",
+                  borderRadius: 3,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: 15,
+                  color: "#ddd",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: d.color }} />
+                {d.label}
+              </div>
+              <div
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: 2,
+                  background: d.color,
+                  flexShrink: 0,
+                }}
+              />
+              <div>
+                <div style={{ fontSize: 17, color: "#bbb" }}>{d.label}</div>
+                <div style={{ fontSize: 13, color: "#888" }}>{d.description}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    ))
+  ), [addModule]);
+
+  // Port hit overlay: geometry tracks module positions/types, so this only
+  // needs to recompute when modules changes — not on pan, tick, or key state.
+  const portHitOverlay = useMemo(() => (
+    modules.map((m) => {
+      const def = MODULE_DEFS[m.type];
+      const allInputs = [...(def.inputs || []), ...(def.modInputs || [])];
+      const allOutputs = def.outputs || [];
+      return (
+        <g key={`ports-${m.id}`}>
+          {allOutputs.map((port) => {
+            const pos = getPortPosition(m, port, true);
+            return (
+              <rect
+                key={`oh-${port}`}
+                x={pos.x - PORT_HIT_SIZE} y={pos.y - PORT_HIT_SIZE}
+                width={PORT_HIT_SIZE * 2} height={PORT_HIT_SIZE * 2}
+                fill="transparent"
+                data-port="1"
+                style={{ cursor: "pointer" }}
+                onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); handlePortDragStart(e, m.id, port, true); }}
+                onMouseUp={(e) => { e.stopPropagation(); handlePortDragEnd(e, m.id, port, true); }}
+              />
+            );
+          })}
+          {allInputs.map((port) => {
+            const pos = getPortPosition(m, port, false);
+            return (
+              <circle
+                key={`ih-${port}`}
+                cx={pos.x} cy={pos.y} r={PORT_HIT_SIZE}
+                fill="transparent"
+                data-port="1"
+                style={{ cursor: "pointer" }}
+                onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); handlePortDragStart(e, m.id, port, false); }}
+                onMouseUp={(e) => { e.stopPropagation(); handlePortDragEnd(e, m.id, port, false); }}
+              />
+            );
+          })}
+        </g>
+      );
+    })
+  ), [modules, handlePortDragStart, handlePortDragEnd]);
+
   // Render cables. panOffset is not a dependency: cables live inside the
   // panned <g>, so their geometry is pan-independent.
   const cableElements = useMemo(() => {
@@ -1953,83 +2113,7 @@ export default function BoredModularEmulator() {
 
         {/* Module palette */}
         <div style={{ padding: "8px 0", flex: 1 }}>
-          {CATEGORIES.map((cat) => (
-            <div key={cat.key} style={{ marginBottom: 4 }}>
-              <div
-                style={{
-                  fontSize: 17,
-                  color: "#555",
-                  textTransform: "uppercase",
-                  letterSpacing: 2,
-                  padding: "4px 12px",
-                }}
-              >
-                {cat.label}
-              </div>
-              {cat.modules.map((type) => {
-                const d = MODULE_DEFS[type];
-                return (
-                  <div
-                    key={type}
-                    draggable
-                    onClick={() => addModule(type)}
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData("application/x-bored-modular", type);
-                      e.dataTransfer.effectAllowed = "copy";
-                      const chip = e.currentTarget.querySelector("[data-drag-chip]");
-                      if (chip) e.dataTransfer.setDragImage(chip, 0, 0);
-                    }}
-                    style={{
-                      padding: "6px 12px",
-                      cursor: "grab",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      transition: "background 0.15s",
-                      position: "relative",
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "#1e1e22")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                  >
-                    <div
-                      data-drag-chip
-                      style={{
-                        position: "absolute",
-                        top: -9999,
-                        left: -9999,
-                        padding: "4px 8px",
-                        background: "#1e1e22",
-                        border: "1px solid #333",
-                        borderRadius: 3,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        fontSize: 15,
-                        color: "#ddd",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      <div style={{ width: 8, height: 8, borderRadius: 2, background: d.color }} />
-                      {d.label}
-                    </div>
-                    <div
-                      style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: 2,
-                        background: d.color,
-                        flexShrink: 0,
-                      }}
-                    />
-                    <div>
-                      <div style={{ fontSize: 17, color: "#bbb" }}>{d.label}</div>
-                      <div style={{ fontSize: 13, color: "#888" }}>{d.description}</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ))}
+          {paletteElements}
         </div>
 
         {/* Patches */}
@@ -2150,14 +2234,14 @@ export default function BoredModularEmulator() {
               key={m.id}
               moduleState={m}
               engine={engineRef}
-              connections={connections}
+              connectedPorts={connectedPortsByModule.get(m.id) || EMPTY_PORT_SET}
               onDragStart={handleDragStart}
               onPortDragStart={handlePortDragStart}
               onPortDragEnd={handlePortDragEnd}
               onParamChange={handleParamChange}
               onMuteToggle={handleMuteToggle}
               onRemove={removeModule}
-              seqFrame={seqFrame}
+              seqFrame={SEQ_TYPES.has(m.type) ? seqFrame : 0}
             />
           ))}
 
@@ -2171,44 +2255,7 @@ export default function BoredModularEmulator() {
 
 
           {/* Port hit overlay — rendered last so ports are always interactive on top of cables */}
-          {modules.map((m) => {
-            const def = MODULE_DEFS[m.type];
-            const allInputs = [...(def.inputs || []), ...(def.modInputs || [])];
-            const allOutputs = def.outputs || [];
-            return (
-              <g key={`ports-${m.id}`}>
-                {allOutputs.map((port) => {
-                  const pos = getPortPosition(m, port, true);
-                  return (
-                    <rect
-                      key={`oh-${port}`}
-                      x={pos.x - PORT_HIT_SIZE} y={pos.y - PORT_HIT_SIZE}
-                      width={PORT_HIT_SIZE * 2} height={PORT_HIT_SIZE * 2}
-                      fill="transparent"
-                      data-port="1"
-                      style={{ cursor: "pointer" }}
-                      onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); handlePortDragStart(e, m.id, port, true); }}
-                      onMouseUp={(e) => { e.stopPropagation(); handlePortDragEnd(e, m.id, port, true); }}
-                    />
-                  );
-                })}
-                {allInputs.map((port) => {
-                  const pos = getPortPosition(m, port, false);
-                  return (
-                    <circle
-                      key={`ih-${port}`}
-                      cx={pos.x} cy={pos.y} r={PORT_HIT_SIZE}
-                      fill="transparent"
-                      data-port="1"
-                      style={{ cursor: "pointer" }}
-                      onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); handlePortDragStart(e, m.id, port, false); }}
-                      onMouseUp={(e) => { e.stopPropagation(); handlePortDragEnd(e, m.id, port, false); }}
-                    />
-                  );
-                })}
-              </g>
-            );
-          })}
+          {portHitOverlay}
         </g>
 
         {/* Empty state */}
