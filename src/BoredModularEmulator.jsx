@@ -1310,6 +1310,23 @@ export default function BoredModularEmulator() {
     cableDragRef.current = cableDrag;
   });
 
+  // The svg's bounding rect is constant between window resizes (fixed-width
+  // sidebar, no scroll/zoom, and the Safari banner is position:fixed, so
+  // nothing shifts it). Reading it on every mousemove forces synchronous
+  // layout right after each drag commit dirties the SVG; cache it instead,
+  // refresh at gesture starts, and invalidate on resize.
+  const svgRectRef = useRef(null);
+  const refreshSvgRect = useCallback(() => {
+    const svg = svgRef.current;
+    if (svg) svgRectRef.current = svg.getBoundingClientRect();
+    return svgRectRef.current;
+  }, []);
+  useEffect(() => {
+    const invalidate = () => { svgRectRef.current = null; };
+    window.addEventListener("resize", invalidate);
+    return () => window.removeEventListener("resize", invalidate);
+  }, []);
+
   const initAudio = useCallback(() => {
     if (!audioStarted) {
       engineRef.current.init();
@@ -1639,8 +1656,8 @@ export default function BoredModularEmulator() {
   const handleDragStart = useCallback(
     (e, id) => {
       if (e.button === 1 || e.button === 2) return;
-      const svg = svgRef.current;
-      const rect = svg.getBoundingClientRect();
+      const rect = refreshSvgRect();
+      if (!rect) return;
       const mod = modulesRef.current.find((m) => m.id === id);
       if (!mod) return;
       const pan = panOffsetRef.current;
@@ -1650,7 +1667,7 @@ export default function BoredModularEmulator() {
         offsetY: (e.clientY - rect.top) / 1 - pan.y - mod.y,
       });
     },
-    []
+    [refreshSvgRect]
   );
 
   const handlePortDragEnd = useCallback(
@@ -1742,9 +1759,8 @@ export default function BoredModularEmulator() {
   // Mouse move
   const handleMouseMove = useCallback(
     (e) => {
-      const svg = svgRef.current;
-      if (!svg) return;
-      const rect = svg.getBoundingClientRect();
+      const rect = svgRectRef.current || refreshSvgRect();
+      if (!rect) return;
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
       mousePosRef.current.x = mx;
@@ -1769,7 +1785,7 @@ export default function BoredModularEmulator() {
         });
       }
     },
-    [dragging, isPanning, panOffset]
+    [dragging, isPanning, panOffset, refreshSvgRect]
   );
 
   const handleMouseUp = useCallback(() => {
