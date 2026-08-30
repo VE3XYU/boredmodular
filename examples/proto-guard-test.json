@@ -1,5 +1,5 @@
 {
-  "_readme": "Own-property guard test. The OscA below carries hostile param keys (__proto__, constructor, toString, hasOwnProperty) that a bare params[k] lookup would resolve through the prototype chain, writing .value onto Object.prototype or shared built-ins. Import this patch: it must load with 'Imported!', the OscA must show coarse +5 / level 0.3, a quiet saw drone must reach the Output, and in the console Object.prototype.value and ({}).toString must be untouched (undefined / native function).",
+  "_readme": "Own-property guard test. The OscA below carries hostile param keys (__proto__, constructor, toString, hasOwnProperty) that a bare params[k] lookup would resolve through the prototype chain, writing .value onto Object.prototype or shared built-ins. The connections list carries hostile port names (toString/hasOwnProperty) and a duplicate of the real cable: connect() must reject all three, so exactly ONE cable renders after import and re-exporting the patch drops the bad tuples. Import this patch: it must load with 'Imported!', the OscA must show coarse +5 / level 0.3, a quiet saw drone must reach the Output, one cable only, and in the console Object.prototype.value and ({}).toString must be untouched (undefined / native function).",
   "modules": [
     {
       "id": "mod_1",
@@ -33,6 +33,24 @@
       "fromPort": "Out",
       "toId": "mod_2",
       "toPort": "InL"
+    },
+    {
+      "fromId": "mod_1",
+      "fromPort": "Out",
+      "toId": "mod_2",
+      "toPort": "InL"
+    },
+    {
+      "fromId": "mod_1",
+      "fromPort": "toString",
+      "toId": "mod_2",
+      "toPort": "InR"
+    },
+    {
+      "fromId": "mod_1",
+      "fromPort": "Out",
+      "toId": "mod_2",
+      "toPort": "hasOwnProperty"
     }
   ]
 }
