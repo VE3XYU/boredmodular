@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useLayoutEffect, useMemo, memo } from "react";
 import AudioEngine from "./AudioEngine";
-import { MODULE_DEFS, CATEGORIES, SIGNAL_TYPE_COLORS, getPortSignalType } from "./moduleDefs";
+import { MODULE_DEFS, CATEGORIES, SEQ_TYPES, SIGNAL_TYPE_COLORS, getPortSignalType } from "./moduleDefs";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -22,15 +22,16 @@ const PARAM_STRIP_LABEL_BAND_H = 12;
 const PARAM_STRIP_LABELED_H = PARAM_STRIP_H + PARAM_STRIP_LABEL_BAND_H;
 
 // Layout geometry depends only on the def's paramRows and the param KEY SET,
-// both fixed for a given params snapshot (edits replace the snapshot object).
+// both fixed for a given params snapshot (a snapshot belongs to exactly one
+// module, whose type never changes; edits replace the snapshot object).
 // Cache by snapshot identity: this function runs per port per module per
 // render (ports, hit overlay, module height, cables), so items deliberately
 // hold param KEYS, not param objects — values are read live by the renderer.
 const _paramLayoutCache = new WeakMap();
 
 function buildParamLayout(def, params) {
-  const cached = params ? _paramLayoutCache.get(params) : undefined;
-  if (cached && cached.def === def) return cached.layout;
+  const cached = _paramLayoutCache.get(params);
+  if (cached) return cached;
 
   const items = [];
   const paramRowMap = new Map();
@@ -54,7 +55,7 @@ function buildParamLayout(def, params) {
   });
   const totalH = y - 4 + PARAMS_PAD_BOTTOM;
   const layout = { items, totalH };
-  if (params) _paramLayoutCache.set(params, { def, layout });
+  if (params) _paramLayoutCache.set(params, layout);
   return layout;
 }
 
@@ -200,11 +201,6 @@ function applyDropSnap(modules, draggedId, snapped) {
     return m;
   });
 }
-
-// Sequencer module types: the only custom UIs that poll engine state
-// (_currentStep, pattern arrays) at render time, so the only ones that need
-// the live seqFrame tick as a re-render trigger.
-const SEQ_TYPES = new Set(["EventSeq", "CtrlSeq", "NoteSeqA", "NoteSeqB"]);
 
 // Shared empty Set for modules with no connections — a stable identity so
 // ModuleNode's memo doesn't break on unrelated connection changes.
@@ -574,11 +570,27 @@ function ParamNumericInput({ x, y, width, height, p, color, onCommit, onCancel }
   );
 }
 
+// Pitch classes rendered as black keys (piano roll row shading); mirrors the
+// `black` flags in PIANO_KEYS.
+const BLACK_KEY_PCS = new Set([1, 3, 6, 8, 10]);
+
+// 16-cell step indicator shared by all four sequencer UIs.
+function StepLEDStrip({ step, seqY, cellW }) {
+  return (
+    <g>
+      {[...Array(16)].map((_, i) => (
+        <rect key={`led-${i}`} x={i * cellW + 1} y={seqY} width={cellW - 2} height={3}
+          rx={1} fill={i === step ? "#ff0" : "#222"} />
+      ))}
+    </g>
+  );
+}
+
 // NoteSeqB piano roll, memoized: 384 grid cells (each with a closure and a
-// style object) make this the heaviest module subtree by far, and the 66ms
-// seqFrame tick re-rendered all of it 15x/s. Its props only change when the
-// step actually advances (quarter-note rate), the base octave shifts, or an
-// edit lands. Pattern arrays live on the engine module and are read live.
+// style object) make this the heaviest module subtree by far. Its props only
+// change when the step actually advances (quarter-note rate), the base octave
+// shifts, or an edit lands. Pattern arrays live on the engine module and are
+// read live.
 const NoteSeqBGrid = memo(function NoteSeqBGrid({
   mod,
   seqY,
@@ -592,15 +604,11 @@ const NoteSeqBGrid = memo(function NoteSeqBGrid({
   const rowH = 4;
   return (
     <g>
-      {/* Step indicator */}
-      {[...Array(16)].map((_, i) => (
-        <rect key={`led-${i}`} x={i * cellW + 1} y={seqY} width={cellW - 2} height={3}
-          rx={1} fill={i === step ? "#ff0" : "#222"} />
-      ))}
+      <StepLEDStrip step={step} seqY={seqY} cellW={cellW} />
       {/* Grid */}
       {[...Array(rows)].map((_, row) => {
         const midi = baseMidi + (rows - 1 - row);
-        const isBlack = [1,3,6,8,10].includes(midi % 12);
+        const isBlack = BLACK_KEY_PCS.has(midi % 12);
         return [...Array(16)].map((_, col) => {
           const isActive = mod?._pitchValues[col] === midi && mod?._gatePattern[col];
           return (
@@ -631,15 +639,38 @@ const ModuleNode = memo(function ModuleNode({
   onParamChange,
   onMuteToggle,
   onRemove,
-  seqFrame, // unread: its change is the re-render trigger for sequencer UIs
 }) {
   const [editingParam, setEditingParam] = useState(null);
   const def = MODULE_DEFS[moduleState.type];
   const params = moduleState.params || {};
 
-  // NoteSeqB cell toggle. Stable across seqFrame ticks (moduleState doesn't
-  // change on a tick) so NoteSeqBGrid's memo holds between steps; reads the
-  // live steps value at call time, mirroring the old inline handler.
+  // Sequencer step tick, self-contained: poll this module's engine
+  // _currentStep at ~15fps and re-render only when the step actually
+  // advanced. Local state keeps the re-render scoped to this one memoized
+  // module, and the step gate means a stopped clock costs nothing — the
+  // old parent-level seqFrame counter re-rendered every sequencer's whole
+  // subtree at tick rate regardless.
+  const isSeq = SEQ_TYPES.has(moduleState.type);
+  const [, bumpSeqStep] = useState(0);
+  useEffect(() => {
+    if (!isSeq) return;
+    let last = engine.current?.modules?.get(moduleState.id)?._currentStep ?? -1;
+    const id = setInterval(() => {
+      const step = engine.current?.modules?.get(moduleState.id)?._currentStep ?? -1;
+      if (step !== last) {
+        last = step;
+        bumpSeqStep((n) => n + 1);
+      }
+    }, 66);
+    return () => clearInterval(id);
+  }, [isSeq, engine, moduleState.id]);
+
+  // NoteSeqB cell toggle. Depends on moduleState.id, not moduleState: during
+  // a drag the module object is replaced per mousemove, and a fresh handler
+  // identity would defeat NoteSeqBGrid's memo on exactly the subtree it
+  // exists to protect. The same-value "steps" write's real job is to mint a
+  // new params snapshot so paramsRev busts the grid memo — the engine's
+  // value is identical to React's copy.
   const onNoteSeqBToggle = useCallback(
     (col, midi) => {
       const mod = engine.current?.modules?.get(moduleState.id);
@@ -650,9 +681,9 @@ const ModuleNode = memo(function ModuleNode({
         mod._pitchValues[col] = midi;
         mod._gatePattern[col] = true;
       }
-      onParamChange(moduleState.id, "steps", moduleState.params.steps.value);
+      onParamChange(moduleState.id, "steps", mod.params.steps.value);
     },
-    [engine, moduleState, onParamChange]
+    [engine, moduleState.id, onParamChange]
   );
 
   const allInputs = [...(def.inputs || []), ...(def.modInputs || [])];
@@ -1004,11 +1035,7 @@ const ModuleNode = memo(function ModuleNode({
         const cellW = MODULE_WIDTH / 16;
         return (
           <g>
-            {/* Step indicator */}
-            {[...Array(16)].map((_, i) => (
-              <rect key={`led-${i}`} x={i * cellW + 1} y={seqY} width={cellW - 2} height={3}
-                rx={1} fill={i === step ? "#ff0" : "#222"} />
-            ))}
+            <StepLEDStrip step={step} seqY={seqY} cellW={cellW} />
             {/* Row 1 triggers */}
             {[...Array(16)].map((_, i) => (
               <rect key={`t1-${i}`} x={i * cellW + 1} y={seqY + 6} width={cellW - 2} height={24}
@@ -1042,11 +1069,7 @@ const ModuleNode = memo(function ModuleNode({
         const maxH = 60;
         return (
           <g>
-            {/* Step indicator */}
-            {[...Array(16)].map((_, i) => (
-              <rect key={`led-${i}`} x={i * cellW + 1} y={seqY} width={cellW - 2} height={3}
-                rx={1} fill={i === step ? "#ff0" : "#222"} />
-            ))}
+            <StepLEDStrip step={step} seqY={seqY} cellW={cellW} />
             {/* Value bars */}
             {[...Array(16)].map((_, i) => {
               const val = mod?._values[i] || 0;
@@ -1088,11 +1111,7 @@ const ModuleNode = memo(function ModuleNode({
         const sliderH = 60;
         return (
           <g>
-            {/* Step indicator */}
-            {[...Array(16)].map((_, i) => (
-              <rect key={`led-${i}`} x={i * cellW + 1} y={seqY} width={cellW - 2} height={3}
-                rx={1} fill={i === step ? "#ff0" : "#222"} />
-            ))}
+            <StepLEDStrip step={step} seqY={seqY} cellW={cellW} />
             {/* Pitch sliders */}
             {[...Array(16)].map((_, i) => {
               const midi = mod?._pitchValues[i] || 60;
@@ -1236,6 +1255,61 @@ const CableSVG = memo(function CableSVG({ x1, y1, x2, y2, color }) {
   );
 });
 
+// One patch cable, memoized: setModules during a drag replaces only the
+// dragged module's object, so cables not touching it keep both endpoint
+// identities and skip re-render entirely — only affected cables recompute.
+const PatchCable = memo(function PatchCable({ conn, fromMod, toMod, onRemove }) {
+  const p1 = getPortPosition(fromMod, conn.fromPort, true);
+  const p2 = getPortPosition(toMod, conn.toPort, false);
+  return (
+    <g onDoubleClick={() => onRemove(conn)} style={{ cursor: "pointer" }} pointerEvents="visibleStroke">
+      <CableSVG x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} color={conn.color} />
+    </g>
+  );
+});
+
+// Per-module transparent port hit shapes, memoized for the same reason:
+// a drag mousemove rebuilds one module's hit shapes, not every port closure
+// on the canvas.
+const PortHitModule = memo(function PortHitModule({ m, onPortDragStart, onPortDragEnd }) {
+  const def = MODULE_DEFS[m.type];
+  const allInputs = [...(def.inputs || []), ...(def.modInputs || [])];
+  const allOutputs = def.outputs || [];
+  return (
+    <g>
+      {allOutputs.map((port) => {
+        const pos = getPortPosition(m, port, true);
+        return (
+          <rect
+            key={`oh-${port}`}
+            x={pos.x - PORT_HIT_SIZE} y={pos.y - PORT_HIT_SIZE}
+            width={PORT_HIT_SIZE * 2} height={PORT_HIT_SIZE * 2}
+            fill="transparent"
+            data-port="1"
+            style={{ cursor: "pointer" }}
+            onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); onPortDragStart(e, m.id, port, true); }}
+            onMouseUp={(e) => { e.stopPropagation(); onPortDragEnd(e, m.id, port, true); }}
+          />
+        );
+      })}
+      {allInputs.map((port) => {
+        const pos = getPortPosition(m, port, false);
+        return (
+          <circle
+            key={`ih-${port}`}
+            cx={pos.x} cy={pos.y} r={PORT_HIT_SIZE}
+            fill="transparent"
+            data-port="1"
+            style={{ cursor: "pointer" }}
+            onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); onPortDragStart(e, m.id, port, false); }}
+            onMouseUp={(e) => { e.stopPropagation(); onPortDragEnd(e, m.id, port, false); }}
+          />
+        );
+      })}
+    </g>
+  );
+});
+
 // Drag-preview cable: refs onto the SVG paths and a RAF loop that reads the
 // shared mousePosRef directly. Skips React reconciliation per mousemove,
 // which would otherwise re-render the entire app while a cable is being dragged.
@@ -1310,11 +1384,14 @@ export default function BoredModularEmulator() {
     cableDragRef.current = cableDrag;
   });
 
-  // The svg's bounding rect is constant between window resizes (fixed-width
-  // sidebar, no scroll/zoom, and the Safari banner is position:fixed, so
-  // nothing shifts it). Reading it on every mousemove forces synchronous
-  // layout right after each drag commit dirties the SVG; cache it instead,
-  // refresh at gesture starts, and invalidate on resize.
+  // Reading the svg's bounding rect on every mousemove forces synchronous
+  // layout right after each drag commit dirties the SVG, so cache it and
+  // refresh once per gesture: a capture-phase mousedown on the svg runs
+  // before any child handler, so every drag/pan/cable gesture starts with a
+  // fresh rect. (Layout CAN shift without a resize event — e.g. the browser
+  // auto-scrolling the overflow:hidden root to reveal a focused numeric
+  // input — so per-gesture refresh, not a one-time measure, is load-bearing.)
+  // Resize still invalidates so a lazy mid-gesture re-read is also correct.
   const svgRectRef = useRef(null);
   const refreshSvgRect = useCallback(() => {
     const svg = svgRef.current;
@@ -1561,9 +1638,13 @@ export default function BoredModularEmulator() {
         }
         return next;
       });
-      migratedConnections.forEach((c) => {
-        engineRef.current.connect(c.fromId, c.fromPort, c.toId, c.toPort);
-      });
+      // Only commit connections the engine actually made. A tuple connect()
+      // rejects (unknown/hostile port name, duplicate, missing module) would
+      // otherwise render a phantom cable with no audio behind it AND round-trip
+      // back into every future save/export of the patch.
+      const appliedConnections = migratedConnections.filter((c) =>
+        engineRef.current.connect(c.fromId, c.fromPort, c.toId, c.toPort)
+      );
       // Restore per-module internal state (sequencer steps, etc.) after
       // connections are in place. resetSeq() neutralises any ClkGen tick that
       // may have advanced _currentStep during the awaited createModule loop.
@@ -1574,7 +1655,7 @@ export default function BoredModularEmulator() {
         if (audioMod && typeof audioMod.resetSeq === "function") audioMod.resetSeq();
       }
       setModules(rebuilt);
-      setConnections(migratedConnections);
+      setConnections(appliedConnections);
     },
     [modules, initAudio]
   );
@@ -1656,15 +1737,16 @@ export default function BoredModularEmulator() {
   const handleDragStart = useCallback(
     (e, id) => {
       if (e.button === 1 || e.button === 2) return;
-      const rect = refreshSvgRect();
+      // Fresh via the svg's capture-phase mousedown refresh.
+      const rect = svgRectRef.current || refreshSvgRect();
       if (!rect) return;
       const mod = modulesRef.current.find((m) => m.id === id);
       if (!mod) return;
       const pan = panOffsetRef.current;
       setDragging({
         id,
-        offsetX: (e.clientX - rect.left) / 1 - pan.x - mod.x,
-        offsetY: (e.clientY - rect.top) / 1 - pan.y - mod.y,
+        offsetX: e.clientX - rect.left - pan.x - mod.x,
+        offsetY: e.clientY - rect.top - pan.y - mod.y,
       });
     },
     [refreshSvgRect]
@@ -1738,13 +1820,14 @@ export default function BoredModularEmulator() {
     [initAudio, handlePortDragEnd]
   );
 
-  const removeCable = useCallback((idx) => {
+  // Remove by connection-object identity, not list index: the connection a
+  // memoized PatchCable closed over stays valid however the list has been
+  // reordered or filtered since.
+  const removeCable = useCallback((conn) => {
     setConnections((prev) => {
-      const c = prev[idx];
-      if (c) {
-        engineRef.current.disconnect(c.fromId, c.fromPort, c.toId, c.toPort);
-      }
-      return prev.filter((_, i) => i !== idx);
+      if (!prev.includes(conn)) return prev;
+      engineRef.current.disconnect(conn.fromId, conn.fromPort, conn.toId, conn.toPort);
+      return prev.filter((c) => c !== conn);
     });
   }, []);
 
@@ -1753,12 +1836,15 @@ export default function BoredModularEmulator() {
       const type = e.dataTransfer.getData("application/x-bored-modular");
       if (!type || !MODULE_DEFS[type]) return;
       e.preventDefault();
-      const rect = svgRef.current.getBoundingClientRect();
+      // A drop has no preceding svg mousedown, so refresh rather than trust
+      // the cache.
+      const rect = refreshSvgRect();
+      if (!rect) return;
       const x = e.clientX - rect.left - panOffset.x;
       const y = e.clientY - rect.top - panOffset.y;
       addModuleAt(type, x, y);
     },
-    [panOffset, addModuleAt]
+    [panOffset, addModuleAt, refreshSvgRect]
   );
 
   // Mouse move
@@ -1777,8 +1863,8 @@ export default function BoredModularEmulator() {
             if (m.id !== dragging.id) return m;
             return {
               ...m,
-              x: mx / 1 - panOffset.x - dragging.offsetX,
-              y: my / 1 - panOffset.y - dragging.offsetY,
+              x: mx - panOffset.x - dragging.offsetX,
+              y: my - panOffset.y - dragging.offsetY,
             };
           })
         );
@@ -1945,20 +2031,6 @@ export default function BoredModularEmulator() {
     };
   }, [keyHeld, initAudio, handleParamChange, cableDrag]);
 
-  // Sequencer step animation: poll at ~15fps to update step LEDs. The effect
-  // depends on the derived boolean, not the modules array: with [modules] as
-  // the dependency, every drag mousemove tore down and recreated the interval,
-  // so the 66ms timer never fired during a sustained drag. Memoized modules
-  // no longer repaint incidentally on every mousemove, so the tick must stay
-  // alive on its own for LEDs to keep stepping mid-drag.
-  const [seqFrame, setSeqFrame] = useState(0);
-  const hasSeq = useMemo(() => modules.some((m) => SEQ_TYPES.has(m.type)), [modules]);
-  useEffect(() => {
-    if (!hasSeq) return;
-    const id = setInterval(() => setSeqFrame(f => f + 1), 66);
-    return () => clearInterval(id);
-  }, [hasSeq]);
-
   // Per-module connected-port sets, one Set per patched module. ModuleNode
   // receives its own Set (or the shared empty one), so its memo only sees a
   // prop change when the connection list itself changes.
@@ -2057,76 +2129,36 @@ export default function BoredModularEmulator() {
     ))
   ), [addModule]);
 
-  // Port hit overlay: geometry tracks module positions/types, so this only
-  // needs to recompute when modules changes — not on pan, tick, or key state.
-  const portHitOverlay = useMemo(() => (
-    modules.map((m) => {
-      const def = MODULE_DEFS[m.type];
-      const allInputs = [...(def.inputs || []), ...(def.modInputs || [])];
-      const allOutputs = def.outputs || [];
-      return (
-        <g key={`ports-${m.id}`}>
-          {allOutputs.map((port) => {
-            const pos = getPortPosition(m, port, true);
-            return (
-              <rect
-                key={`oh-${port}`}
-                x={pos.x - PORT_HIT_SIZE} y={pos.y - PORT_HIT_SIZE}
-                width={PORT_HIT_SIZE * 2} height={PORT_HIT_SIZE * 2}
-                fill="transparent"
-                data-port="1"
-                style={{ cursor: "pointer" }}
-                onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); handlePortDragStart(e, m.id, port, true); }}
-                onMouseUp={(e) => { e.stopPropagation(); handlePortDragEnd(e, m.id, port, true); }}
-              />
-            );
-          })}
-          {allInputs.map((port) => {
-            const pos = getPortPosition(m, port, false);
-            return (
-              <circle
-                key={`ih-${port}`}
-                cx={pos.x} cy={pos.y} r={PORT_HIT_SIZE}
-                fill="transparent"
-                data-port="1"
-                style={{ cursor: "pointer" }}
-                onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); handlePortDragStart(e, m.id, port, false); }}
-                onMouseUp={(e) => { e.stopPropagation(); handlePortDragEnd(e, m.id, port, false); }}
-              />
-            );
-          })}
-        </g>
-      );
-    })
-  ), [modules, handlePortDragStart, handlePortDragEnd]);
+  // Port hit overlay: one memoized PortHitModule per module, so a drag
+  // mousemove (which replaces only the dragged module's object) rebuilds one
+  // module's hit shapes rather than every port closure on the canvas.
+  const portHitOverlay = modules.map((m) => (
+    <PortHitModule
+      key={`ports-${m.id}`}
+      m={m}
+      onPortDragStart={handlePortDragStart}
+      onPortDragEnd={handlePortDragEnd}
+    />
+  ));
 
   // Render cables. panOffset is not a dependency: cables live inside the
-  // panned <g>, so their geometry is pan-independent.
+  // panned <g>, so their geometry is pan-independent. Keyed by connection
+  // tuple (engine connect() rejects duplicate tuples, so tuples are unique)
+  // so removing one cable doesn't re-key the rest.
   const cableElements = useMemo(() => {
     const byId = new Map(modules.map((m) => [m.id, m]));
-    // Key by connection tuple so removing one cable doesn't re-key the rest
-    // (index keys churn the whole list). connect() accepts duplicate tuples,
-    // so a seen-count suffix keeps keys unique in that degenerate case.
-    const seenTuples = new Map();
-    return connections.map((c, idx) => {
+    return connections.map((c) => {
       const fromMod = byId.get(c.fromId);
       const toMod = byId.get(c.toId);
       if (!fromMod || !toMod) return null;
-      const p1 = getPortPosition(fromMod, c.fromPort, true);
-      const p2 = getPortPosition(toMod, c.toPort, false);
-      const tuple = `${c.fromId}:${c.fromPort}->${c.toId}:${c.toPort}`;
-      const n = (seenTuples.get(tuple) || 0) + 1;
-      seenTuples.set(tuple, n);
       return (
-        <g key={n === 1 ? tuple : `${tuple}#${n}`} onDoubleClick={() => removeCable(idx)} style={{ cursor: "pointer" }} pointerEvents="visibleStroke">
-          <CableSVG
-            x1={p1.x}
-            y1={p1.y}
-            x2={p2.x}
-            y2={p2.y}
-            color={c.color}
-          />
-        </g>
+        <PatchCable
+          key={`${c.fromId}:${c.fromPort}->${c.toId}:${c.toPort}`}
+          conn={c}
+          fromMod={fromMod}
+          toMod={toMod}
+          onRemove={removeCable}
+        />
       );
     });
   }, [connections, modules, removeCable]);
@@ -2276,6 +2308,7 @@ export default function BoredModularEmulator() {
         style={{ flex: 1, cursor: isPanning ? "grabbing" : "default", userSelect: "none" }}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
+        onMouseDownCapture={refreshSvgRect}
         onMouseDown={handleSvgMouseDown}
         onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }}
         onDrop={handleSidebarDrop}
@@ -2302,7 +2335,6 @@ export default function BoredModularEmulator() {
               onParamChange={handleParamChange}
               onMuteToggle={handleMuteToggle}
               onRemove={removeModule}
-              seqFrame={SEQ_TYPES.has(m.type) ? seqFrame : 0}
             />
           ))}
 
