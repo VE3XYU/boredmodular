@@ -1694,6 +1694,11 @@ export default function BoredModularEmulator() {
       }
       const success = engineRef.current.connect(outId, outPort, inId, inPort);
       if (success) {
+        // Pass the source module's type so PORT_SIGNAL_TYPE_OVERRIDES apply —
+        // without it, LFO/RandomGen/CtrlSeq-style control outputs coloured as
+        // audio (red) when patched live, while the same patch re-imported
+        // coloured them correctly.
+        const outType = modulesRef.current.find((m) => m.id === outId)?.type;
         setConnections((prev) => [
           ...prev,
           {
@@ -1701,7 +1706,7 @@ export default function BoredModularEmulator() {
             fromPort: outPort,
             toId: inId,
             toPort: inPort,
-            color: SIGNAL_TYPE_COLORS[getPortSignalType(outPort, "output")],
+            color: SIGNAL_TYPE_COLORS[getPortSignalType(outPort, "output", outType)],
           },
         ]);
       }
