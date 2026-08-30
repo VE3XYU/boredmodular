@@ -1360,6 +1360,8 @@ export default function BoredModularEmulator() {
     modules.forEach((m) => engineRef.current.removeModule(m.id));
     setModules([]);
     setConnections([]);
+    setPatchMsg("Cleared");
+    setTimeout(() => setPatchMsg(null), 1500);
   }, [modules]);
 
   const loadPatchData = useCallback(
@@ -2016,6 +2018,7 @@ export default function BoredModularEmulator() {
               { label: "Load", action: loadPatch },
               { label: "Export", action: exportPatch },
               { label: "Import", action: () => fileInputRef.current?.click() },
+              { label: "Clear", action: clearPatch, span2: true },
             ].map((btn) => (
               <div
                 key={btn.label}
@@ -2029,6 +2032,7 @@ export default function BoredModularEmulator() {
                   fontSize: 15,
                   color: "#999",
                   border: "1px solid #333",
+                  ...(btn.span2 ? { gridColumn: "1 / -1" } : {}),
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = "#2a2a2e"; e.currentTarget.style.color = "#ddd"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = "#222"; e.currentTarget.style.color = "#999"; }}
