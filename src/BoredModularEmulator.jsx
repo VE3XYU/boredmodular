@@ -1515,12 +1515,26 @@ export default function BoredModularEmulator() {
 
   const fileInputRef = useRef(null);
   const [patchMsg, setPatchMsg] = useState(null);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const clearPatch = useCallback(() => {
     modules.forEach((m) => engineRef.current.removeModule(m.id));
     setModules([]);
     setConnections([]);
+    setConfirmClear(false);
+    setPatchMsg("Cleared");
+    setTimeout(() => setPatchMsg(null), 1500);
   }, [modules]);
+
+  // Escape closes the clear-confirm dialog while it's open.
+  useEffect(() => {
+    if (!confirmClear) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") setConfirmClear(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [confirmClear]);
 
   const loadPatchData = useCallback(
     async (patch) => {
@@ -2220,6 +2234,8 @@ export default function BoredModularEmulator() {
               { label: "Load", action: loadPatch },
               { label: "Export", action: exportPatch },
               { label: "Import", action: () => fileInputRef.current?.click() },
+              // Nothing to lose on an empty canvas, so skip the dialog there.
+              { label: "Clear", action: () => { if (modules.length) setConfirmClear(true); }, span2: true },
             ].map((btn) => (
               <div
                 key={btn.label}
@@ -2233,6 +2249,7 @@ export default function BoredModularEmulator() {
                   fontSize: 15,
                   color: "#999",
                   border: "1px solid #333",
+                  ...(btn.span2 ? { gridColumn: "1 / -1" } : {}),
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = "#2a2a2e"; e.currentTarget.style.color = "#ddd"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = "#222"; e.currentTarget.style.color = "#999"; }}
@@ -2358,6 +2375,77 @@ export default function BoredModularEmulator() {
           </text>
         )}
       </svg>
+
+      {/* Clear-canvas confirmation — backdrop click or Escape cancels */}
+      {confirmClear && (
+        <div
+          onMouseDown={() => setConfirmClear(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.6)",
+            zIndex: 1001,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            role="alertdialog"
+            aria-label="Clear the canvas?"
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              background: "#141416",
+              border: "1px solid #333",
+              borderRadius: 6,
+              padding: "18px 22px",
+              width: 300,
+              boxShadow: "0 4px 24px rgba(0,0,0,0.6)",
+            }}
+          >
+            <div style={{ fontSize: 17, color: "#ddd", marginBottom: 6 }}>Clear the canvas?</div>
+            <div style={{ fontSize: 15, color: "#888", lineHeight: 1.5, marginBottom: 14 }}>
+              This removes every module and cable. Are you sure?
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              <div
+                onClick={() => setConfirmClear(false)}
+                style={{
+                  padding: "6px 0",
+                  textAlign: "center",
+                  background: "#222",
+                  border: "1px solid #333",
+                  borderRadius: 3,
+                  cursor: "pointer",
+                  fontSize: 15,
+                  color: "#999",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "#2a2a2e"; e.currentTarget.style.color = "#ddd"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "#222"; e.currentTarget.style.color = "#999"; }}
+              >
+                Cancel
+              </div>
+              <div
+                onClick={clearPatch}
+                style={{
+                  padding: "6px 0",
+                  textAlign: "center",
+                  background: "#5a1a1a",
+                  border: "1px solid #833",
+                  borderRadius: 3,
+                  cursor: "pointer",
+                  fontSize: 15,
+                  color: "#e88",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "#7a2020"; e.currentTarget.style.color = "#fbb"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "#5a1a1a"; e.currentTarget.style.color = "#e88"; }}
+              >
+                Clear
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
