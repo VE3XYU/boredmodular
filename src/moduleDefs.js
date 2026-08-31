@@ -570,9 +570,18 @@ function applyAttenuatorCurve(value, min, max, curve) {
   return value;
 }
 
+// Sequencer module types: the only custom UIs that poll engine state
+// (_currentStep, pattern arrays) at render time, so the only modules whose
+// step display needs a live polling tick in the renderer. A new sequencer
+// module must be added here alongside its MODULE_DEFS/CATEGORIES entries,
+// or its step LED will freeze (memoized modules re-render only on prop
+// changes, so nothing errors — the display just stops advancing).
+const SEQ_TYPES = new Set(["EventSeq", "CtrlSeq", "NoteSeqA", "NoteSeqB"]);
+
 export {
   MODULE_DEFS,
   CATEGORIES,
+  SEQ_TYPES,
   SIGNAL_TYPE_COLORS,
   PORT_SIGNAL_TYPE_OVERRIDES,
   PORT_ATTENUATOR_TYPES,

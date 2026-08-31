@@ -191,7 +191,9 @@ class AudioEngine {
   // Slave/clock/note-source paths return early in connect() and never reach
   // here, so virtual signals propagate even when muted (documented limitation).
   _getOrCreateMuteGain(mod, port, outputNode) {
-    if (!mod._muteGains) mod._muteGains = {};
+    // Null prototype: port names originate in patch files, and a plain {}
+    // would let "toString" and friends resolve to Object.prototype members.
+    if (!mod._muteGains) mod._muteGains = Object.create(null);
     const existing = mod._muteGains[port];
     if (existing) return existing;
     const g = this.ctx.createGain();
@@ -2005,8 +2007,23 @@ class AudioEngine {
     const fromMod = this.modules.get(fromId);
     const toMod = this.modules.get(toId);
     if (!fromMod || !toMod) return false;
-    const outputNode = fromMod.outputs[fromPort];
-    const inputNode = toMod.inputs[toPort];
+    // Duplicate-tuple guard: Web Audio collapses a second connect() between
+    // the same node pair into one edge, so a second identical cable would be
+    // pure UI — and removing either one would silently sever audio for both
+    // (disconnect() drops the single edge and filters every matching tuple).
+    // Reject up front so the UI and the graph can't diverge.
+    if (this.connections.some(
+      (c) => c.fromId === fromId && c.fromPort === fromPort && c.toId === toId && c.toPort === toPort
+    )) return false;
+    // Own-property port resolution: patch files are untrusted, and a hostile
+    // port name like "toString" resolves truthy through the prototype chain
+    // on a bare lookup — sailing past the !outputNode/!inputNode guard whose
+    // job is rejecting unknown ports. (Virtual ports are own keys mapped to
+    // null, so they still fall through to their branches below unchanged.)
+    const outputNode = Object.prototype.hasOwnProperty.call(fromMod.outputs, fromPort)
+      ? fromMod.outputs[fromPort] : undefined;
+    const inputNode = Object.prototype.hasOwnProperty.call(toMod.inputs, toPort)
+      ? toMod.inputs[toPort] : undefined;
 
     // Master/Slave connection: Slv output -> Mst input (virtual, no audio)
     if (fromPort === "Slv" && toPort === "Mst" && toMod._recalcFreq) {
@@ -2111,8 +2128,12 @@ class AudioEngine {
       return;
     }
 
-    const outputNode = fromMod.outputs[fromPort];
-    const inputNode = toMod.inputs[toPort];
+    // Own-property port resolution — mirror connect()'s guard so hostile
+    // port names from a patch file can't resolve through the prototype chain.
+    const outputNode = Object.prototype.hasOwnProperty.call(fromMod.outputs, fromPort)
+      ? fromMod.outputs[fromPort] : undefined;
+    const inputNode = Object.prototype.hasOwnProperty.call(toMod.inputs, toPort)
+      ? toMod.inputs[toPort] : undefined;
     if (!outputNode || !inputNode) return;
 
     // Note pitch targets (Keyboard, NoteSeqA, NoteSeqB) — mirror connect()'s
@@ -2195,7 +2216,11 @@ class AudioEngine {
 
   setParam(moduleId, paramName, value) {
     const mod = this.modules.get(moduleId);
-    if (!mod || !mod.params[paramName]) return;
+    // Own-property guard: a name like "__proto__" or "toString" passes a bare
+    // truthiness check by resolving through the prototype chain, and `p.value`
+    // below would then write onto Object.prototype or a shared built-in.
+    // Patch files are the untrusted caller here.
+    if (!mod || !Object.prototype.hasOwnProperty.call(mod.params, paramName)) return;
     const p = mod.params[paramName];
     // Finiteness guard: for numeric params, coerce with Number() and fall back
     // to the current value when non-finite, then clamp into [min,max] when both
